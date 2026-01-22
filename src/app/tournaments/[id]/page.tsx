@@ -52,6 +52,33 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     );
   }
 
+  // Get all tournaments for selector
+  const { data: allTournaments } = await supabase
+    .from('tournaments')
+    .select('id, name, status, start_date')
+    .order('start_date', { ascending: false });
+
+  // Sort tournaments: active first, then upcoming (by date), then completed (recent first)
+  const sortedTournaments = allTournaments
+    ? [...allTournaments].sort((a, b) => {
+        const statusPriority: Record<string, number> = {
+          active: 0,
+          upcoming: 1,
+          completed: 2,
+        };
+        const aPriority = statusPriority[a.status] ?? 3;
+        const bPriority = statusPriority[b.status] ?? 3;
+        
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        
+        if (a.status === 'upcoming') return a.start_date.localeCompare(b.start_date);
+        return b.start_date.localeCompare(a.start_date);
+      })
+    : [];
+
+  // Find current week tournament (active tournament)
+  const currentWeekTournament = sortedTournaments.find((t) => t.status === 'active');
+
   // Check if user has an existing roster for this tournament
   const { data: existingRoster } = await supabase
     .from('user_rosters')
