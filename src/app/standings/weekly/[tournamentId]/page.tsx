@@ -66,6 +66,30 @@ export default async function WeeklyStandingsByTournamentPage({
 
   // Get all rosters for this tournament, ranked by total_winnings
   // Filter by user's league to show only rosters from the same league
+  console.log('[Weekly Standings] Query params:', { tournamentId, userLeagueId });
+  
+  // TEMPORARY: Try without league filter to diagnose
+  const { data: allRosters } = await supabase
+    .from('user_rosters')
+    .select(
+      `
+      id,
+      roster_name,
+      total_winnings,
+      user_id,
+      profiles!inner(username, active_league_id),
+      tournament:tournaments(name, status)
+    `
+    )
+    .eq('tournament_id', tournamentId)
+    .order('total_winnings', { ascending: false });
+  
+  console.log('[Weekly Standings] ALL rosters (no filter):', allRosters?.length || 0);
+  console.log('[Weekly Standings] ALL rosters data:', allRosters?.map((r: any) => ({
+    username: r.profiles?.username,
+    league_id: r.profiles?.active_league_id,
+  })));
+  
   const { data: rosters, error: rostersError } = await supabase
     .from('user_rosters')
     .select(
