@@ -162,6 +162,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   };
 
   let prizeDistributionMap = new Map<number, PrizeDistributionRow>();
+  let prizeDistributions: PrizeDistributionRow[] = [];
 
   let tournamentLeaderboard: LeaderboardRow[] = [];
   let leaderboardSource: 'database' | 'livegolfapi' | 'cache' | 'none' = 'none';
@@ -199,21 +200,23 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     // Prize money calculation is now handled manually by admin via the prize money page
     // This prevents glitching and ensures calculations happen when explicitly requested
 
-    const { data: prizeDistributions } = await supabase
+    const { data: prizeDistributionsData } = await supabase
       .from('prize_money_distributions')
       .select('position, percentage, amount, total_purse')
       .eq('tournament_id', id)
       .order('position', { ascending: true });
 
-    if (prizeDistributions) {
+    prizeDistributions = prizeDistributionsData || [];
+
+    if (prizeDistributions.length > 0) {
       prizeDistributionMap = new Map(
         prizeDistributions.map((dist) => [
           dist.position,
           {
             position: dist.position,
             percentage: dist.percentage,
-            amount: parseFloat(dist.amount),
-            total_purse: parseFloat(dist.total_purse),
+            amount: dist.amount,
+            total_purse: dist.total_purse,
           },
         ])
       );
