@@ -3,6 +3,8 @@ import { createServiceClient } from '@/lib/supabase/service';
 import {
   fetchScoresFromLiveGolfAPI,
   transformLiveGolfAPIScores,
+  fetchMinimalScoresFromLiveGolfAPI,
+  transformMinimalLiveGolfAPIScores,
 } from '@/lib/livegolfapi';
 
 /**
@@ -11,8 +13,8 @@ import {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { tournamentId, liveGolfAPITournamentId } = await request.json();
-    console.log(`[SYNC API] 🔄 Starting sync for tournament: ${tournamentId}, API event: ${liveGolfAPITournamentId}`);
+    const { tournamentId, liveGolfAPITournamentId, minimal = false } = await request.json();
+    console.log(`[SYNC API] 🔄 Starting ${minimal ? 'minimal' : 'full'} sync for tournament: ${tournamentId}, API event: ${liveGolfAPITournamentId}`);
 
     if (!tournamentId || !liveGolfAPITournamentId) {
       return NextResponse.json(
@@ -26,45 +28,73 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Fetch scores from LiveGolfAPI
-    const liveGolfResult = await fetchScoresFromLiveGolfAPI(
-      liveGolfAPITournamentId
-    );
+    let transformedScores;
 
-    if (!liveGolfResult.data) {
-      return NextResponse.json(
-        {
-          error:
-            liveGolfResult.error || 'LiveGolfAPI did not return scoreboard data',
-        },
-        { status: 502 }
+    if (minimal) {
+      // Fast minimal sync - only essential data
+      console.log(`[SYNC] Using minimal API for faster sync`);
+
+      const liveGolfResult = await fetchMinimalScoresFromLiveGolfAPI(
+        liveGolfAPITournamentId
+      );
+
+      if (!liveGolfResult.data) {
+        return NextResponse.json(
+          {
+            error:
+              liveGolfResult.error || 'LiveGolfAPI did not return minimal scoreboard data',
+          },
+          { status: 502 }
+        );
+      }
+
+      transformedScores = await transformMinimalLiveGolfAPIScores(
+        liveGolfResult.data,
+        supabase
+      );
+    } else {
+      // Full sync with detailed data
+      console.log(`[SYNC] Using full API for complete sync`);
+
+      const liveGolfResult = await fetchScoresFromLiveGolfAPI(
+        liveGolfAPITournamentId
+      );
+
+      if (!liveGolfResult.data) {
+        return NextResponse.json(
+          {
+            error:
+              liveGolfResult.error || 'LiveGolfAPI did not return scoreboard data',
+          },
+          { status: 502 }
+        );
+      }
+
+      const scorecards = liveGolfResult.data;
+
+      // Get existing tournament players to avoid duplicates
+      const { data: existingTournamentPlayers, error: tpError } = await supabase
+        .from('tournament_players')
+        .select('pga_player_id')
+        .eq('tournament_id', tournamentId);
+
+      if (tpError) {
+        return NextResponse.json(
+          { error: 'Failed to load tournament players' },
+          { status: 500 }
+        );
+      }
+
+      const existingPlayerIds = new Set(
+        existingTournamentPlayers?.map(tp => tp.pga_player_id) || []
+      );
+
+      // Transform LiveGolfAPI scores (creates players automatically)
+      transformedScores = await transformLiveGolfAPIScores(
+        scorecards,
+        supabase
       );
     }
-
-    const scorecards = liveGolfResult.data;
-
-    // Get existing tournament players to avoid duplicates
-    const { data: existingTournamentPlayers, error: tpError } = await supabase
-      .from('tournament_players')
-      .select('pga_player_id')
-      .eq('tournament_id', tournamentId);
-
-    if (tpError) {
-      return NextResponse.json(
-        { error: 'Failed to load tournament players' },
-        { status: 500 }
-      );
-    }
-
-    const existingPlayerIds = new Set(
-      existingTournamentPlayers?.map(tp => tp.pga_player_id) || []
-    );
-
-    // Transform LiveGolfAPI scores (creates players automatically)
-    const transformedScores = await transformLiveGolfAPIScores(
-      scorecards,
-      supabase
-    );
 
     if (transformedScores.length === 0) {
       return NextResponse.json(
@@ -139,9 +169,13 @@ export async function POST(request: NextRequest) {
     console.log(`[SYNC] Processing ${rosteredUpdates.length} rostered players first...`);
 
     if (rosteredUpdates.length > 0) {
-      const batchSize = 10; // Process in smaller batches to avoid overwhelming the database
-      for (let i = 0; i < rosteredUpdates.length; i += batchSize) {
-        const batch = rosteredUpdates.slice(i, i + batchSize);
+      const batchSize = 5; // Smaller batches for Vercel timeout limits
+      // Limit to first 20 rostered players to ensure completion within timeout
+      const limitedUpdates = rosteredUpdates.slice(0, 20);
+      console.log(`[SYNC] Processing ${limitedUpdates.length} out of ${rosteredUpdates.length} rostered players (limited for timeout)`);
+
+      for (let i = 0; i < limitedUpdates.length; i += batchSize) {
+        const batch = limitedUpdates.slice(i, i + batchSize);
         const batchPromises = batch.map(async ({ score, tournamentPlayerId }) => {
           // Log what we're about to store (first 3 players + any with tee time strings)
           if (updates.length < 3 || (typeof score.thru === 'string' && score.thru.includes('PM'))) {

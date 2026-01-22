@@ -286,6 +286,170 @@ export async function fetchScoresFromLiveGolfAPI(
 }
 
 /**
+ * Fetch minimal scores from LiveGolfAPI - only essential data for performance
+ * Returns just player name, position, total score, thru, and tee_time
+ */
+export async function fetchMinimalScoresFromLiveGolfAPI(
+  eventId: string
+): Promise<LiveGolfAPIScoresResult> {
+  const apiKey = process.env.LIVEGOLFAPI_KEY;
+
+  if (!apiKey) {
+    throw new Error('LIVEGOLFAPI_KEY is not set in environment variables');
+  }
+
+  // Check cache first
+  const cached = await readCache(eventId);
+  if (cached && !cached.isStale) {
+    console.log(`[LiveGolfAPI] Using fresh cache for ${eventId} (minimal data)`);
+    return {
+      data: cached.data,
+      source: 'cache',
+      timestamp: Date.now() - cached.age
+    };
+  }
+
+  try {
+    console.log(`[LiveGolfAPI] Fetching minimal data from API for event: ${eventId}`);
+    const response = await fetch(
+      `https://use.livegolfapi.com/v1/events/${eventId}`,
+      {
+        headers: {
+          'x-api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+      }
+    );
+
+    if (!response.ok) {
+      // Fallback to cache if available
+      if (cached) {
+        return {
+          data: cached.data,
+          source: 'cache',
+          timestamp: Date.now() - cached.age,
+          error: `API error: ${response.status}`
+        };
+      }
+      return { data: null, source: 'none', error: `API error: ${response.status}` };
+    }
+
+    const fullData = await response.json();
+
+    // Extract only minimal data we need
+    const minimalData = fullData.data?.map((scorecard: LiveGolfAPIScorecard) => {
+      const currentRound = getCurrentRound(scorecard.rounds);
+      return {
+        player: scorecard.player.replace(/\s*\([^)]+\)\s*$/, '').trim(), // Clean name
+        position: scorecard.positionValue || null,
+        total_score: parseScore(scorecard.total),
+        thru: currentRound?.thru || null,
+        tee_time: currentRound?.teeTime || null,
+      };
+    }) || [];
+
+    console.log(`[LiveGolfAPI] ✅ Extracted minimal data: ${minimalData.length} players`);
+
+    // Cache the minimal data
+    await writeCache(eventId, minimalData);
+
+    return {
+      data: minimalData,
+      source: 'livegolfapi',
+      timestamp: Date.now()
+    };
+
+  } catch (error: any) {
+    console.error('Error fetching minimal scores:', error);
+
+    if (cached) {
+      return {
+        data: cached.data,
+        source: 'cache',
+        timestamp: Date.now() - cached.age,
+        error: error?.message
+      };
+    }
+    return { data: null, source: 'none', error: error?.message };
+  }
+}
+
+/**
+ * Transform minimal LiveGolfAPI data to our format
+ * Much faster since we already have clean data and minimal processing
+ */
+export async function transformMinimalLiveGolfAPIScores(
+  minimalScores: Array<{
+    player: string;
+    position: number | null;
+    total_score: number;
+    thru: string | null;
+    tee_time: string | null;
+  }>,
+  supabaseClient: any
+): Promise<Array<{
+  pgaPlayerId: string;
+  playerName: string;
+  total_score: number;
+  today_score: number;
+  thru: number | string;
+  position: number | null;
+  made_cut: boolean;
+  tee_time: string | null;
+}>> {
+  console.log(`\n=== Transforming ${minimalScores.length} minimal scores ===`);
+
+  // Batch lookup all players
+  const playerNames = minimalScores.map(score => score.player);
+  const { data: existingPlayers } = await supabaseClient
+    .from('pga_players')
+    .select('id, name')
+    .in('name', playerNames);
+
+  const playerMap = new Map(
+    existingPlayers?.map(player => [player.name, player.id]) || []
+  );
+
+  console.log(`Found ${playerMap.size} out of ${playerNames.length} players in database`);
+
+  const results = minimalScores
+    .map(score => {
+      const pgaPlayerId = playerMap.get(score.player);
+      if (!pgaPlayerId) {
+        console.log(`Skipping player not in database: ${score.player}`);
+        return null;
+      }
+
+      // Simple thru processing
+      let thru: number | string = 0;
+      if (score.thru && score.thru !== '-') {
+        const parsed = parseInt(score.thru);
+        if (!isNaN(parsed)) {
+          thru = parsed;
+        } else {
+          thru = score.thru; // Keep "F" as string
+        }
+      }
+
+      return {
+        pgaPlayerId,
+        playerName: score.player,
+        total_score: score.total_score,
+        today_score: score.total_score, // For round 1, today = total
+        thru,
+        position: score.position,
+        made_cut: score.position !== null && score.position <= 65, // Basic cut logic
+        tee_time: score.tee_time,
+      };
+    })
+    .filter(Boolean);
+
+  console.log(`Transformed ${results.length} valid player scores`);
+  return results;
+}
+
+/**
  * Transform LiveGolfAPI scorecards to our format
  * Maps player names to our pga_player_ids
  */
@@ -386,8 +550,6 @@ export async function transformLiveGolfAPIScores(
         console.log(`Skipping player not in database: ${scorecard.player}`);
         return null;
       }
-
-      const pgaPlayerId = existingPlayer.id;
 
       // Parse total score (tournament cumulative)
       const total_score = parseScore(scorecard.total);
