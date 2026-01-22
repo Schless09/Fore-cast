@@ -280,7 +280,9 @@ export function ExpandableRosterRow({
                               )}
                             </td>
                             <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center hidden md:table-cell">
-                              {tp?.thru && tp.thru !== 0 ? (
+                              {tp?.thru === 'F' ? (
+                                <span className="text-casino-green font-medium">F</span>
+                              ) : (tp?.thru && parseInt(tp.thru) > 0) ? (
                                 <span className="text-casino-blue">{tp.thru}</span>
                               ) : tp?.tee_time ? (
                                 <span className="text-casino-gray">

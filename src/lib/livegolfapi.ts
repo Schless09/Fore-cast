@@ -321,10 +321,46 @@ export async function transformLiveGolfAPIScores(
   starting_tee: number | null;
 }>> {
   console.log(`\n=== Transforming ${scorecards.length} scorecards ===`);
-  
+
+  // Deduplicate scorecards by player name, preferring ones with real data
+  const deduplicatedScorecards = new Map<string, LiveGolfAPIScorecard>();
+
+  for (const scorecard of scorecards) {
+    // Strip course suffix from API player name (e.g., "Min Woo Lee (NT)" → "Min Woo Lee")
+    const cleanPlayerName = scorecard.player.replace(/\s*\([^)]+\)\s*$/, '').trim();
+
+    // Check if we already have this player
+    const existing = deduplicatedScorecards.get(cleanPlayerName);
+
+    if (!existing) {
+      // First time seeing this player
+      deduplicatedScorecards.set(cleanPlayerName, scorecard);
+    } else {
+      // We have this player already, choose the one with better data
+      const existingHasData = existing.position !== null && existing.total !== null;
+      const currentHasData = scorecard.position !== null && scorecard.total !== null;
+
+      if (currentHasData && !existingHasData) {
+        // Current has data, existing doesn't - use current
+        deduplicatedScorecards.set(cleanPlayerName, scorecard);
+      } else if (!currentHasData && existingHasData) {
+        // Existing has data, current doesn't - keep existing
+        // Do nothing
+      } else if (currentHasData && existingHasData) {
+        // Both have data - prefer the one with course suffix (more specific)
+        if (scorecard.player.includes('(') && !existing.player.includes('(')) {
+          deduplicatedScorecards.set(cleanPlayerName, scorecard);
+        }
+      }
+      // If neither has data, keep the first one
+    }
+  }
+
+  console.log(`After deduplication: ${deduplicatedScorecards.size} unique players`);
+
   const results = await Promise.all(
-    scorecards.map(async (scorecard, idx) => {
-      // Strip course suffix from API player name (e.g., "Min Woo Lee (NT)" → "Min Woo Lee")
+    Array.from(deduplicatedScorecards.values()).map(async (scorecard, idx) => {
+      // Player name was already cleaned during deduplication
       const cleanPlayerName = scorecard.player.replace(/\s*\([^)]+\)\s*$/, '').trim();
 
       // Check if player exists in our database
