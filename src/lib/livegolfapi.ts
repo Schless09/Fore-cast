@@ -123,13 +123,23 @@ function parseScore(scoreStr: string | null): number {
 
 /**
  * Get current round (today's round) from rounds array
+ * Returns the round currently being played (has thru info) or the most recent round
  */
 function getCurrentRound(rounds: LiveGolfAPIRound[]): LiveGolfAPIRound | null {
-  // Find the most recent completed round
-  const completedRounds = rounds.filter((r) => r.score !== null && r.thru !== '-');
-  return completedRounds.length > 0 
-    ? completedRounds[completedRounds.length - 1] 
-    : null;
+  if (!rounds || rounds.length === 0) return null;
+  
+  // Find the round currently in progress (has a thru value that's not '-' or null)
+  const activeRound = rounds.find((r) => r.thru && r.thru !== '-');
+  if (activeRound) {
+    console.log(`[getCurrentRound] Found active round: Round ${activeRound.round}, thru: ${activeRound.thru}`);
+    return activeRound;
+  }
+  
+  // If no active round, get the highest round number (most recent)
+  const sortedRounds = [...rounds].sort((a, b) => (b.round || 0) - (a.round || 0));
+  const latestRound = sortedRounds[0];
+  console.log(`[getCurrentRound] No active round, using latest: Round ${latestRound?.round}`);
+  return latestRound || null;
 }
 
 /**
@@ -237,6 +247,17 @@ export async function fetchScoresFromLiveGolfAPI(
     await writeCache(eventId, leaderboard);
 
     console.log(`[LiveGolfAPI] Successfully fetched and cached ${Array.isArray(leaderboard) ? leaderboard.length : 'unknown'} records`);
+    
+    // Log first 3 players with full data for debugging
+    if (Array.isArray(leaderboard) && leaderboard.length > 0) {
+      console.log('=== LiveGolfAPI Response Sample (First 3 Players) ===');
+      leaderboard.slice(0, 3).forEach((player, idx) => {
+        console.log(`\n--- Player ${idx + 1}: ${player.player} ---`);
+        console.log(JSON.stringify(player, null, 2));
+      });
+      console.log('=== End Sample ===\n');
+    }
+    
     return { 
       data: leaderboard, 
       source: 'livegolfapi',
@@ -263,6 +284,19 @@ export async function fetchScoresFromLiveGolfAPI(
  * Transform LiveGolfAPI scorecards to our format
  * Maps player names to our pga_player_ids
  */
+/**
+ * Normalize player name for matching
+ * Removes qualifiers like (LQ), (SC), (NT) and normalizes special characters
+ */
+function normalizePlayerName(name: string): string {
+  return name
+    .replace(/\s*\([A-Z]{2}\)\s*$/i, '') // Remove qualifiers like (LQ), (SC), (NT)
+    .toLowerCase()
+    .trim()
+    .normalize('NFD') // Decompose accented characters
+    .replace(/[\u0300-\u036f]/g, ''); // Remove accent marks
+}
+
 export function transformLiveGolfAPIScores(
   scorecards: LiveGolfAPIScorecard[],
   playerNameMap: Map<string, string> // Map from player name to our pga_player_id
@@ -270,7 +304,7 @@ export function transformLiveGolfAPIScores(
   pgaPlayerId: string;
   total_score: number;
   today_score: number;
-  thru: number;
+  thru: number | string;
   position: number | null;
   made_cut: boolean;
   round_1_score: number | null;
@@ -280,23 +314,72 @@ export function transformLiveGolfAPIScores(
   tee_time: string | null;
   starting_tee: number | null;
 }> {
-  return scorecards
-    .map((scorecard) => {
-      const pgaPlayerId = playerNameMap.get(scorecard.player.toLowerCase().trim());
+  console.log(`\n=== Transforming ${scorecards.length} scorecards ===`);
+  
+  const results = scorecards
+    .map((scorecard, idx) => {
+      // Try exact match first
+      let pgaPlayerId = playerNameMap.get(scorecard.player.toLowerCase().trim());
+      
+      // If no exact match, try normalized name (removes qualifiers and accents)
+      if (!pgaPlayerId) {
+        const normalized = normalizePlayerName(scorecard.player);
+        pgaPlayerId = playerNameMap.get(normalized);
+      }
+      
       if (!pgaPlayerId) {
         console.warn(`No mapping found for player: ${scorecard.player}`);
         return null;
       }
 
-      // Parse total score
+      // Parse total score (tournament cumulative)
       const total_score = parseScore(scorecard.total);
 
       // Get current round for today_score and thru
       const currentRound = getCurrentRound(scorecard.rounds);
-      const today_score = currentRound ? parseScore(currentRound.total) : 0;
-      const thru = currentRound && currentRound.thru !== '-' 
-        ? parseInt(currentRound.thru) || 0 
-        : 0;
+      
+      // Calculate today's score based on current round
+      let today_score = 0;
+      if (currentRound) {
+        // If round has a score/total, use it
+        if (currentRound.total !== null && currentRound.total !== undefined) {
+          today_score = parseScore(currentRound.total);
+        } else if (currentRound.score !== null && currentRound.score !== undefined) {
+          // Use actual score if available
+          const score = typeof currentRound.score === 'number' ? currentRound.score : parseInt(currentRound.score);
+          // Calculate relative to par (assuming par is 72 for 18 holes, 36 for 9)
+          const par = currentRound.thru && !isNaN(parseInt(currentRound.thru)) ? parseInt(currentRound.thru) * 4 : 72;
+          today_score = score - par;
+        } else if (currentRound.round === 1) {
+          // Round 1 in progress - today's score IS the tournament total
+          today_score = total_score;
+        } else {
+          // Later rounds in progress - calculate from previous rounds
+          const previousRounds = scorecard.rounds.filter(r => r.round < currentRound.round && r.score !== null);
+          const previousTotal = previousRounds.reduce((sum, r) => sum + parseScore(r.total), 0);
+          today_score = total_score - previousTotal;
+        }
+      }
+      
+      // Handle thru field - could be hole number, "F", or tee time
+      let thru: number | string = 0;
+      if (currentRound?.thru && currentRound.thru !== '-') {
+        const parsed = parseInt(currentRound.thru);
+        // If it's a valid number (hole), use it as number; otherwise keep as string (tee time or "F")
+        if (!isNaN(parsed)) {
+          thru = parsed;
+        } else {
+          thru = currentRound.thru; // Keep tee times or "F" as strings
+        }
+      }
+      
+      // Log first 3 transformed players
+      if (idx < 3) {
+        console.log(`\n--- Transformed Player ${idx + 1}: ${scorecard.player} ---`);
+        console.log('All rounds:', JSON.stringify(scorecard.rounds, null, 2));
+        console.log('Current Round:', currentRound);
+        console.log('Extracted:', { total_score, today_score, thru });
+      }
 
       // Parse position (positionValue >= 980 means CUT/WD)
       const position = scorecard.positionValue >= 980 ? null : scorecard.positionValue;
@@ -328,4 +411,7 @@ export function transformLiveGolfAPIScores(
       };
     })
     .filter(Boolean) as any[];
+  
+  console.log(`=== Transformation complete: ${results.length} players matched ===\n`);
+  return results;
 }

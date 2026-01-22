@@ -56,6 +56,11 @@ export async function POST(request: NextRequest) {
       .select('id, position, made_cut')
       .eq('tournament_id', tournamentId);
 
+    console.log(`[PRIZE MONEY] Found ${tournamentPlayers?.length || 0} tournament players`);
+    if (tournamentPlayers && tournamentPlayers.length > 0) {
+      console.log(`[PRIZE MONEY] Sample players:`, tournamentPlayers.slice(0, 3).map(p => ({ id: p.id, position: p.position })));
+    }
+
     if (tpError) {
       return NextResponse.json(
         { error: 'Failed to load tournament players' },

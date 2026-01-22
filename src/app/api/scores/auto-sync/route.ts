@@ -16,11 +16,11 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServiceClient();
     
-    // Get all active tournaments (status = 'in_progress')
+    // Get all active tournaments (status = 'active')
     const { data: tournaments, error: tournamentsError } = await supabase
       .from('tournaments')
       .select('id, name, livegolfapi_event_id')
-      .eq('status', 'in_progress')
+      .eq('status', 'active')
       .not('livegolfapi_event_id', 'is', null);
 
     if (tournamentsError) {

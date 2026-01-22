@@ -64,7 +64,7 @@ export default function AdminPrizeMoneyPage() {
         try {
           const parsed = JSON.parse(prizeData);
           distributions = parsed;
-        } catch (parseError) {
+        } catch {
           setError('Invalid JSON format');
           setIsUpdating(false);
           return;
@@ -93,8 +93,8 @@ export default function AdminPrizeMoneyPage() {
 
       setMessage(result.message || 'Prize money distribution imported successfully');
       setPrizeData(''); // Clear form on success
-    } catch (err: any) {
-      setError(err.message || 'Failed to import prize money');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to import prize money');
     } finally {
       setIsUpdating(false);
     }
@@ -124,8 +124,8 @@ export default function AdminPrizeMoneyPage() {
       }
 
       setMessage(result.message || 'Winnings calculated successfully');
-    } catch (err: any) {
-      setError(err.message || 'Failed to calculate winnings');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to calculate winnings');
     } finally {
       setIsUpdating(false);
     }
@@ -262,14 +262,14 @@ export default function AdminPrizeMoneyPage() {
           <ol className="list-decimal list-inside space-y-2 text-gray-600 mb-4">
             <li><strong>Import Prize Money:</strong> Upload the prize money distribution table for the tournament</li>
             <li><strong>Update Scores:</strong> Sync player positions from LiveGolfAPI</li>
-            <li><strong>Calculate Winnings:</strong> System automatically calculates each player's prize money based on final position</li>
+            <li><strong>Calculate Winnings:</strong> System automatically calculates each player&apos;s prize money based on final position</li>
             <li><strong>Handle Ties:</strong> If players tie, they split the combined prize money of all tied positions</li>
-            <li><strong>Roster Total:</strong> Each roster's total winnings = sum of all players' prize money</li>
+            <li><strong>Roster Total:</strong> Each roster&apos;s total winnings = sum of all players&apos; prize money</li>
           </ol>
           <div className="p-3 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800">
               <strong>Example:</strong> If 2 players tie for 2nd place, they split the 2nd and 3rd place prize money.
-              If you're the only person who picked the winner, you get the full 1st place prize money even if your other 9 players missed the cut.
+              If you&apos;re the only person who picked the winner, you get the full 1st place prize money even if your other 9 players missed the cut.
             </p>
           </div>
         </CardContent>

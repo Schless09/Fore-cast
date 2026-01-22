@@ -51,17 +51,17 @@ In your Vercel project dashboard:
 3. Add `NEXT_PUBLIC_APP_URL` with your production URL
 4. Redeploy for changes to take effect
 
-### 5. Mark Tournament as "In Progress"
+### 5. Mark Tournament as "Active"
 
 For auto-sync to work:
 1. Go to `/admin/tournaments`
-2. Set tournament status to **"in_progress"**
+2. Set tournament status to **"Active (Live)"**
 3. Ensure `livegolfapi_event_id` is set
 
 ## How Auto-Sync Works
 
 1. **Every 5 minutes**, Vercel Cron calls `/api/scores/auto-sync`
-2. The endpoint finds all tournaments with `status = 'in_progress'`
+2. The endpoint finds all tournaments with `status = 'active'`
 3. For each tournament, it calls `/api/scores/sync` to fetch latest scores
 4. Scores are updated in the database
 5. Fantasy points are automatically recalculated
@@ -82,7 +82,7 @@ Check cron job execution in Vercel:
 ### Scores Not Updating
 
 1. **Check tournament status:**
-   - Must be set to "in_progress"
+   - Must be set to "active"
    - Must have `livegolfapi_event_id`
 
 2. **Check environment variables:**
@@ -142,4 +142,4 @@ curl -X POST http://localhost:3000/api/scores/auto-sync \
 After tournament completes:
 1. Set tournament status to "completed"
 2. Run `/api/scores/calculate-winnings` to finalize prize money
-3. Auto-sync will stop automatically (only syncs "in_progress" tournaments)
+3. Auto-sync will stop automatically (only syncs "active" tournaments)

@@ -55,11 +55,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create a map from player name (lowercase) to pga_player_id
+    // Create a map from player name (lowercase and normalized) to pga_player_id
     const playerNameMap = new Map<string, string>();
     tournamentPlayers?.forEach((tp: any) => {
       if (tp.pga_players?.name) {
-        playerNameMap.set(tp.pga_players.name.toLowerCase().trim(), tp.pga_player_id);
+        const name = tp.pga_players.name;
+        // Add both original and normalized versions
+        playerNameMap.set(name.toLowerCase().trim(), tp.pga_player_id);
+        
+        // Also add normalized version (without accents)
+        const normalized = name
+          .toLowerCase()
+          .trim()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+        playerNameMap.set(normalized, tp.pga_player_id);
       }
     });
 
@@ -79,6 +89,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Log how many players have tee time strings
+    const playersWithTeeTimes = transformedScores.filter(s => typeof s.thru === 'string' && s.thru.includes('PM'));
+    console.log(`\n[TRANSFORM RESULT] Total transformed: ${transformedScores.length}, With tee times: ${playersWithTeeTimes.length}`);
+    if (playersWithTeeTimes.length > 0) {
+      console.log(`[TRANSFORM RESULT] First 3 players with tee times:`, playersWithTeeTimes.slice(0, 3).map(p => ({
+        id: p.pgaPlayerId.substring(0, 8),
+        position: p.position,
+        thru: p.thru,
+        thru_type: typeof p.thru,
+      })));
+    }
+
     // Update scores in database
     const updates = [];
     for (const score of transformedScores) {
@@ -91,10 +113,22 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (findError || !tournamentPlayer) {
-        console.error(
-          `Tournament player not found for pgaPlayerId: ${score.pgaPlayerId}`
+        console.log(
+          `[SYNC SKIP] Player not in database - pgaPlayerId: ${score.pgaPlayerId.substring(0, 8)}, position: ${score.position}, thru: ${score.thru} (${typeof score.thru})`
         );
         continue;
+      }
+
+      // Log what we're about to store (first 3 players + any with tee time strings)
+      if (updates.length < 3 || (typeof score.thru === 'string' && score.thru.includes('PM'))) {
+        console.log(`\n[SYNC] Updating player:`, {
+          name: score.pgaPlayerId.substring(0, 8),
+          position: score.position,
+          total_score: score.total_score,
+          today_score: score.today_score,
+          thru: score.thru,
+          thru_type: typeof score.thru,
+        });
       }
 
       // Update tournament player scores and tee times
@@ -138,8 +172,45 @@ export async function POST(request: NextRequest) {
       console.error('Error triggering recalculation:', recalcError);
     }
 
-    // Note: After tournament completion, call /api/scores/calculate-winnings
-    // to calculate prize money based on final positions
+    // Check if tournament is active and has prize money distribution
+    // If so, automatically calculate prize money for real-time updates
+    try {
+      const { data: tournament, error: tournamentError } = await supabase
+        .from('tournaments')
+        .select('status')
+        .eq('id', tournamentId)
+        .single();
+
+      if (!tournamentError && tournament?.status === 'active') {
+        // Check if prize money distribution exists
+        const { data: prizeDistributions } = await supabase
+          .from('prize_money_distributions')
+          .select('id')
+          .eq('tournament_id', tournamentId)
+          .limit(1);
+
+        if (prizeDistributions && prizeDistributions.length > 0) {
+          console.log(`[PRIZE MONEY] Tournament ${tournamentId} is active with prize distribution - calculating real-time winnings`);
+
+          const winningsResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_APP_URL}/api/scores/calculate-winnings`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tournamentId }),
+            }
+          );
+
+          if (!winningsResponse.ok) {
+            console.error('Error calculating prize money:', await winningsResponse.text());
+          } else {
+            console.log(`[PRIZE MONEY] Successfully updated prize money for tournament ${tournamentId}`);
+          }
+        }
+      }
+    } catch (winningsError) {
+      console.error('Error triggering prize money calculation:', winningsError);
+    }
 
     return NextResponse.json({
       success: true,

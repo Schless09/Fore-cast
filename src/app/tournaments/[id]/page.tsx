@@ -14,13 +14,28 @@ interface TournamentPageProps {
   params: Promise<{ id: string }>;
 }
 
+// Simple refresh link (server component safe)
+function RefreshButton() {
+  return (
+    <span className="text-casino-gray text-xs">
+      (Page auto-refreshes every 3 minutes)
+    </span>
+  );
+}
+
 // Revalidate page every 3 minutes to prevent excessive API calls
 // This works in conjunction with the LiveGolfAPI cache layer
 export const revalidate = 180;
 
+// Add dynamic rendering to ensure fresh data
+export const dynamic = 'force-dynamic';
+
 export default async function TournamentPage({ params }: TournamentPageProps) {
   const { id } = await params;
   const supabase = await createClient();
+
+  // Add timestamp for debugging revalidation
+  const pageGeneratedAt = new Date().getTime();
 
   const {
     data: { user },
@@ -115,14 +130,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
   // Determine what to show
   // - Upcoming: roster builder
-  // - Active: roster builder if no roster yet; personal leaderboard if roster exists
+  // - Active: roster builder if no roster yet; live leaderboard if roster exists
   // - Completed: golfer leaderboard (regardless of user's roster)
   const showRosterBuilder =
     tournament.status === 'upcoming' ||
     (tournament.status === 'active' && !existingRoster);
   const showPersonalLeaderboard =
     tournament.status === 'active' && !!existingRoster;
-  const showGolferLeaderboard = tournament.status === 'completed';
+  const showGolferLeaderboard = tournament.status === 'completed' || (tournament.status === 'active' && !!existingRoster);
 
   // Load tournament leaderboard (golfers) for completed tournaments
   type PrizeDistributionRow = {
@@ -138,7 +153,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     tied_with_count: number;
     total_score: number;
     today_score: number;
-    thru: number;
+    thru: string | number;
     prize_money: number;
     name: string;
     tee_time?: string | null;
@@ -162,7 +177,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     return parseInt(s, 10) || 0;
   };
 
-  if (tournament.status === 'completed') {
+  if (tournament.status === 'completed' || (tournament.status === 'active' && existingRoster)) {
     // Try database first
     const { data: leaderboardData, error: dbError } = await supabase
       .from('tournament_players')
@@ -180,6 +195,46 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       )
       .eq('tournament_id', id)
       .order('position', { ascending: true });
+
+    // If we have players but no prize money calculated, try to calculate it
+    if (!dbError && leaderboardData && leaderboardData.length > 0) {
+      const hasPrizeMoney = leaderboardData.some(player => player.prize_money > 0);
+      if (!hasPrizeMoney) {
+        try {
+          console.log(`[AUTO CALC] Calculating prize money for tournament ${id}`);
+          await fetch(
+            `${process.env.NEXT_PUBLIC_APP_URL}/api/scores/calculate-winnings`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tournamentId: id }),
+            }
+          );
+          // Re-fetch data after calculation
+          const { data: updatedData } = await supabase
+            .from('tournament_players')
+            .select(
+              `
+              position,
+              is_tied,
+              tied_with_count,
+              total_score,
+              today_score,
+              thru,
+              prize_money,
+              pga_players ( name )
+            `
+            )
+            .eq('tournament_id', id)
+            .order('position', { ascending: true });
+          if (updatedData) {
+            leaderboardData.splice(0, leaderboardData.length, ...updatedData);
+          }
+        } catch (calcError) {
+          console.error('[AUTO CALC] Failed to calculate prize money:', calcError);
+        }
+      }
+    }
 
     const { data: prizeDistributions } = await supabase
       .from('prize_money_distributions')
@@ -203,6 +258,57 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
     if (!dbError && leaderboardData && leaderboardData.length > 0) {
       leaderboardSource = 'database';
+
+      // Try to ensure prize money is calculated for database data (don't block page load)
+      try {
+        console.log(`[AUTO CALC] Ensuring prize money is calculated for tournament ${id}`);
+        // Use a timeout to prevent blocking page load
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
+        const calcResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_APP_URL}/api/scores/calculate-winnings`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tournamentId: id }),
+            signal: controller.signal,
+          }
+        );
+
+        clearTimeout(timeoutId);
+
+        if (calcResponse.ok) {
+          console.log(`[AUTO CALC] Prize money calculation completed for ${id}`);
+          // Re-fetch data after calculation
+          const { data: updatedData } = await supabase
+            .from('tournament_players')
+            .select(
+              `
+              position,
+              is_tied,
+              tied_with_count,
+              total_score,
+              today_score,
+              thru,
+              prize_money,
+              pga_players ( name )
+            `
+            )
+            .eq('tournament_id', id)
+            .order('position', { ascending: true });
+
+          if (updatedData) {
+            leaderboardData.splice(0, leaderboardData.length, ...updatedData);
+          }
+        }
+      } catch (calcError) {
+        // Don't log timeout errors as they are expected
+        if (calcError.name !== 'AbortError') {
+          console.error('[AUTO CALC] Failed to calculate prize money:', calcError);
+        }
+      }
+
       tournamentLeaderboard =
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         leaderboardData.map((row: any) => ({
@@ -211,7 +317,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           tied_with_count: row.tied_with_count ?? 1,
           total_score: row.total_score ?? 0,
           today_score: row.today_score ?? 0,
-          thru: row.thru ?? 0,
+          thru: row.thru ?? '-',
           prize_money: row.prize_money ?? 0,
           name: row.pga_players?.name || 'Unknown',
           prize_distribution:
@@ -235,6 +341,49 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           tournamentLeaderboard = [];
         } else {
           leaderboardSource = result.source === 'cache' ? 'cache' : 'livegolfapi';
+
+          // If we have LiveGolfAPI data but also have database players, try to calculate prize money
+          // This handles the case where LiveGolfAPI is used as fallback but we want prize money
+          if (prizeDistributions && prizeDistributions.length > 0) {
+            try {
+              console.log(`[AUTO CALC] Checking if prize money needs calculation for LiveGolfAPI data`);
+              // Check if we have database players that might need prize money calculation
+              const { data: dbPlayers } = await supabase
+                .from('tournament_players')
+                .select('prize_money')
+                .eq('tournament_id', id)
+                .limit(1);
+
+              if (dbPlayers && dbPlayers.length > 0) {
+                const hasPrizeMoney = dbPlayers.some((p: any) => (p.prize_money ?? 0) > 0);
+                if (!hasPrizeMoney) {
+                  console.log(`[AUTO CALC] Calculating prize money for database players`);
+                  // Use timeout to prevent blocking
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                  try {
+                    await fetch(
+                      `${process.env.NEXT_PUBLIC_APP_URL}/api/scores/calculate-winnings`,
+                      {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tournamentId: id }),
+                        signal: controller.signal,
+                      }
+                    );
+                  } finally {
+                    clearTimeout(timeoutId);
+                  }
+                }
+              }
+            } catch (calcError) {
+              if (calcError.name !== 'AbortError') {
+                console.error('[AUTO CALC] Failed to check/calculate prize money:', calcError);
+              }
+            }
+          }
+
           tournamentLeaderboard =
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             scores.map((scorecard: any) => {
@@ -248,6 +397,28 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             const actualPosition =
               scorecard.positionValue >= 980 ? null : scorecard.positionValue;
 
+            // Handle thru field - could be hole number "9", "18", "F", or tee time
+            let thruValue = '-';
+            if (currentRound?.thru && currentRound.thru !== '-') {
+              const parsed = parseInt(currentRound.thru);
+              // If it's a number (hole), use it; if "F", show finished; otherwise it's likely a tee time
+              if (!isNaN(parsed)) {
+                thruValue = currentRound.thru;
+              } else if (currentRound.thru === 'F') {
+                thruValue = 'F';
+              } else {
+                // Likely a tee time like "6:09 PM" or "5:58 PM"
+                thruValue = currentRound.thru;
+              }
+            }
+
+            // Calculate prize money for LiveGolfAPI data if we have prize distribution
+            let calculatedPrizeMoney = 0;
+            if (actualPosition && prizeDistributionMap.has(actualPosition)) {
+              const dist = prizeDistributionMap.get(actualPosition);
+              calculatedPrizeMoney = dist?.amount || 0;
+            }
+
             return {
               position: actualPosition,
               is_tied:
@@ -256,11 +427,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               tied_with_count: 1,
               total_score: parseScore(scorecard.total),
               today_score: currentRound ? parseScore(currentRound.total) : 0,
-              thru:
-                currentRound && currentRound.thru !== '-'
-                  ? parseInt(currentRound.thru) || 0
-                  : 0,
-              prize_money: 0,
+              thru: thruValue,
+              prize_money: calculatedPrizeMoney,
               name: scorecard.player || 'Unknown',
               tee_time: currentRound?.teeTime || null,
               starting_tee: currentRound?.startingTee || null,
@@ -283,14 +451,79 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     }
   }
 
+  // Get player IDs on user's roster for highlighting  
+  const userRosterPlayerIds = existingRosterData?.playerIds || [];
+  
+  // Create a map of player names to IDs from tournament_players for highlighting
+  const playerNameToIdMap = new Map<string, string>();
+  if ((tournament.status === 'active' || tournament.status === 'completed') && (existingRoster || tournament.status === 'completed')) {
+    const { data: allPlayers } = await supabase
+      .from('tournament_players')
+      .select('pga_player_id, pga_players(name)')
+      .eq('tournament_id', id);
+    
+    allPlayers?.forEach((tp: any) => {
+      if (tp.pga_players?.name) {
+        const name = tp.pga_players.name;
+        playerNameToIdMap.set(name.toLowerCase().trim(), tp.pga_player_id);
+        // Also add normalized version
+        const normalized = name.toLowerCase().trim()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+        playerNameToIdMap.set(normalized, tp.pga_player_id);
+      }
+    });
+  }
+
   const renderTournamentLeaderboard = () => {
     if (tournamentLeaderboard.length === 0) {
+      // If no player data but we have prize money distribution, show the prize structure
+      if (prizeDistributions && prizeDistributions.length > 0) {
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl">
+                Prize Money Structure
+              </CardTitle>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-casino-gray mt-2">
+                <span>Total Purse: {formatCurrency(prizeDistributions[0]?.total_purse || 0)}</span>
+                <span className="text-casino-green">
+                  Tournament starts soon - leaderboard will update with live scores
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
+                    <th className="px-2 sm:px-4 py-2">Pos</th>
+                    <th className="px-2 sm:px-4 py-2 text-right">Prize</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prizeDistributions.slice(0, 20).map((dist: any, idx: number) => (
+                    <tr key={idx} className="border-b border-casino-gold/10">
+                      <td className="px-2 sm:px-4 py-2 font-medium text-casino-text text-xs sm:text-sm">
+                        {dist.position}
+                      </td>
+                      <td className="px-2 sm:px-4 py-2 text-right text-casino-text text-xs sm:text-sm">
+                        {formatCurrency(dist.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        );
+      }
+
       return (
         <Card>
-          <CardContent className="py-8 text-center text-gray-300">
+          <CardContent className="py-8 text-center text-casino-gray">
             <p className="mb-2">No leaderboard data available for this tournament.</p>
             {tournament.livegolfapi_event_id && leaderboardSource === 'none' && (
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-casino-gray">
                 Unable to fetch data from LiveGolfAPI. Please try again later or contact support.
               </p>
             )}
@@ -302,8 +535,18 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg sm:text-xl">Leaderboard (Golfers)</CardTitle>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 mt-2">
+              <CardTitle className="text-lg sm:text-xl">
+                {tournament.status === 'active' ? 'Live Leaderboard' : 'Final Leaderboard'}
+                <div className="text-xs text-casino-gray mt-1">
+                  Tournament: {tournament.name} (ID: {id})
+                </div>
+              </CardTitle>
+          {tournament.status === 'active' && existingRoster && (
+            <p className="text-sm text-casino-green mt-2">
+              ⭐ Your players are highlighted below
+            </p>
+          )}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-casino-gray mt-2">
             <span>
               Source:{' '}
               {leaderboardSource === 'database'
@@ -314,68 +557,76 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 ? 'LiveGolfAPI'
                 : 'Unknown'}
             </span>
+            <span className="text-casino-gray">
+              Page generated: {formatTimestampCST(pageGeneratedAt)}
+            </span>
             {lastUpdated && (
-              <span className="text-gray-600">
-                Last updated: {formatTimestampCST(lastUpdated)}
+              <span className="text-casino-gray">
+                Data updated: {formatTimestampCST(lastUpdated)}
               </span>
             )}
+            {tournament.status === 'active' && (
+              <span className="text-casino-green">
+                🔄 Auto-updates every 3 minutes
+              </span>
+            )}
+            <RefreshButton />
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-            <tr className="border-b border-gray-200 text-left text-gray-500 uppercase text-xs">
+            <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
               <th className="px-2 sm:px-4 py-2">Pos</th>
               <th className="px-2 sm:px-4 py-2">Golfer</th>
               <th className="px-2 sm:px-4 py-2">Total</th>
               <th className="px-2 sm:px-4 py-2">Today</th>
-              <th className="px-2 sm:px-4 py-2 hidden sm:table-cell">Thru</th>
-              <th className="px-2 sm:px-4 py-2 hidden lg:table-cell">Tee</th>
-              <th className="px-2 sm:px-4 py-2 text-right hidden md:table-cell">%</th>
+              <th className="px-2 sm:px-4 py-2 hidden sm:table-cell" title="Holes completed or tee time">Thru</th>
               <th className="px-2 sm:px-4 py-2 text-right">Prize</th>
             </tr>
             </thead>
             <tbody>
               {tournamentLeaderboard.map((row, idx) => {
                 const name = row.name || 'Unknown';
+                const normalizedName = name.toLowerCase().trim()
+                  .replace(/\s*\([A-Z]{2}\)\s*$/i, '')
+                  .normalize('NFD')
+                  .replace(/[\u0300-\u036f]/g, '');
+                
+                const playerId = playerNameToIdMap.get(normalizedName) || playerNameToIdMap.get(name.toLowerCase().trim());
+                const isUserPlayer = playerId && userRosterPlayerIds.includes(playerId);
+                
                 const pos = row.position
                   ? `${row.is_tied ? 'T' : ''}${row.position}`
                   : 'CUT';
                 const totalClass = getScoreColor(row.total_score);
                 const todayClass = getScoreColor(row.today_score);
-                const percentage =
-                  row.prize_distribution?.percentage !== null &&
-                  row.prize_distribution?.percentage !== undefined
-                    ? `${row.prize_distribution.percentage.toFixed(3)}%`
-                    : '-';
                 return (
                   <tr
                     key={`${row.position}-${name}-${idx}`}
-                    className="border-b border-gray-100 hover:bg-gray-50"
+                    className={`border-b transition-colors ${
+                      isUserPlayer
+                        ? 'bg-casino-gold/20 border-casino-gold/40 hover:bg-casino-gold/30'
+                        : 'border-casino-gold/10 hover:bg-casino-elevated'
+                    }`}
                   >
-                    <td className="px-2 sm:px-4 py-2 font-medium text-gray-900 text-xs sm:text-sm">{pos}</td>
-                    <td className="px-2 sm:px-4 py-2 text-gray-900 text-xs sm:text-sm">{name}</td>
+                    <td className="px-2 sm:px-4 py-2 font-medium text-casino-text text-xs sm:text-sm">
+                      {isUserPlayer && <span className="mr-1">⭐</span>}
+                      {pos}
+                    </td>
+                    <td className={`px-2 sm:px-4 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>
+                      {name}
+                    </td>
                     <td className={`px-2 sm:px-4 py-2 font-semibold text-xs sm:text-sm ${totalClass}`}>
                       {formatScore(row.total_score)}
                     </td>
                     <td className={`px-2 sm:px-4 py-2 text-xs sm:text-sm ${todayClass}`}>
                       {formatScore(row.today_score)}
                     </td>
-                    <td className="px-2 sm:px-4 py-2 text-gray-700 text-xs sm:text-sm hidden sm:table-cell">
-                      {row.thru ? row.thru : '-'}
+                    <td className="px-2 sm:px-4 py-2 text-casino-gray text-xs sm:text-sm hidden sm:table-cell">
+                      {row.thru && row.thru !== '-' && row.thru !== '0' ? row.thru : '-'}
                     </td>
-                    <td className="px-2 sm:px-4 py-2 text-gray-600 text-xs sm:text-sm hidden lg:table-cell">
-                      {row.tee_time ? new Date(row.tee_time).toLocaleTimeString('en-US', { 
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true
-                        // Uses user's local timezone automatically
-                      }) : '-'}
-                    </td>
-                    <td className="px-2 sm:px-4 py-2 text-right text-gray-900 text-xs sm:text-sm hidden md:table-cell">
-                      {percentage}
-                    </td>
-                    <td className="px-2 sm:px-4 py-2 text-right text-gray-900 text-xs sm:text-sm">
+                    <td className="px-2 sm:px-4 py-2 text-right text-casino-text text-xs sm:text-sm">
                       {formatCurrency(
                         row.prize_money ||
                           row.prize_distribution?.amount ||
@@ -483,17 +734,18 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         />
       )}
 
-      {showGolferLeaderboard ? (
+      {/* Show personal leaderboard for active tournaments */}
+      {showPersonalLeaderboard && existingRoster && (
+        <div className="mb-6">
+          <PersonalLeaderboard rosterId={existingRoster.id} />
+        </div>
+      )}
+
+      {/* Show full tournament leaderboard */}
+      {showGolferLeaderboard && (
         <div className="space-y-6">
           {renderTournamentLeaderboard()}
         </div>
-      ) : (
-        showPersonalLeaderboard &&
-        existingRoster && (
-          <div className="space-y-6">
-            <PersonalLeaderboard rosterId={existingRoster.id} />
-          </div>
-        )
       )}
 
       {/* Links */}

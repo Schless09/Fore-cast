@@ -59,7 +59,20 @@ export function calculatePlayerPrizeMoney(
 
   // Handle ties
   if (isTied && tiedCount > 1) {
-    // Calculate total prize money for all tied positions
+    // Use pre-calculated tie amounts from the distribution table
+    const tieField = `tied_${tiedCount}` as keyof PrizeMoneyDistribution;
+    let tieAmount = distribution[tieField] as number | string | undefined;
+
+    // Convert string to number if needed
+    if (typeof tieAmount === 'string') {
+      tieAmount = parseFloat(tieAmount);
+    }
+
+    if (tieAmount !== undefined && !isNaN(tieAmount)) {
+      return tieAmount;
+    }
+
+    // Fallback: Calculate total prize money for all tied positions and split evenly
     let totalTiedMoney = 0;
     const positionsToSplit: number[] = [];
 
@@ -74,7 +87,7 @@ export function calculatePlayerPrizeMoney(
     }
 
     // Split evenly among tied players
-    return totalTiedMoney / tiedCount;
+    return Math.round(totalTiedMoney / tiedCount);
   }
 
   // No tie, return the base amount

@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { createClient } from '@/lib/supabase/client';
 import seedData from './seed-data.json';
+
+// Note: We need to use API routes for updates since tournaments table has RLS
 
 export default function AdminTournamentsPage() {
   const [isCreating, setIsCreating] = useState(false);
@@ -13,6 +16,8 @@ export default function AdminTournamentsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -22,6 +27,83 @@ export default function AdminTournamentsPage() {
     status: 'upcoming',
     livegolfapi_event_id: '',
   });
+
+  useEffect(() => {
+    fetchTournaments();
+  }, []);
+
+  const fetchTournaments = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error: fetchError } = await supabase
+        .from('tournaments')
+        .select('*');
+
+      if (fetchError) throw fetchError;
+      
+      // Sort by closest to today's date
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const sorted = (data || []).sort((a, b) => {
+        const dateA = new Date(a.start_date);
+        const dateB = new Date(b.start_date);
+        const diffA = Math.abs(dateA.getTime() - today.getTime());
+        const diffB = Math.abs(dateB.getTime() - today.getTime());
+        return diffA - diffB;
+      });
+      
+      setTournaments(sorted);
+    } catch (err) {
+      console.error('Error fetching tournaments:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateTournamentStatus = async (tournamentId: string, newStatus: string) => {
+    try {
+      console.log('Updating tournament:', tournamentId, 'to status:', newStatus);
+      
+      // Use API route which has service role access
+      const response = await fetch('/api/admin/tournaments/update-status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tournamentId,
+          status: newStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update status');
+      }
+
+      const data = await response.json();
+      console.log('Update response:', data);
+
+      // Optimistically update the UI immediately
+      setTournaments(prevTournaments => prevTournaments.map(t => 
+        t.id === tournamentId ? { ...t, status: newStatus } : t
+      ));
+
+      setMessage(`Tournament status updated to "${newStatus}"`);
+      
+      // Fetch fresh data
+      setTimeout(async () => {
+        await fetchTournaments();
+      }, 100);
+      
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Failed to update tournament status:', err);
+      setError(err.message || 'Failed to update status');
+      setTimeout(() => setError(null), 3000);
+      // Revert optimistic update on error
+      await fetchTournaments();
+    }
+  };
 
   const handleCreateTournament = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +140,7 @@ export default function AdminTournamentsPage() {
         status: 'upcoming',
         livegolfapi_event_id: '',
       });
+      fetchTournaments();
     } catch (err: any) {
       setError(err.message || 'Failed to create tournament');
     } finally {
@@ -142,6 +225,84 @@ export default function AdminTournamentsPage() {
           Create and manage PGA Tour tournaments
         </p>
       </div>
+
+      {message && (
+        <div className="mb-4 p-3 text-sm text-green-600 bg-green-50 rounded-lg">
+          {message}
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {/* Existing Tournaments List */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Existing Tournaments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : tournaments.length === 0 ? (
+            <p className="text-casino-gray text-center py-8">
+              No tournaments found. Create one below or import the 2026 season.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {tournaments.map((tournament) => (
+                <div
+                  key={tournament.id}
+                  className="border border-casino-gold/30 rounded-lg p-4 bg-casino-elevated"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-casino-text">
+                        {tournament.name}
+                      </h3>
+                      <div className="text-sm text-casino-gray space-y-1 mt-2">
+                        {tournament.course && (
+                          <p>📍 {tournament.course}</p>
+                        )}
+                        <p>📅 {new Date(tournament.start_date).toLocaleDateString()} - {new Date(tournament.end_date).toLocaleDateString()}</p>
+                        {tournament.livegolfapi_event_id && (
+                          <p className="text-casino-green">✓ LiveGolfAPI Connected</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs text-casino-gray">Status:</label>
+                      <select
+                        key={`${tournament.id}-${tournament.status}`}
+                        value={tournament.status || 'upcoming'}
+                        onChange={(e) => updateTournamentStatus(tournament.id, e.target.value)}
+                        className="px-3 py-2 border border-casino-gold/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-casino-gold bg-casino-card text-casino-text text-sm"
+                      >
+                        <option value="upcoming">Upcoming</option>
+                        <option value="active">Active (Live)</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                      <p className="text-xs text-casino-gray">Current: {tournament.status}</p>
+                      
+                      {tournament.status === 'active' && (
+                        <span className="text-xs text-casino-green flex items-center gap-1">
+                          <span className="w-2 h-2 bg-casino-green rounded-full animate-pulse"></span>
+                          Auto-syncing scores
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Delete All */}
       <Card className="mb-6 border-red-200">
@@ -327,7 +488,7 @@ export default function AdminTournamentsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
               >
                 <option value="upcoming">Upcoming</option>
-                <option value="active">Active</option>
+                <option value="active">Active (Live)</option>
                 <option value="completed">Completed</option>
               </select>
             </div>
