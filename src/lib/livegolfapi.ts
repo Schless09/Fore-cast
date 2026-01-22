@@ -227,7 +227,9 @@ export async function fetchScoresFromLiveGolfAPI(
       const message = `LiveGolfAPI error (${response.status}): ${
         errorText || response.statusText
       }`;
-      console.warn(message);
+      console.error(`[LiveGolfAPI] API CALL FAILED:`, message);
+      console.error(`[LiveGolfAPI] URL: https://use.livegolfapi.com/v1/events/${eventId}`);
+      console.error(`[LiveGolfAPI] API Key present: ${!!apiKey}`);
       
       // API failed - use stale cache if available
       if (cached) {
@@ -248,7 +250,8 @@ export async function fetchScoresFromLiveGolfAPI(
     const fetchTime = Date.now();
     await writeCache(eventId, leaderboard);
 
-    console.log(`[LiveGolfAPI] Successfully fetched and cached ${Array.isArray(leaderboard) ? leaderboard.length : 'unknown'} records`);
+    console.log(`[LiveGolfAPI] ✅ SUCCESSFULLY FETCHED FRESH DATA: ${Array.isArray(leaderboard) ? leaderboard.length : 'unknown'} records`);
+    console.log(`[LiveGolfAPI] Sample player:`, leaderboard?.[0]?.player || 'No players');
     
     // Log first 3 players with full data for debugging
     if (Array.isArray(leaderboard) && leaderboard.length > 0) {

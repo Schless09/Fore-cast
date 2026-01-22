@@ -12,6 +12,7 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const { tournamentId, liveGolfAPITournamentId } = await request.json();
+    console.log(`[SYNC API] 🔄 Starting sync for tournament: ${tournamentId}, API event: ${liveGolfAPITournamentId}`);
 
     if (!tournamentId || !liveGolfAPITournamentId) {
       return NextResponse.json(
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
           .insert({
             tournament_id: tournamentId,
             pga_player_id: score.pgaPlayerId,
-            cost: 10000, // Default cost
+            cost: 100.00, // Default cost (fits DECIMAL(5,2) constraint)
           })
           .select('id')
           .single();

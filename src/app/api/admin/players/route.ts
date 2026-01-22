@@ -123,7 +123,7 @@ export async function PATCH(request: NextRequest) {
         .insert({
           tournament_id: tournamentId,
           pga_player_id: playerId,
-          cost: 10000, // Default cost
+          cost: 100.00, // Default cost (fits DECIMAL(5,2) constraint)
         });
 
       if (insertError) {
