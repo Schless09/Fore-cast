@@ -1,4 +1,12 @@
-export function LoadingSpinner({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
+import { cn } from '@/lib/utils';
+
+export function LoadingSpinner({ 
+  size = 'md',
+  className 
+}: { 
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}) {
   const sizes = {
     sm: 'h-4 w-4',
     md: 'h-8 w-8',
@@ -6,7 +14,7 @@ export function LoadingSpinner({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   };
 
   return (
-    <div className="flex items-center justify-center">
+    <div className={cn("flex items-center justify-center", className)}>
       <svg
         className={`animate-spin ${sizes[size]} text-green-600`}
         xmlns="http://www.w3.org/2000/svg"
