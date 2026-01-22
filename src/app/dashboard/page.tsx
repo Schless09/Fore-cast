@@ -120,6 +120,24 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
+      {/* Season Leaderboard */}
+      <div className="mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Season Leaderboard</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="w-full" style={{ height: '600px' }}>
+              <iframe 
+                src="https://docs.google.com/spreadsheets/d/e/2PACX-1vTecKBhuY8WNibIiprccOrj7jXqxouPcK5QgnQphyc_ealkISLSU_co1fuzPID8qnXmz-gVfYFR0ina/pubhtml?gid=2031372717&amp;single=true&amp;widget=true&amp;headers=false"
+                className="w-full h-full border-0 rounded"
+                title="Season Leaderboard"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Active Rosters */}
       <div className="mb-8">
         <h2 className="text-2xl font-semibold text-white mb-4">
