@@ -43,9 +43,9 @@ interface LiveGolfAPIScorecard {
 
 const CACHE_DIR = path.join(process.cwd(), '.cache', 'livegolfapi');
 
-// Cache TTL: 3 minutes for live tournaments
+// Cache TTL: 30 seconds for debugging live data issues
 // This prevents excessive API calls when users refresh frequently
-const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
 interface CacheEntry {
   data: any;
@@ -197,16 +197,18 @@ export async function fetchScoresFromLiveGolfAPI(
   // Check cache first - if fresh, return immediately
   const cached = await readCache(eventId);
   if (cached && !cached.isStale) {
-    console.log(`[LiveGolfAPI] Using fresh cache for ${eventId} (${Math.round(cached.age / 1000)}s old)`);
-    return { 
-      data: cached.data, 
+    const cacheTimestamp = cached.timestamp || (Date.now() - cached.age);
+    console.log(`[LiveGolfAPI] Using fresh cache for ${eventId} (${Math.round(cached.age / 1000)}s old, timestamp: ${new Date(cacheTimestamp).toISOString()})`);
+    return {
+      data: cached.data,
       source: 'cache',
-      timestamp: Date.now() - cached.age // Original fetch time
+      timestamp: cacheTimestamp
     };
   }
 
   // Cache is stale or missing - fetch from API
   try {
+    const fetchStartTime = Date.now();
     console.log(`[LiveGolfAPI] Fetching fresh data from API for event: ${eventId}`);
     const response = await fetch(
       `https://use.livegolfapi.com/v1/events/${eventId}`,
@@ -218,7 +220,7 @@ export async function fetchScoresFromLiveGolfAPI(
         cache: 'no-store', // Prevent Next.js from caching failed requests
       }
     );
-    console.log(`[LiveGolfAPI] Response status: ${response.status}`);
+    console.log(`[LiveGolfAPI] Response status: ${response.status}, fetch took ${Date.now() - fetchStartTime}ms`);
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => response.statusText);

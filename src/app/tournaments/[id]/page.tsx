@@ -23,9 +23,9 @@ function RefreshButton() {
   );
 }
 
-// Revalidate page every 3 minutes to prevent excessive API calls
+// Revalidate page every 30 seconds for debugging
 // This works in conjunction with the LiveGolfAPI cache layer
-export const revalidate = 180;
+export const revalidate = 30;
 
 // Add dynamic rendering to ensure fresh data
 export const dynamic = 'force-dynamic';
@@ -442,7 +442,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             </span>
             {lastUpdated && (
               <span className="text-casino-gray">
-                Data updated: {formatTimestampCST(lastUpdated)}
+                Data updated: {formatTimestampCST(lastUpdated)} ({Math.round((Date.now() - lastUpdated) / 1000 / 60)} minutes ago)
               </span>
             )}
             {tournament.status === 'active' && (
