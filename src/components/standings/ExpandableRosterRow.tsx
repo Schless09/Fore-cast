@@ -272,9 +272,11 @@ export function ExpandableRosterRow({
                               )}
                             </td>
                             <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center hidden md:table-cell">
-                              {tp?.tee_time ? (
+                              {tp?.thru && tp.thru !== 0 ? (
+                                <span className="text-casino-blue">{tp.thru}</span>
+                              ) : tp?.tee_time ? (
                                 <span className="text-casino-gray">
-                                  {new Date(tp.tee_time).toLocaleTimeString('en-US', { 
+                                  {new Date(tp.tee_time).toLocaleTimeString('en-US', {
                                     hour: 'numeric',
                                     minute: '2-digit',
                                     hour12: true
