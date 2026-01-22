@@ -113,6 +113,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     thru: number;
     prize_money: number;
     name: string;
+    tee_time?: string | null;
+    starting_tee?: number | null;
     prize_distribution?: PrizeDistributionRow;
   };
 
