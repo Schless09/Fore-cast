@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Helper functions for integrating with LiveGolfAPI.com
@@ -47,6 +48,14 @@ interface LiveGolfAPIScorecard {
   calculatedTiedCount?: number;
 }
 
+interface MinimalPlayer {
+  player: string;
+  position: number | null;
+  total_score: number;
+  thru: string | null;
+  tee_time: string | null;
+}
+
 const CACHE_DIR = path.join(process.cwd(), '.cache', 'livegolfapi');
 
 // Cache TTL: 5 minutes for production use
@@ -54,7 +63,7 @@ const CACHE_DIR = path.join(process.cwd(), '.cache', 'livegolfapi');
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface CacheEntry {
-  data: any;
+  data: LiveGolfAPIScorecard[] | MinimalPlayer[] | unknown;
   timestamp: number;
 }
 
@@ -66,7 +75,7 @@ async function ensureCacheDir() {
   }
 }
 
-async function writeCache(eventId: string, data: any) {
+async function writeCache(eventId: string, data: LiveGolfAPIScorecard[] | MinimalPlayer[] | unknown) {
   try {
     await ensureCacheDir();
     const cacheEntry: CacheEntry = {
@@ -83,14 +92,14 @@ async function writeCache(eventId: string, data: any) {
   }
 }
 
-async function readCache(eventId: string): Promise<{ data: any; age: number; isStale: boolean } | null> {
+async function readCache(eventId: string): Promise<{ data: LiveGolfAPIScorecard[] | MinimalPlayer[] | unknown; age: number; isStale: boolean } | null> {
   try {
     const cachePath = path.join(CACHE_DIR, `${eventId}.json`);
     const content = await fs.readFile(cachePath, 'utf-8');
     const parsed = JSON.parse(content);
     
     // Handle both old cache format (raw data) and new format (with timestamp)
-    let data: any;
+    let data: LiveGolfAPIScorecard[] | MinimalPlayer[] | unknown;
     let timestamp: number;
     
     if (parsed.timestamp !== undefined && parsed.data !== undefined) {
@@ -109,8 +118,8 @@ async function readCache(eventId: string): Promise<{ data: any; age: number; isS
     console.log(`[LiveGolfAPI] Cache found for ${eventId}. Age: ${Math.round(age / 1000)}s, Stale: ${isStale}`);
     
     return { data, age, isStale };
-  } catch (error: any) {
-    console.log(`[LiveGolfAPI] Cache miss for ${eventId}:`, error?.message);
+  } catch (error: unknown) {
+    console.log(`[LiveGolfAPI] Cache miss for ${eventId}:`, error instanceof Error ? error.message : 'Unknown error');
     return null;
   }
 }
@@ -206,7 +215,7 @@ export async function fetchScoresFromLiveGolfAPI(
     const cacheTimestamp = Date.now() - cached.age;
     console.log(`[LiveGolfAPI] Using fresh cache for ${eventId} (${Math.round(cached.age / 1000)}s old, timestamp: ${new Date(cacheTimestamp).toISOString()})`);
     return {
-      data: cached.data,
+      data: cached.data as LiveGolfAPIScorecard[] | null,
       source: 'cache',
       timestamp: cacheTimestamp
     };
@@ -241,7 +250,7 @@ export async function fetchScoresFromLiveGolfAPI(
       if (cached) {
         console.log(`[LiveGolfAPI] API failed, falling back to stale cache (${Math.round(cached.age / 1000)}s old)`);
         return { 
-          data: cached.data, 
+          data: cached.data as LiveGolfAPIScorecard[] | null, 
           source: 'cache', 
           timestamp: Date.now() - cached.age,
           error: message 
@@ -276,20 +285,21 @@ export async function fetchScoresFromLiveGolfAPI(
       source: 'livegolfapi',
       timestamp: fetchTime
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching scores from LiveGolfAPI:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     // Network error - use stale cache if available
     if (cached) {
       console.log(`[LiveGolfAPI] Network error, falling back to stale cache (${Math.round(cached.age / 1000)}s old)`);
       return { 
-        data: cached.data, 
+        data: cached.data as LiveGolfAPIScorecard[] | null, 
         source: 'cache',
         timestamp: Date.now() - cached.age,
-        error: error?.message 
+        error: errorMessage 
       };
     }
-    return { data: null, source: 'none', error: error?.message };
+    return { data: null, source: 'none', error: errorMessage };
   }
 }
 
@@ -400,7 +410,7 @@ export async function fetchMinimalScoresFromLiveGolfAPI(
 
     console.log(`[LiveGolfAPI] ✅ Extracted minimal data: ${minimalData.length} players`);
     if (minimalData.length > 0) {
-      console.log(`[MINIMAL] First 3 players:`, minimalData.slice(0, 3).map(p => p.player));
+      console.log(`[MINIMAL] First 3 players:`, minimalData.slice(0, 3).map((p: MinimalPlayer) => p.player));
     }
 
     // Cache the minimal data
@@ -412,8 +422,9 @@ export async function fetchMinimalScoresFromLiveGolfAPI(
       timestamp: Date.now()
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching minimal scores:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     if (cached) {
       return {
@@ -426,10 +437,10 @@ export async function fetchMinimalScoresFromLiveGolfAPI(
         }> | null,
         source: 'cache',
         timestamp: Date.now() - cached.age,
-        error: error?.message
+        error: errorMessage
       };
     }
-    return { data: null, source: 'none', error: error?.message };
+    return { data: null, source: 'none', error: errorMessage };
   }
 }
 
@@ -448,7 +459,7 @@ export async function transformMinimalLiveGolfAPIScores(
     isTied?: boolean;
     tiedCount?: number;
   }>,
-  supabaseClient: ReturnType<typeof createClient>
+  supabaseClient: SupabaseClient
 ): Promise<Array<{
   pgaPlayerId: string;
   playerName: string;
@@ -478,7 +489,7 @@ export async function transformMinimalLiveGolfAPIScores(
     .in('name', playerNames as string[]);
 
   const playerMap = new Map(
-    existingPlayers?.map(player => [player.name, player.id]) || []
+    existingPlayers?.map((player: { id: string; name: string }) => [player.name, player.id]) || []
   );
 
   console.log(`[MINIMAL] Found ${playerMap.size} out of ${playerNames.length} players in database`);
@@ -489,7 +500,7 @@ export async function transformMinimalLiveGolfAPIScores(
       .from('pga_players')
       .select('name')
       .limit(5);
-    console.log(`[MINIMAL] Sample database players:`, allPlayers?.map(p => p.name));
+    console.log(`[MINIMAL] Sample database players:`, allPlayers?.map((p: { name: string }) => p.name));
   }
 
   // Sort by score and assign proper sequential positions
@@ -551,16 +562,17 @@ export async function transformMinimalLiveGolfAPIScores(
         }
       }
 
+      const position = score.calculatedPosition ?? null;
       return {
         pgaPlayerId,
         playerName: score.player,
         total_score: score.total_score,
         today_score: score.total_score, // For round 1, today = total
         thru,
-        position: score.calculatedPosition,
+        position,
         is_tied: score.isTied || false,
         tied_with_count: score.tiedCount || 1,
-        made_cut: score.calculatedPosition !== null && score.calculatedPosition <= 65,
+        made_cut: position !== null && position <= 65,
         round_1_score: null, // Minimal API doesn't provide round scores
         round_2_score: null,
         round_3_score: null,
@@ -569,7 +581,7 @@ export async function transformMinimalLiveGolfAPIScores(
         starting_tee: null, // Minimal API doesn't provide starting tee
       };
     })
-    .filter(Boolean);
+    .filter((result): result is NonNullable<typeof result> => result !== null);
 
   console.log(`Transformed ${results.length} valid player scores`);
   return results;
@@ -650,7 +662,7 @@ export async function transformLiveGolfAPIScores(
     .in('name', playerNames as string[]);
 
   const playerMap = new Map(
-    existingPlayers?.map(player => [player.name, player.id]) || []
+    existingPlayers?.map((player: { id: string; name: string }) => [player.name, player.id]) || []
   );
 
   console.log(`Found ${playerMap.size} out of ${playerNames.length} players in database`);
@@ -744,7 +756,7 @@ export async function transformLiveGolfAPIScores(
       
 
       // Use calculated position instead of API position
-      const position = scorecard.calculatedPosition;
+      const position = scorecard.calculatedPosition ?? null;
       const is_tied = scorecard.isTied || scorecard.calculatedIsTied || false;
       const tied_with_count = scorecard.tiedCount || scorecard.calculatedTiedCount || 1;
       const made_cut = position !== null && position <= 65;
@@ -780,7 +792,7 @@ export async function transformLiveGolfAPIScores(
   );
 
   // Filter out null results
-  const validResults = results.filter(Boolean) as any[];
+  const validResults = results.filter((result): result is NonNullable<typeof result> => result !== null);
   
   console.log(`=== Transformation complete: ${validResults.length} players processed ===\n`);
   return validResults;
