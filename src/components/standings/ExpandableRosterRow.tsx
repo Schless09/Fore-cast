@@ -50,6 +50,8 @@ export function ExpandableRosterRow({
               prize_money,
               total_score,
               made_cut,
+              tee_time,
+              starting_tee,
               pga_players(name, country, image_url)
             )
           `)
