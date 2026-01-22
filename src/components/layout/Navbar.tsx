@@ -61,7 +61,7 @@ export function Navbar() {
     return (
       <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold bg-linear-to-r from-casino-gold to-[#f59e0b] bg-clip-text text-transparent font-orbitron tracking-wider">
+          <Link href="/" className="text-2xl font-bold text-casino-gold font-orbitron tracking-wider">
             FORE!CAST
           </Link>
         </div>
@@ -73,7 +73,7 @@ export function Navbar() {
     return (
       <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50 shadow-[0_4px_20px_rgba(251,191,36,0.1)]">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold bg-linear-to-r from-casino-gold to-[#f59e0b] bg-clip-text text-transparent font-orbitron tracking-wider hover:scale-105 transition-transform">
+          <Link href="/" className="text-2xl font-bold text-casino-gold font-orbitron tracking-wider hover:scale-105 transition-transform">
             FORE!CAST
           </Link>
           <div className="flex items-center gap-4">
@@ -97,7 +97,7 @@ export function Navbar() {
   return (
       <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50 shadow-[0_4px_20px_rgba(251,191,36,0.1)]">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/dashboard" className="text-2xl font-bold bg-linear-to-r from-casino-gold to-[#f59e0b] bg-clip-text text-transparent font-orbitron tracking-wider hover:scale-105 transition-transform">
+          <Link href="/dashboard" className="text-2xl font-bold text-casino-gold font-orbitron tracking-wider hover:scale-105 transition-transform">
             FORE!CAST
           </Link>
         <div className="flex items-center gap-8">

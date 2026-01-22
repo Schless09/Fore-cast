@@ -58,7 +58,7 @@ export function Hero() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-4">
           <Link href="/auth/signup" className="w-full sm:w-auto">
             <button className="btn-casino-gold w-full sm:w-auto px-10 py-4 text-lg rounded-xl font-bold tracking-wide">
-              🎰 Start Playing
+              🏌️ Start Playing
             </button>
           </Link>
           <Link href="/tournaments" className="w-full sm:w-auto">
