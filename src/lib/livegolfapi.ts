@@ -358,19 +358,30 @@ export async function transformLiveGolfAPIScores(
 
   console.log(`After deduplication: ${deduplicatedScorecards.size} unique players`);
 
+  // Get all player names that need to be checked
+  const playerNames = Array.from(deduplicatedScorecards.values()).map(scorecard =>
+    scorecard.player.replace(/\s*\([^)]+\)\s*$/, '').trim()
+  );
+
+  // Batch lookup all players at once
+  const { data: existingPlayers } = await supabaseClient
+    .from('pga_players')
+    .select('id, name')
+    .in('name', playerNames);
+
+  const playerMap = new Map(
+    existingPlayers?.map(player => [player.name, player.id]) || []
+  );
+
+  console.log(`Found ${playerMap.size} out of ${playerNames.length} players in database`);
+
   const results = await Promise.all(
     Array.from(deduplicatedScorecards.values()).map(async (scorecard, idx) => {
       // Player name was already cleaned during deduplication
       const cleanPlayerName = scorecard.player.replace(/\s*\([^)]+\)\s*$/, '').trim();
 
-      // Check if player exists in our database
-      const { data: existingPlayer } = await supabaseClient
-        .from('pga_players')
-        .select('id')
-        .eq('name', cleanPlayerName)
-        .single();
-
-      if (!existingPlayer) {
+      const pgaPlayerId = playerMap.get(cleanPlayerName);
+      if (!pgaPlayerId) {
         // Skip players that don't exist in our database
         console.log(`Skipping player not in database: ${scorecard.player}`);
         return null;

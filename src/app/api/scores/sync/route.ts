@@ -135,49 +135,58 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Process rostered players first (higher priority)
+    // Process rostered players first (higher priority) - in parallel batches
     console.log(`[SYNC] Processing ${rosteredUpdates.length} rostered players first...`);
-    for (const { score, tournamentPlayerId } of rosteredUpdates) {
 
-      // Log what we're about to store (first 3 players + any with tee time strings)
-      if (updates.length < 3 || (typeof score.thru === 'string' && score.thru.includes('PM'))) {
-        console.log(`\n[SYNC] Updating player: ${score.playerName}`, {
-          position: score.position,
-          total_score: score.total_score,
-          today_score: score.today_score,
-          thru: score.thru,
+    if (rosteredUpdates.length > 0) {
+      const batchSize = 10; // Process in smaller batches to avoid overwhelming the database
+      for (let i = 0; i < rosteredUpdates.length; i += batchSize) {
+        const batch = rosteredUpdates.slice(i, i + batchSize);
+        const batchPromises = batch.map(async ({ score, tournamentPlayerId }) => {
+          // Log what we're about to store (first 3 players + any with tee time strings)
+          if (updates.length < 3 || (typeof score.thru === 'string' && score.thru.includes('PM'))) {
+            console.log(`\n[SYNC] Updating player: ${score.playerName}`, {
+              position: score.position,
+              total_score: score.total_score,
+              today_score: score.today_score,
+              thru: score.thru,
+            });
+          }
+
+          // Update tournament player scores and tee times
+          const { error: updateError } = await supabase
+            .from('tournament_players')
+            .update({
+              total_score: score.total_score,
+              today_score: score.today_score,
+              thru: score.thru,
+              position: score.position,
+              made_cut: score.made_cut,
+              round_1_score: score.round_1_score || null,
+              round_2_score: score.round_2_score || null,
+              round_3_score: score.round_3_score || null,
+              round_4_score: score.round_4_score || null,
+              tee_time: score.tee_time || null,
+              starting_tee: score.starting_tee || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tournamentPlayerId);
+
+          if (updateError) {
+            console.error('Error updating tournament player:', updateError);
+            return null;
+          }
+
+          return {
+            id: tournamentPlayerId,
+            pgaPlayerId: score.pgaPlayerId,
+            playerName: score.playerName,
+          };
         });
+
+        const batchResults = await Promise.all(batchPromises);
+        updates.push(...batchResults.filter(Boolean));
       }
-
-      // Update tournament player scores and tee times
-      const { error: updateError } = await supabase
-        .from('tournament_players')
-        .update({
-          total_score: score.total_score,
-          today_score: score.today_score,
-          thru: score.thru,
-          position: score.position,
-          made_cut: score.made_cut,
-          round_1_score: score.round_1_score || null,
-          round_2_score: score.round_2_score || null,
-          round_3_score: score.round_3_score || null,
-          round_4_score: score.round_4_score || null,
-          tee_time: score.tee_time || null,
-          starting_tee: score.starting_tee || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', tournamentPlayerId);
-
-      if (updateError) {
-        console.error('Error updating tournament player:', updateError);
-        continue;
-      }
-
-      updates.push({
-        id: tournamentPlayerId,
-        pgaPlayerId: score.pgaPlayerId,
-        playerName: score.playerName,
-      });
     }
 
     // Skip other players to avoid timeout - only update rostered players
