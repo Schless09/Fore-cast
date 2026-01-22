@@ -94,14 +94,13 @@ export async function POST(request: NextRequest) {
       .select(`
         tournament_player:tournament_players!inner(
           id,
-          pga_player_id,
-          pga_players(name)
+          pga_player_id
         )
       `)
       .eq('tournament_players.tournament_id', tournamentId);
 
     const rosteredPlayerIds = new Set(
-      rosteredPlayers?.map(rp => rp.tournament_player?.pga_player_id).filter(Boolean) || []
+      rosteredPlayers?.map(rp => (rp as any).tournament_player?.pga_player_id).filter(Boolean) || []
     );
 
     console.log(`[SYNC] Found ${rosteredPlayerIds.size} players in user rosters for this tournament`);
