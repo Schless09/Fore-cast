@@ -1,3 +1,7 @@
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Anyone can read active league invites" ON league_invites;
+DROP POLICY IF EXISTS "Anyone can read league names" ON leagues;
+
 -- Enable public read access for league invites (for viewing invite details before signup)
 CREATE POLICY "Anyone can read active league invites"
 ON league_invites
