@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { RosterBuilder } from '@/components/roster/RosterBuilder';
 import { PersonalLeaderboard } from '@/components/leaderboard/PersonalLeaderboard';
+import { LiveLeaderboard } from '@/components/leaderboard/LiveLeaderboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { TournamentSelector } from '@/components/tournaments/TournamentSelector';
@@ -459,77 +460,20 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             )}
             {tournament.status === 'active' && (
               <span className="text-casino-green">
-                🔄 Auto-updates every 3 minutes
+                🔄 Real-time updates enabled
               </span>
             )}
             <RefreshButton />
           </div>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-            <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
-              <th className="px-2 sm:px-4 py-2">Pos</th>
-              <th className="px-2 sm:px-4 py-2">Golfer</th>
-              <th className="px-2 sm:px-4 py-2">Total</th>
-              <th className="px-2 sm:px-4 py-2">Today</th>
-              <th className="px-2 sm:px-4 py-2 hidden sm:table-cell" title="Holes completed or tee time">Thru</th>
-              <th className="px-2 sm:px-4 py-2 text-right">Prize</th>
-            </tr>
-            </thead>
-            <tbody>
-              {tournamentLeaderboard.map((row, idx) => {
-                const name = row.name || 'Unknown';
-                const normalizedName = name.toLowerCase().trim()
-                  .replace(/\s*\([A-Z]{2}\)\s*$/i, '')
-                  .normalize('NFD')
-                  .replace(/[\u0300-\u036f]/g, '');
-                
-                const playerId = playerNameToIdMap.get(normalizedName) || playerNameToIdMap.get(name.toLowerCase().trim());
-                const isUserPlayer = playerId && userRosterPlayerIds.includes(playerId);
-                
-                const pos = row.position
-                  ? `${row.is_tied ? 'T' : ''}${row.position}`
-                  : 'CUT';
-                const totalClass = getScoreColor(row.total_score);
-                const todayClass = getScoreColor(row.today_score);
-                return (
-                  <tr
-                    key={`${row.position}-${name}-${idx}`}
-                    className={`border-b transition-colors ${
-                      isUserPlayer
-                        ? 'bg-casino-gold/20 border-casino-gold/40 hover:bg-casino-gold/30'
-                        : 'border-casino-gold/10 hover:bg-casino-elevated'
-                    }`}
-                  >
-                    <td className="px-2 sm:px-4 py-2 font-medium text-casino-text text-xs sm:text-sm">
-                      {isUserPlayer && <span className="mr-1">⭐</span>}
-                      {pos}
-                    </td>
-                    <td className={`px-2 sm:px-4 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>
-                      {name}
-                    </td>
-                    <td className={`px-2 sm:px-4 py-2 font-semibold text-xs sm:text-sm ${totalClass}`}>
-                      {formatScore(row.total_score)}
-                    </td>
-                    <td className={`px-2 sm:px-4 py-2 text-xs sm:text-sm ${todayClass}`}>
-                      {formatScore(row.today_score)}
-                    </td>
-                    <td className="px-2 sm:px-4 py-2 text-casino-gray text-xs sm:text-sm hidden sm:table-cell">
-                      {row.thru && row.thru !== '-' && row.thru !== '0' ? row.thru : '-'}
-                    </td>
-                    <td className="px-2 sm:px-4 py-2 text-right text-casino-text text-xs sm:text-sm">
-                      {formatCurrency(
-                        row.prize_money ||
-                          row.prize_distribution?.amount ||
-                          0
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <CardContent>
+          <LiveLeaderboard
+            initialData={tournamentLeaderboard}
+            tournamentId={id}
+            prizeDistributions={prizeDistributions}
+            userRosterPlayerIds={userRosterPlayerIds}
+            playerNameToIdMap={playerNameToIdMap}
+          />
         </CardContent>
       </Card>
     );
