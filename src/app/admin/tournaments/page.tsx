@@ -297,8 +297,11 @@ export default function AdminTournamentsPage() {
                           <p>📍 {tournament.course}</p>
                         )}
                         <p>📅 {new Date(tournament.start_date).toLocaleDateString()} - {new Date(tournament.end_date).toLocaleDateString()}</p>
+                        <p className="text-xs font-mono bg-casino-card px-2 py-1 rounded">
+                          ID: {tournament.id}
+                        </p>
                         {tournament.livegolfapi_event_id && (
-                          <p className="text-casino-green">✓ LiveGolfAPI Connected</p>
+                          <p className="text-casino-green">✓ LiveGolfAPI Connected ({tournament.livegolfapi_event_id})</p>
                         )}
                       </div>
                     </div>
