@@ -71,12 +71,12 @@ export default async function WeeklyStandingsByTournamentPage({
       roster_name,
       total_winnings,
       user_id,
-      profiles!inner(username, league_id),
+      profiles!inner(username, active_league_id),
       tournament:tournaments(name, status)
     `
     )
     .eq('tournament_id', tournamentId)
-    .eq('profiles.league_id', userLeagueId)
+    .eq('profiles.active_league_id', userLeagueId)
     .order('total_winnings', { ascending: false });
 
   if (rostersError) {

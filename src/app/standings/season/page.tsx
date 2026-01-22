@@ -92,12 +92,12 @@ export default async function SeasonStandingsPage() {
         user_id,
         roster_name,
         total_winnings,
-        profiles!inner(username, league_id),
+        profiles!inner(username, active_league_id),
         tournament:tournaments(id, name, status, start_date)
       `
       )
       .in('tournament_id', tournamentIds)
-      .eq('profiles.league_id', userLeagueId)
+      .eq('profiles.active_league_id', userLeagueId)
       .order('created_at', { ascending: false });
 
     rosters = (result.data as unknown as RosterData[]) || [];

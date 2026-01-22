@@ -66,7 +66,6 @@ export default function Home() {
               </h3>
               <p className="text-[#9ca3af] leading-relaxed">
                 Watch your team climb the <span className="text-casino-green font-semibold">real-time leaderboard</span>. 
-                Updated every 3 minutes during tournaments.
               </p>
             </CardContent>
           </Card>
@@ -89,13 +88,13 @@ export default function Home() {
 
         <div className="mt-16 text-center">
           <div className="card-elevated p-8 max-w-3xl mx-auto">
-            <p className="text-casino-gold font-bold text-sm tracking-wider uppercase mb-3">🎲 Casino-Style Gaming</p>
+            <p className="text-casino-gold font-bold text-sm tracking-wider uppercase mb-3">Casino-Style Gaming</p>
             <h3 className="text-2xl sm:text-3xl font-bold text-[#e8eaed] mb-4">
               Weekly Tournaments. Real Competition. Big Prizes.
             </h3>
             <p className="text-[#9ca3af] text-lg mb-6">
               Join thousands of players competing for weekly glory and season championships. 
-              Make your picks before Monday noon CST each week.
+              Make your picks weekly before the golfers tee off.
             </p>
             <button className="btn-casino-gold px-8 py-3 rounded-lg text-lg font-bold">
               Join the Action →

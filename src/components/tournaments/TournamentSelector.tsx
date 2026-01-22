@@ -38,8 +38,7 @@ export function TournamentSelector({
       {tournaments.map((t) => {
         const isCurrentWeek = t.id === currentWeekTournamentId;
         const statusEmoji = 
-          isCurrentWeek ? '⭐ ' :
-          t.status === 'active' ? '🔴 ' :
+          t.status === 'active' ? '⭐ ' :
           t.status === 'upcoming' ? '📅 ' :
           '✅ ';
         
