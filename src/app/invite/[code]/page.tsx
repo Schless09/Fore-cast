@@ -13,14 +13,32 @@ export default async function InvitePage({ params }: InvitePageProps) {
   const { code } = await params;
   const supabase = await createClient();
 
+  // Fetch the league info from the invite code first
+  const { data: invite } = await supabase
+    .from('league_invites')
+    .select(`
+      id,
+      league_id,
+      leagues:league_id (
+        id,
+        name
+      )
+    `)
+    .eq('invite_code', code)
+    .single();
+
+  const leagueName = invite?.leagues ? (invite.leagues as any).name : null;
+
   // Check if user is authenticated
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    // Store invite code in session and redirect to signup
-    const redirectUrl = `/auth/signup?invite=${code}`;
+    // Store invite code and league name, then redirect to signup
+    const redirectUrl = leagueName 
+      ? `/auth/signup?invite=${code}&league=${encodeURIComponent(leagueName)}`
+      : `/auth/signup?invite=${code}`;
     redirect(redirectUrl);
   }
 
