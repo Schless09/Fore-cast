@@ -11,6 +11,7 @@ export function Navbar() {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -76,7 +77,7 @@ export function Navbar() {
           <Link href="/" className="text-2xl font-bold text-casino-gold font-orbitron tracking-wider hover:scale-105 transition-transform">
             FORE!CAST
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-4">
             <Link
               href="/auth/login"
               className="text-casino-text hover:text-casino-gold font-medium transition-colors"
@@ -89,7 +90,42 @@ export function Navbar() {
               </button>
             </Link>
           </div>
+          
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden text-casino-gold p-2"
+            aria-label="Toggle menu"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isMobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
+        
+        {/* Mobile menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden mt-4 pb-4 border-t border-casino-gold/20">
+            <div className="flex flex-col gap-4 pt-4">
+              <Link
+                href="/auth/login"
+                className="text-casino-text hover:text-casino-gold font-medium transition-colors px-4 py-2"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Sign In
+              </Link>
+              <Link href="/auth/signup" onClick={() => setIsMobileMenuOpen(false)}>
+                <button className="btn-casino-gold px-6 py-2 rounded-lg font-semibold w-full">
+                  Sign Up
+                </button>
+              </Link>
+            </div>
+          </div>
+        )}
       </nav>
     );
   }
@@ -100,7 +136,9 @@ export function Navbar() {
           <Link href="/dashboard" className="text-2xl font-bold text-casino-gold font-orbitron tracking-wider hover:scale-105 transition-transform">
             FORE!CAST
           </Link>
-        <div className="flex items-center gap-8">
+        
+        {/* Desktop menu */}
+        <div className="hidden md:flex items-center gap-8">
           <Link
             href="/dashboard"
             className="text-casino-text hover:text-casino-gold font-medium transition-all hover:tracking-wide"
@@ -139,7 +177,74 @@ export function Navbar() {
             </button>
           </div>
         </div>
+        
+        {/* Mobile menu button */}
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="md:hidden text-casino-gold p-2"
+          aria-label="Toggle menu"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {isMobileMenuOpen ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            )}
+          </svg>
+        </button>
       </div>
+      
+      {/* Mobile menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-casino-gold/20">
+          <div className="max-w-7xl mx-auto flex flex-col gap-1 py-4">
+            <Link
+              href="/dashboard"
+              className="text-casino-text hover:text-casino-gold hover:bg-casino-card/50 font-medium transition-all px-4 py-3 rounded-lg"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/tournaments"
+              className="text-casino-text hover:text-casino-gold hover:bg-casino-card/50 font-medium transition-all px-4 py-3 rounded-lg"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Tournaments
+            </Link>
+            <Link
+              href="/standings/weekly"
+              className="text-casino-text hover:text-casino-gold hover:bg-casino-card/50 font-medium transition-all px-4 py-3 rounded-lg"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Weekly Standings
+            </Link>
+            <Link
+              href="/standings/season"
+              className="text-casino-text hover:text-casino-gold hover:bg-casino-card/50 font-medium transition-all px-4 py-3 rounded-lg"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Season Standings
+            </Link>
+            <div className="border-t border-casino-gold/20 mt-2 pt-2 px-4">
+              {profile && (
+                <p className="text-sm text-casino-gold font-semibold mb-3">
+                  {profile.username || profile.email?.split('@')[0] || 'User'}
+                </p>
+              )}
+              <button
+                onClick={() => {
+                  handleSignOut();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="text-casino-gray hover:text-casino-text text-sm font-medium transition-colors w-full text-left py-2"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
