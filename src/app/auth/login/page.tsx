@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { Card, CardContent } from '@/components/ui/Card';
 
+export const dynamic = 'force-dynamic';
+
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
