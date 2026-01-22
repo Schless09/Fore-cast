@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { logger } from '@/lib/logger';
 
-export function SignupForm() {
+interface SignupFormProps {
+  inviteCode?: string;
+}
+
+export function SignupForm({ inviteCode }: SignupFormProps) {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -86,7 +90,13 @@ export function SignupForm() {
         // User is immediately signed in (email confirmation disabled)
         // Profile will be created automatically via trigger
         logger.info('User immediately signed in, redirecting to dashboard');
-        router.push('/dashboard');
+        
+        // If there's an invite code, redirect to the invite page to accept it
+        if (inviteCode) {
+          router.push(`/invite/${inviteCode}`);
+        } else {
+          router.push('/dashboard');
+        }
         router.refresh();
       } else {
         // Email confirmation required - show success message

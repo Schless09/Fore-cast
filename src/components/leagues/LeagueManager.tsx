@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { JoinLeagueModal } from './JoinLeagueModal';
-import { switchLeague, leaveLeague } from '@/lib/actions/league';
+import { switchLeague, leaveLeague, createLeagueInvite } from '@/lib/actions/league';
 
 interface League {
   id: string;
@@ -22,6 +22,8 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueM
   const [showModal, setShowModal] = useState(false);
   const [activeLeagueId, setActiveLeagueId] = useState(initialActiveLeagueId);
   const [loading, setLoading] = useState<string | null>(null);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [showInvite, setShowInvite] = useState<string | null>(null);
   const router = useRouter();
 
   const handleSwitchLeague = async (leagueId: string) => {
@@ -49,6 +51,26 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueM
       alert(result.error || 'Failed to leave league');
     }
     setLoading(null);
+  };
+
+  const handleGenerateInvite = async (leagueId: string) => {
+    setLoading(leagueId);
+    const result = await createLeagueInvite(leagueId);
+    
+    if (result.success && result.inviteUrl) {
+      setInviteUrl(result.inviteUrl);
+      setShowInvite(leagueId);
+    } else {
+      alert(result.error || 'Failed to generate invite link');
+    }
+    setLoading(null);
+  };
+
+  const copyToClipboard = () => {
+    if (inviteUrl) {
+      navigator.clipboard.writeText(inviteUrl);
+      alert('Invite link copied to clipboard!');
+    }
   };
 
   return (
@@ -83,54 +105,91 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueM
                 const isActive = league.id === activeLeagueId;
                 
                 return (
-                  <div
-                    key={league.id}
-                    className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
-                      isActive
-                        ? 'border-casino-gold bg-casino-gold/10'
-                        : 'border-casino-card hover:border-casino-gold/30'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {isActive && (
-                        <span className="text-casino-gold text-xl">⭐</span>
-                      )}
-                      <div>
-                        <h3 className="font-bold text-casino-text">
-                          {league.name}
-                        </h3>
-                        <p className="text-xs text-casino-gray">
-                          Joined {new Date(league.joined_at).toLocaleDateString()}
-                        </p>
+                  <div key={league.id}>
+                    <div
+                      className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                        isActive
+                          ? 'border-casino-gold bg-casino-gold/10'
+                          : 'border-casino-card hover:border-casino-gold/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isActive && (
+                          <span className="text-casino-gold text-xl">⭐</span>
+                        )}
+                        <div>
+                          <h3 className="font-bold text-casino-text">
+                            {league.name}
+                          </h3>
+                          <p className="text-xs text-casino-gray">
+                            Joined {new Date(league.joined_at).toLocaleDateString()}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                      {!isActive && (
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Button
-                          onClick={() => handleSwitchLeague(league.id)}
+                          onClick={() => handleGenerateInvite(league.id)}
                           disabled={loading === league.id}
                           variant="outline"
                           size="sm"
+                          className="text-casino-blue border-casino-blue/30 hover:bg-casino-blue/10"
                         >
-                          {loading === league.id ? 'Switching...' : 'Switch To'}
+                          📨 Invite
                         </Button>
-                      )}
-                      {isActive && (
-                        <span className="text-xs px-3 py-1 bg-casino-gold/20 text-casino-gold rounded-full font-medium">
-                          Active
-                        </span>
-                      )}
-                      <Button
-                        onClick={() => handleLeaveLeague(league.id, league.name)}
-                        disabled={loading === league.id}
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        Leave
-                      </Button>
+                        {!isActive && (
+                          <Button
+                            onClick={() => handleSwitchLeague(league.id)}
+                            disabled={loading === league.id}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {loading === league.id ? 'Switching...' : 'Switch To'}
+                          </Button>
+                        )}
+                        {isActive && (
+                          <span className="text-xs px-3 py-1 bg-casino-gold/20 text-casino-gold rounded-full font-medium">
+                            Active
+                          </span>
+                        )}
+                        <Button
+                          onClick={() => handleLeaveLeague(league.id, league.name)}
+                          disabled={loading === league.id}
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          Leave
+                        </Button>
+                      </div>
                     </div>
+                    
+                    {/* Show invite link if generated for this league */}
+                    {showInvite === league.id && inviteUrl && (
+                      <div className="mt-2 p-4 bg-casino-blue/10 border border-casino-blue/30 rounded-lg">
+                        <p className="text-sm text-casino-text mb-2 font-medium">
+                          Share this link with friends:
+                        </p>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={inviteUrl}
+                            readOnly
+                            className="flex-1 px-3 py-2 bg-casino-card border border-casino-gold/30 rounded text-sm text-casino-text"
+                          />
+                          <Button
+                            onClick={copyToClipboard}
+                            size="sm"
+                            variant="primary"
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                        <p className="text-xs text-casino-gray mt-2">
+                          Anyone with this link can join your league (if they have an account or create one)
+                        </p>
+                      </div>
+                    )}
                   </div>
                 );
               })}

@@ -293,3 +293,154 @@ export async function leaveLeague(leagueId: string) {
 
   return { success: true };
 }
+
+// Create an invite link for a league
+export async function createLeagueInvite(leagueId: string) {
+  const supabase = await createClient();
+  
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !user) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  // Verify user is a member of this league
+  const { data: membership } = await supabase
+    .from('league_members')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('league_id', leagueId)
+    .single();
+
+  if (!membership) {
+    return { success: false, error: 'Not a member of this league' };
+  }
+
+  // Generate invite code using the database function
+  const { data: codeResult, error: codeError } = await supabase
+    .rpc('generate_invite_code');
+
+  if (codeError || !codeResult) {
+    return { success: false, error: 'Failed to generate invite code' };
+  }
+
+  // Create the invite
+  const { data: invite, error: inviteError } = await supabase
+    .from('league_invites')
+    .insert({
+      league_id: leagueId,
+      invite_code: codeResult,
+      created_by: user.id,
+    })
+    .select('id, invite_code')
+    .single();
+
+  if (inviteError || !invite) {
+    return { success: false, error: 'Failed to create invite' };
+  }
+
+  return { 
+    success: true, 
+    inviteCode: invite.invite_code,
+    inviteUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/invite/${invite.invite_code}`
+  };
+}
+
+// Accept an invite and join the league
+export async function acceptLeagueInvite(inviteCode: string) {
+  const supabase = await createClient();
+  
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !user) {
+    return { success: false, error: 'Not authenticated', requiresAuth: true };
+  }
+
+  // Get invite details
+  const { data: invite, error: inviteError } = await supabase
+    .from('league_invites')
+    .select(`
+      id,
+      league_id,
+      max_uses,
+      current_uses,
+      is_active,
+      expires_at,
+      leagues:league_id (
+        id,
+        name
+      )
+    `)
+    .eq('invite_code', inviteCode)
+    .single();
+
+  if (inviteError || !invite) {
+    return { success: false, error: 'Invalid invite code' };
+  }
+
+  // Check if invite is valid
+  if (!invite.is_active) {
+    return { success: false, error: 'This invite is no longer active' };
+  }
+
+  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+    return { success: false, error: 'This invite has expired' };
+  }
+
+  if (invite.max_uses && invite.current_uses >= invite.max_uses) {
+    return { success: false, error: 'This invite has reached its maximum uses' };
+  }
+
+  // Check if user is already a member
+  const { data: existingMember } = await supabase
+    .from('league_members')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('league_id', invite.league_id)
+    .single();
+
+  if (existingMember) {
+    // Already a member, just switch to this league
+    await supabase
+      .from('profiles')
+      .update({ active_league_id: invite.league_id })
+      .eq('id', user.id);
+    
+    return { 
+      success: true, 
+      message: 'You are already a member of this league',
+      leagueName: (invite.leagues as any)?.name
+    };
+  }
+
+  // Add user to league_members
+  const { error: memberError } = await supabase
+    .from('league_members')
+    .insert({ 
+      user_id: user.id, 
+      league_id: invite.league_id,
+      is_active: true
+    });
+
+  if (memberError) {
+    return { success: false, error: 'Failed to join league' };
+  }
+
+  // Set as active league
+  await supabase
+    .from('profiles')
+    .update({ active_league_id: invite.league_id })
+    .eq('id', user.id);
+
+  // Increment invite usage count
+  await supabase
+    .from('league_invites')
+    .update({ current_uses: invite.current_uses + 1 })
+    .eq('id', invite.id);
+
+  return { 
+    success: true, 
+    message: 'Successfully joined league!',
+    leagueName: (invite.leagues as any)?.name
+  };
+}
