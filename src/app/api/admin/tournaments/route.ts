@@ -141,41 +141,65 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Prepare tournament data
-    const tournamentData = tournaments.map((t: any) => ({
-      name: t.name,
-      course: t.course || null,
-      start_date: t.start_date,
-      end_date: t.end_date,
-      status: t.status || 'upcoming',
-      current_round: 1,
-      livegolfapi_event_id: t.livegolfapi_event_id || null,
-    }));
+    const createdTournaments = [];
+    let skippedCount = 0;
 
-    const { data: createdTournaments, error } = await supabase
-      .from('tournaments')
-      .insert(tournamentData)
-      .select();
+    // Process each tournament individually to handle duplicates properly
+    for (const tournament of tournaments) {
+      // Check if tournament already exists by livegolfapi_event_id or name + start_date
+      let existingQuery = supabase.from('tournaments').select('id');
 
-    if (error) {
-      logger.error('Failed to bulk create tournaments', {
-        errorMessage: error.message,
-        errorCode: error.code,
-        tournamentCount: tournaments.length,
-      }, error as Error);
-      return NextResponse.json(
-        { error: `Failed to create tournaments: ${error.message}` },
-        { status: 500 }
-      );
+      if (tournament.livegolfapi_event_id) {
+        existingQuery = existingQuery.eq('livegolfapi_event_id', tournament.livegolfapi_event_id);
+      } else {
+        existingQuery = existingQuery.eq('name', tournament.name).eq('start_date', tournament.start_date);
+      }
+
+      const { data: existing } = await existingQuery.limit(1);
+
+      if (existing && existing.length > 0) {
+        // Tournament already exists, skip it
+        skippedCount++;
+        continue;
+      }
+
+      // Create new tournament
+      const { data: newTournament, error: createError } = await supabase
+        .from('tournaments')
+        .insert({
+          name: tournament.name,
+          course: tournament.course || null,
+          start_date: tournament.start_date,
+          end_date: tournament.end_date,
+          status: tournament.status || 'upcoming',
+          current_round: 1,
+          livegolfapi_event_id: tournament.livegolfapi_event_id || null,
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        logger.error('Failed to create tournament', {
+          errorMessage: createError.message,
+          tournamentName: tournament.name,
+        }, createError as Error);
+        // Continue with other tournaments instead of failing completely
+        continue;
+      }
+
+      createdTournaments.push(newTournament);
     }
 
-    logger.info('Bulk tournaments created successfully', {
-      count: createdTournaments?.length || 0,
+    logger.info('Bulk tournaments processed successfully', {
+      created: createdTournaments.length,
+      skipped: skippedCount,
+      total: tournaments.length,
     });
 
     return NextResponse.json({
       success: true,
-      count: createdTournaments?.length || 0,
+      count: createdTournaments.length,
+      skipped: skippedCount,
       tournaments: createdTournaments,
     });
   } catch (error: any) {

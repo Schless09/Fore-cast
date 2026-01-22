@@ -177,7 +177,7 @@ export default function AdminTournamentsPage() {
   };
 
   const handleBulkImport = async () => {
-    if (!confirm(`Import ${seedData.length} tournaments? This will create all tournaments from the 2026 season.`)) {
+    if (!confirm(`Import ${seedData.length} tournaments? This will create new tournaments from the 2026 season and skip any that already exist.`)) {
       return;
     }
 
@@ -312,6 +312,8 @@ export default function AdminTournamentsPage() {
         <CardContent>
           <p className="text-gray-600 mb-4">
             Delete all tournaments from the database. This will also delete all related rosters and player data.
+            <br />
+            <strong className="text-red-600">⚠️ Use this to clean up duplicate tournaments before re-importing.</strong>
           </p>
           <Button
             onClick={handleDeleteAll}
