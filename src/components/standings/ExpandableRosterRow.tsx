@@ -160,6 +160,9 @@ export function ExpandableRosterRow({
                         <th className="px-1 sm:px-2 py-1 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">
                           Score
                         </th>
+                        <th className="px-1 sm:px-2 py-1 text-center text-xs font-medium text-casino-gray uppercase hidden md:table-cell">
+                          Tee
+                        </th>
                         <th className="px-1 sm:px-2 py-1 text-right text-xs font-medium text-casino-gray uppercase">
                           Win
                         </th>
@@ -223,6 +226,20 @@ export function ExpandableRosterRow({
                                 <span className="text-casino-gray-dark">-</span>
                               )}
                             </td>
+                            <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center hidden md:table-cell">
+                              {tp?.tee_time ? (
+                                <span className="text-casino-gray">
+                                  {new Date(tp.tee_time).toLocaleTimeString('en-US', { 
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true,
+                                    timeZone: 'America/Chicago'
+                                  })}
+                                </span>
+                              ) : (
+                                <span className="text-casino-gray-dark">-</span>
+                              )}
+                            </td>
                             <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-right">
                               <span
                                 className={
@@ -248,7 +265,13 @@ export function ExpandableRosterRow({
                         </td>
                         <td
                           colSpan={3}
-                          className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm font-semibold text-casino-gold text-right hidden sm:table-cell"
+                          className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm font-semibold text-casino-gold text-right hidden sm:table-cell md:hidden"
+                        >
+                          Total Winnings:
+                        </td>
+                        <td
+                          colSpan={4}
+                          className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm font-semibold text-casino-gold text-right hidden md:table-cell"
                         >
                           Total Winnings:
                         </td>

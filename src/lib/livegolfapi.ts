@@ -26,6 +26,8 @@ interface LiveGolfAPIRound {
   total: string | null;
   thru: string;
   position: string;
+  teeTime?: string;
+  startingTee?: number;
 }
 
 interface LiveGolfAPIScorecard {

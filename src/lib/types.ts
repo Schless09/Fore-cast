@@ -52,6 +52,8 @@ export interface TournamentPlayer {
   prize_money: number;
   is_tied: boolean;
   tied_with_count: number;
+  tee_time: string | null;
+  starting_tee: number | null;
   created_at: string;
   updated_at: string;
   // Joined data

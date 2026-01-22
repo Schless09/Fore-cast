@@ -232,6 +232,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                   : 0,
               prize_money: 0,
               name: scorecard.player || 'Unknown',
+              tee_time: currentRound?.teeTime || null,
+              starting_tee: currentRound?.startingTee || null,
               prize_distribution:
                 actualPosition && prizeDistributionMap.has(actualPosition)
                   ? prizeDistributionMap.get(actualPosition)
@@ -298,6 +300,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               <th className="px-2 sm:px-4 py-2">Total</th>
               <th className="px-2 sm:px-4 py-2">Today</th>
               <th className="px-2 sm:px-4 py-2 hidden sm:table-cell">Thru</th>
+              <th className="px-2 sm:px-4 py-2 hidden lg:table-cell">Tee</th>
               <th className="px-2 sm:px-4 py-2 text-right hidden md:table-cell">%</th>
               <th className="px-2 sm:px-4 py-2 text-right">Prize</th>
             </tr>
@@ -330,6 +333,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                     </td>
                     <td className="px-2 sm:px-4 py-2 text-gray-700 text-xs sm:text-sm hidden sm:table-cell">
                       {row.thru ? row.thru : '-'}
+                    </td>
+                    <td className="px-2 sm:px-4 py-2 text-gray-600 text-xs sm:text-sm hidden lg:table-cell">
+                      {row.tee_time ? new Date(row.tee_time).toLocaleTimeString('en-US', { 
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                        timeZone: 'America/Chicago'
+                      }) : '-'}
                     </td>
                     <td className="px-2 sm:px-4 py-2 text-right text-gray-900 text-xs sm:text-sm hidden md:table-cell">
                       {percentage}
