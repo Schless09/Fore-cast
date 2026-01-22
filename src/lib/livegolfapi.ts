@@ -324,11 +324,14 @@ export async function transformLiveGolfAPIScores(
   
   const results = await Promise.all(
     scorecards.map(async (scorecard, idx) => {
+      // Strip course suffix from API player name (e.g., "Min Woo Lee (NT)" → "Min Woo Lee")
+      const cleanPlayerName = scorecard.player.replace(/\s*\([^)]+\)\s*$/, '').trim();
+
       // Check if player exists in our database
       const { data: existingPlayer } = await supabaseClient
         .from('pga_players')
         .select('id')
-        .eq('name', scorecard.player)
+        .eq('name', cleanPlayerName)
         .single();
 
       if (!existingPlayer) {
@@ -397,7 +400,7 @@ export async function transformLiveGolfAPIScores(
 
       return {
         pgaPlayerId,
-        playerName: scorecard.player,
+        playerName: cleanPlayerName,
         total_score,
         today_score,
         thru,

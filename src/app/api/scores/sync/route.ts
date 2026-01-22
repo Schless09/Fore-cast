@@ -100,9 +100,9 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!existingTournamentPlayer) {
-        // Skip players that aren't in this tournament
-        console.log(`[SYNC] Skipping player not in tournament: ${score.playerName}`);
-        continue;
+                  // Skip players that aren't in this tournament
+                  console.log(`[SYNC] Skipping player not in tournament: ${score.playerName} (clean: ${score.playerName.replace(/\s*\([^)]+\)\s*$/, '').trim()})`);
+                  continue;
       }
 
       const tournamentPlayerId = existingTournamentPlayer.id;
