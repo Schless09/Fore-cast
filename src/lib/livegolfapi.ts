@@ -248,6 +248,8 @@ export async function fetchScoresFromLiveGolfAPI(
     // Extract the leaderboard array from the response
     const leaderboard = json.leaderboard || json;
     const fetchTime = Date.now();
+
+
     await writeCache(eventId, leaderboard);
 
     console.log(`[LiveGolfAPI] ✅ SUCCESSFULLY FETCHED FRESH DATA: ${Array.isArray(leaderboard) ? leaderboard.length : 'unknown'} records`);

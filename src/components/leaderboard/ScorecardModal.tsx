@@ -79,17 +79,7 @@ export function ScorecardModal({ player, tournamentId, isOpen, onClose }: Scorec
         scores: [] // Would be populated with real hole data from API
       };
 
-      // If player has completed holes, show them
-      const holesCompleted = parseInt(String(tournamentPlayer.thru)) || 0;
-      if (holesCompleted > 0) {
-        // Mock hole-by-hole data - in real implementation, this comes from LiveGolfAPI
-        scorecardData.scores = Array.from({ length: Math.min(holesCompleted, 18) }, (_, i) => ({
-          hole: i + 1,
-          par: 4, // Standard par 4 - would come from course data
-          score: Math.floor(Math.random() * 3) + 3, // Would come from API
-          yardage: Math.floor(Math.random() * 200) + 420, // Would come from course data
-        }));
-      }
+      // LiveGolfAPI doesn't provide individual hole scores, only round summaries
 
       setScorecard(scorecardData);
     } catch (err) {
@@ -172,10 +162,10 @@ export function ScorecardModal({ player, tournamentId, isOpen, onClose }: Scorec
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span>Detailed hole-by-hole scorecard data coming soon!</span>
+                  <span>Detailed hole-by-hole scores not available from LiveGolfAPI</span>
                 </div>
                 <p className="text-center text-sm text-casino-gray mt-2">
-                  Currently showing round summary. Full scorecard integration with LiveGolfAPI in progress.
+                  LiveGolfAPI provides tournament summaries only. Individual hole scores would require a different golf data provider.
                 </p>
               </div>
 
