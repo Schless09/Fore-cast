@@ -85,11 +85,11 @@ export const config = {
     /*
      * Only run middleware on protected routes to reduce overhead
      * Skip homepage, auth pages initially, and all static assets
+     * Removed /standings to reduce auth API calls (handled in page components)
      */
     '/dashboard/:path*',
     '/tournaments/:path*',
     '/players/:path*',
-    '/standings/:path*',
     '/admin/:path*',
   ],
 };
