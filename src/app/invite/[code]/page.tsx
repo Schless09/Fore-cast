@@ -13,21 +13,25 @@ export default async function InvitePage({ params }: InvitePageProps) {
   const { code } = await params;
   const supabase = await createClient();
 
-  // Fetch the league info from the invite code first
-  const { data: invite } = await supabase
+  // Fetch the invite first
+  const { data: invite, error: inviteError } = await supabase
     .from('league_invites')
-    .select(`
-      id,
-      league_id,
-      leagues:league_id (
-        id,
-        name
-      )
-    `)
+    .select('id, league_id, is_active, expires_at')
     .eq('invite_code', code)
     .single();
 
-  const leagueName = invite?.leagues ? (invite.leagues as any).name : null;
+  let leagueName = null;
+
+  // If invite exists, fetch the league name
+  if (invite && !inviteError) {
+    const { data: league } = await supabase
+      .from('leagues')
+      .select('name')
+      .eq('id', invite.league_id)
+      .single();
+    
+    leagueName = league?.name;
+  }
 
   // Check if user is authenticated
   const {
