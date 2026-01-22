@@ -46,9 +46,10 @@ export function JoinLeagueModal({ onClose, canClose = false }: JoinLeagueModalPr
         return;
       }
 
-      // Success! Refresh the page to update the UI
-      router.refresh();
+      // Success! Redirect to dashboard
       if (onClose) onClose();
+      router.push('/dashboard');
+      router.refresh();
     } catch (err) {
       console.error('Error in handleSubmit:', err);
       setError('An unexpected error occurred. Please try again.');
