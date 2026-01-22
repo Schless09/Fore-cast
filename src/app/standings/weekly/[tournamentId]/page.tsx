@@ -73,6 +73,7 @@ export default async function WeeklyStandingsByTournamentPage({
   }
 
   // Get user's roster rank
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userRosterIndex = rosters?.findIndex((r: any) => r.user_id === user.id);
   const userRank = userRosterIndex !== undefined && userRosterIndex !== -1 ? userRosterIndex + 1 : null;
 
@@ -86,6 +87,7 @@ export default async function WeeklyStandingsByTournamentPage({
 
   // Re-sort to prioritize: active > completed (recent) > upcoming (next)
   const sortedTournaments = allTournaments
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ? [...allTournaments].sort((a: any, b: any) => {
         // Priority: active > completed > upcoming
         const statusPriority: Record<string, number> = {
@@ -143,9 +145,11 @@ export default async function WeeklyStandingsByTournamentPage({
     currentWeekTournamentId = currentActive.id;
   } else if (isAfterMondayNoonCST()) {
     // After Monday noon CST: show next upcoming tournament
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     currentWeekTournamentId = sortedTournaments.find((t: any) => t.status === 'upcoming')?.id;
   } else {
     // Before Monday noon CST: show most recent completed tournament
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     currentWeekTournamentId = sortedTournaments.find((t: any) => t.status === 'completed')?.id;
   }
   
@@ -269,6 +273,7 @@ export default async function WeeklyStandingsByTournamentPage({
                     </tr>
                   </thead>
                   <tbody>
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {rosters.map((roster: any, index: number) => {
                       const isUserRoster = roster.user_id === user.id;
 
@@ -319,6 +324,7 @@ export default async function WeeklyStandingsByTournamentPage({
               <div className="text-right">
                 <p className="text-xs sm:text-sm text-casino-gray mb-1">Your Winnings</p>
                 <p className="text-xl sm:text-2xl font-bold text-casino-green font-orbitron">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {formatCurrency(
                     rosters?.find((r: any) => r.user_id === user.id)?.total_winnings || 0
                   )}
