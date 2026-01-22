@@ -197,7 +197,7 @@ export async function fetchScoresFromLiveGolfAPI(
   // Check cache first - if fresh, return immediately
   const cached = await readCache(eventId);
   if (cached && !cached.isStale) {
-    const cacheTimestamp = cached.timestamp || (Date.now() - cached.age);
+    const cacheTimestamp = Date.now() - cached.age;
     console.log(`[LiveGolfAPI] Using fresh cache for ${eventId} (${Math.round(cached.age / 1000)}s old, timestamp: ${new Date(cacheTimestamp).toISOString()})`);
     return {
       data: cached.data,
