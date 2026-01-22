@@ -214,7 +214,7 @@ export function ExpandableRosterRow({
                           Score
                         </th>
                         <th className="px-1 sm:px-2 py-1 text-center text-xs font-medium text-casino-gray uppercase hidden md:table-cell">
-                          Tee
+                          Thru
                         </th>
                         <th className="px-1 sm:px-2 py-1 text-right text-xs font-medium text-casino-gray uppercase">
                           Win
