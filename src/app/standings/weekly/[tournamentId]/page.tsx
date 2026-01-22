@@ -39,6 +39,9 @@ export default async function WeeklyStandingsByTournamentPage({
 
   const userLeagueId = userProfile?.active_league_id;
 
+  // Debug: Log the league ID being used
+  console.log('[Weekly Standings] User:', user.id, 'Active League ID:', userLeagueId);
+
   // Get tournament
   const { data: tournament, error: tournamentError } = await supabase
     .from('tournaments')
@@ -82,6 +85,15 @@ export default async function WeeklyStandingsByTournamentPage({
   if (rostersError) {
     console.error('Error loading rosters:', rostersError);
   }
+
+  // Debug: Log roster query results
+  console.log('[Weekly Standings] Rosters found:', rosters?.length || 0);
+  console.log('[Weekly Standings] Rosters:', rosters?.map((r: any) => ({
+    username: r.profiles?.username,
+    league_id: r.profiles?.active_league_id,
+    roster_name: r.roster_name,
+    winnings: r.total_winnings
+  })));
 
   // Get user's roster rank
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
