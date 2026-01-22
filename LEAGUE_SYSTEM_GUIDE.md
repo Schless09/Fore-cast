@@ -36,7 +36,24 @@ The migration automatically:
 
 ## Creating Additional Leagues
 
-To create new leagues for other friend groups, run this SQL in Supabase:
+### Option 1: Via UI (Recommended)
+
+Users can create their own leagues directly from the onboarding modal:
+
+1. When the "Join League" modal appears, click **"Don't have a league? Create one"**
+2. Enter your desired league name (minimum 3 characters)
+3. Set a password (minimum 4 characters)
+4. Click "Create League"
+5. Share the league name and password with your friends!
+
+The system automatically:
+- Validates the league name is unique
+- Creates the league
+- Adds you as the first member
+
+### Option 2: Via SQL (Advanced)
+
+For direct database access, run this SQL in Supabase:
 
 ```sql
 INSERT INTO leagues (name, password) 
@@ -93,8 +110,22 @@ All standings pages now filter by the user's league:
 1. User signs up → Creates account
 2. Redirected to dashboard
 3. **"Join League" modal appears** (cannot be dismissed)
-4. User enters league name and password
-5. On successful join → Modal closes, dashboard loads with league data
+4. User can either:
+   - **Join existing league**: Enter league name and password
+   - **Create new league**: Click toggle link, set name and password
+5. On success → Modal closes, dashboard loads with league data
+
+**Creating a League:**
+- Click "Don't have a league? Create one"
+- Enter unique league name (3+ characters)
+- Set password (4+ characters)
+- Share credentials with friends
+- You become the first member
+
+**Joining a League:**
+- Get league name and password from organizer
+- Enter credentials in the join form
+- Instantly added to the league standings
 
 ### Existing User Experience
 
@@ -168,13 +199,15 @@ DELETE FROM leagues WHERE id = 'league-uuid';
 
 Potential improvements for the league system:
 
+- [x] League creation UI ✅ (Completed)
 - [ ] League admin dashboard
 - [ ] Invite-only leagues (remove password requirement)
 - [ ] League settings (buy-in amount, payout structure)
 - [ ] Cross-league challenges
 - [ ] League chat/comments
 - [ ] League statistics and analytics
-- [ ] League creation UI (instead of SQL)
+- [ ] League member list/management
+- [ ] Password reset/change functionality
 
 ## Support
 

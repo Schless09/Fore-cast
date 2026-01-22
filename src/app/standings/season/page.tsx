@@ -54,14 +54,14 @@ export default async function SeasonStandingsPage() {
     redirect('/auth/login');
   }
 
-  // Get user's league
+  // Get user's active league
   const { data: userProfile } = await supabase
     .from('profiles')
-    .select('league_id')
+    .select('active_league_id')
     .eq('id', user.id)
     .single();
 
-  const userLeagueId = userProfile?.league_id;
+  const userLeagueId = userProfile?.active_league_id;
 
   // Get all completed rosters with winnings
   // Note: We need to filter by tournament status, so we'll get tournaments first

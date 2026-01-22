@@ -16,10 +16,10 @@ export default async function DashboardPage() {
     redirect('/auth/login');
   }
 
-  // Get user's profile with league info
+  // Get user's profile with active league info
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*, league:leagues(name)')
+    .select('*, league:leagues!profiles_active_league_id_fkey(name)')
     .eq('id', user.id)
     .single();
 

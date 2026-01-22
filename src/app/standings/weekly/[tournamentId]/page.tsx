@@ -30,14 +30,14 @@ export default async function WeeklyStandingsByTournamentPage({
     redirect('/auth/login');
   }
 
-  // Get user's league
+  // Get user's active league
   const { data: userProfile } = await supabase
     .from('profiles')
-    .select('league_id')
+    .select('active_league_id')
     .eq('id', user.id)
     .single();
 
-  const userLeagueId = userProfile?.league_id;
+  const userLeagueId = userProfile?.active_league_id;
 
   // Get tournament
   const { data: tournament, error: tournamentError } = await supabase

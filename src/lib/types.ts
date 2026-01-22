@@ -8,11 +8,20 @@ export interface League {
   updated_at: string;
 }
 
+export interface LeagueMember {
+  id: string;
+  user_id: string;
+  league_id: string;
+  joined_at: string;
+  is_active: boolean;
+}
+
 export interface Profile {
   id: string;
   username: string;
   email: string;
-  league_id: string | null;
+  league_id: string | null; // Deprecated, use active_league_id
+  active_league_id: string | null;
   created_at: string;
   updated_at: string;
 }
