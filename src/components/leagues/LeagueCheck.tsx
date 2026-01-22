@@ -23,7 +23,8 @@ export function LeagueCheck() {
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       const result = await checkUserLeague();
-      if (!result.hasLeague) {
+      // Only show modal if user is authenticated but has no league
+      if (result.isAuthenticated && !result.hasLeague) {
         setShowModal(true);
       }
       setChecking(false);

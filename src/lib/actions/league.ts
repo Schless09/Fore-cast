@@ -193,7 +193,7 @@ export async function checkUserLeague() {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   
   if (userError || !user) {
-    return { hasLeague: false, leagueName: null, leagues: [] };
+    return { isAuthenticated: false, hasLeague: false, leagueName: null, leagues: [] };
   }
 
   // Get all leagues user is a member of
@@ -203,7 +203,7 @@ export async function checkUserLeague() {
     .eq('user_id', user.id);
 
   if (!memberships || memberships.length === 0) {
-    return { hasLeague: false, leagueName: null, leagues: [] };
+    return { isAuthenticated: true, hasLeague: false, leagueName: null, leagues: [] };
   }
 
   // Get active league
@@ -218,6 +218,7 @@ export async function checkUserLeague() {
   );
 
   return { 
+    isAuthenticated: true,
     hasLeague: true, 
     leagueName: (activeLeague?.leagues as any)?.name || (memberships[0].leagues as any)?.name,
     leagues: memberships.map(m => (m.leagues as any))
