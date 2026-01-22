@@ -142,7 +142,9 @@ export function LiveLeaderboard({
             const totalClass = getScoreColor(row.total_score);
             const todayClass = getScoreColor(row.today_score);
 
-            const prizeAmount = row.prize_distribution?.amount ||
+            // Use calculated prize_money from database first, then fall back to distribution
+            const prizeAmount = row.prize_money ||
+              row.prize_distribution?.amount ||
               (row.position && prizeDistributionMap.has(row.position)
                 ? prizeDistributionMap.get(row.position)?.amount
                 : 0);
