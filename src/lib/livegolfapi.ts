@@ -447,8 +447,15 @@ export async function transformMinimalLiveGolfAPIScores(
   today_score: number;
   thru: number | string;
   position: number | null;
+  is_tied: boolean;
+  tied_with_count: number;
   made_cut: boolean;
+  round_1_score: number | null;
+  round_2_score: number | null;
+  round_3_score: number | null;
+  round_4_score: number | null;
   tee_time: string | null;
+  starting_tee: number | null;
 }>> {
   console.log(`\n=== Transforming ${minimalScores.length} minimal scores ===`);
 
@@ -533,10 +540,15 @@ export async function transformMinimalLiveGolfAPIScores(
         today_score: score.total_score, // For round 1, today = total
         thru,
         position: score.calculatedPosition,
-        made_cut: score.calculatedPosition !== null && score.calculatedPosition <= 65,
         is_tied: score.isTied || false,
         tied_with_count: score.tiedCount || 1,
+        made_cut: score.calculatedPosition !== null && score.calculatedPosition <= 65,
+        round_1_score: null, // Minimal API doesn't provide round scores
+        round_2_score: null,
+        round_3_score: null,
+        round_4_score: null,
         tee_time: score.tee_time,
+        starting_tee: null, // Minimal API doesn't provide starting tee
       };
     })
     .filter(Boolean);
