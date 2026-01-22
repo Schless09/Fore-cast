@@ -21,30 +21,55 @@ export default async function InvitePage({ params }: InvitePageProps) {
   if (!user) {
     // Fetch league info before redirecting (now using public RLS policies)
     try {
+      console.log('[INVITE] Fetching invite with code:', code);
+      
       const { data: invite, error: inviteError } = await supabase
         .from('league_invites')
-        .select('league_id')
+        .select('league_id, is_active')
         .eq('invite_code', code)
         .eq('is_active', true)
         .maybeSingle();
 
+      console.log('[INVITE] Invite query result:', { invite, inviteError });
+
+      if (inviteError) {
+        console.error('[INVITE] Error fetching invite:', inviteError);
+        redirect(`/auth/signup?invite=${code}`);
+      }
+
+      if (!invite) {
+        console.log('[INVITE] No active invite found with code:', code);
+        redirect(`/auth/signup?invite=${code}`);
+      }
+
       if (invite?.league_id) {
+        console.log('[INVITE] Fetching league with id:', invite.league_id);
+        
         const { data: league, error: leagueError } = await supabase
           .from('leagues')
           .select('name')
           .eq('id', invite.league_id)
           .single();
         
-        if (league?.name && !leagueError) {
+        console.log('[INVITE] League query result:', { league, leagueError });
+        
+        if (leagueError) {
+          console.error('[INVITE] Error fetching league:', leagueError);
+          redirect(`/auth/signup?invite=${code}`);
+        }
+        
+        if (league?.name) {
           const redirectUrl = `/auth/signup?invite=${code}&league=${encodeURIComponent(league.name)}`;
+          console.log('[INVITE] Redirecting to:', redirectUrl);
           redirect(redirectUrl);
         }
       }
     } catch (err) {
-      console.error('Error fetching league info:', err);
+      console.error('[INVITE] Unexpected error:', err);
     }
     
     // Fallback redirect without league name if fetch fails
+    console.log('[INVITE] Falling back to redirect without league name');
     redirect(`/auth/signup?invite=${code}`);
   }
 
