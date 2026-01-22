@@ -196,45 +196,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       .eq('tournament_id', id)
       .order('position', { ascending: true });
 
-    // If we have players but no prize money calculated, try to calculate it
-    if (!dbError && leaderboardData && leaderboardData.length > 0) {
-      const hasPrizeMoney = leaderboardData.some(player => player.prize_money > 0);
-      if (!hasPrizeMoney) {
-        try {
-          console.log(`[AUTO CALC] Calculating prize money for tournament ${id}`);
-          await fetch(
-            `${process.env.NEXT_PUBLIC_APP_URL}/api/scores/calculate-winnings`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tournamentId: id }),
-            }
-          );
-          // Re-fetch data after calculation
-          const { data: updatedData } = await supabase
-            .from('tournament_players')
-            .select(
-              `
-              position,
-              is_tied,
-              tied_with_count,
-              total_score,
-              today_score,
-              thru,
-              prize_money,
-              pga_players ( name )
-            `
-            )
-            .eq('tournament_id', id)
-            .order('position', { ascending: true });
-          if (updatedData) {
-            leaderboardData.splice(0, leaderboardData.length, ...updatedData);
-          }
-        } catch (calcError) {
-          console.error('[AUTO CALC] Failed to calculate prize money:', calcError);
-        }
-      }
-    }
+    // Prize money calculation is now handled manually by admin via the prize money page
+    // This prevents glitching and ensures calculations happen when explicitly requested
 
     const { data: prizeDistributions } = await supabase
       .from('prize_money_distributions')
@@ -259,55 +222,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     if (!dbError && leaderboardData && leaderboardData.length > 0) {
       leaderboardSource = 'database';
 
-      // Try to ensure prize money is calculated for database data (don't block page load)
-      try {
-        console.log(`[AUTO CALC] Ensuring prize money is calculated for tournament ${id}`);
-        // Use a timeout to prevent blocking page load
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-
-        const calcResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_APP_URL}/api/scores/calculate-winnings`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tournamentId: id }),
-            signal: controller.signal,
-          }
-        );
-
-        clearTimeout(timeoutId);
-
-        if (calcResponse.ok) {
-          console.log(`[AUTO CALC] Prize money calculation completed for ${id}`);
-          // Re-fetch data after calculation
-          const { data: updatedData } = await supabase
-            .from('tournament_players')
-            .select(
-              `
-              position,
-              is_tied,
-              tied_with_count,
-              total_score,
-              today_score,
-              thru,
-              prize_money,
-              pga_players ( name )
-            `
-            )
-            .eq('tournament_id', id)
-            .order('position', { ascending: true });
-
-          if (updatedData) {
-            leaderboardData.splice(0, leaderboardData.length, ...updatedData);
-          }
-        }
-      } catch (calcError) {
-        // Don't log timeout errors as they are expected
-        if (calcError.name !== 'AbortError') {
-          console.error('[AUTO CALC] Failed to calculate prize money:', calcError);
-        }
-      }
+      // Prize money calculation is now handled manually by admin via the prize money page
+      // This prevents glitching and ensures calculations happen when explicitly requested
 
       tournamentLeaderboard =
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -342,47 +258,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         } else {
           leaderboardSource = result.source === 'cache' ? 'cache' : 'livegolfapi';
 
-          // If we have LiveGolfAPI data but also have database players, try to calculate prize money
-          // This handles the case where LiveGolfAPI is used as fallback but we want prize money
-          if (prizeDistributions && prizeDistributions.length > 0) {
-            try {
-              console.log(`[AUTO CALC] Checking if prize money needs calculation for LiveGolfAPI data`);
-              // Check if we have database players that might need prize money calculation
-              const { data: dbPlayers } = await supabase
-                .from('tournament_players')
-                .select('prize_money')
-                .eq('tournament_id', id)
-                .limit(1);
-
-              if (dbPlayers && dbPlayers.length > 0) {
-                const hasPrizeMoney = dbPlayers.some((p: any) => (p.prize_money ?? 0) > 0);
-                if (!hasPrizeMoney) {
-                  console.log(`[AUTO CALC] Calculating prize money for database players`);
-                  // Use timeout to prevent blocking
-                  const controller = new AbortController();
-                  const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-                  try {
-                    await fetch(
-                      `${process.env.NEXT_PUBLIC_APP_URL}/api/scores/calculate-winnings`,
-                      {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ tournamentId: id }),
-                        signal: controller.signal,
-                      }
-                    );
-                  } finally {
-                    clearTimeout(timeoutId);
-                  }
-                }
-              }
-            } catch (calcError) {
-              if (calcError.name !== 'AbortError') {
-                console.error('[AUTO CALC] Failed to check/calculate prize money:', calcError);
-              }
-            }
-          }
+          // Prize money calculation is now handled manually by admin via the prize money page
+          // This prevents glitching and ensures calculations happen when explicitly requested
 
           tournamentLeaderboard =
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
