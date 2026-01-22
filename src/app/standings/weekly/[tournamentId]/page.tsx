@@ -293,7 +293,7 @@ export default async function WeeklyStandingsByTournamentPage({
 
                       return (
                         <ExpandableRosterRow
-                          key={roster.id}
+                          key={`${roster.id}-${cacheBuster}`}
                           roster={roster}
                           index={index}
                           isUserRoster={isUserRoster}
