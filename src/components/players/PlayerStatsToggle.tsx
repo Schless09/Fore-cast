@@ -97,7 +97,7 @@ export default function PlayerStatsToggle({
 
       {/* Stats Summary */}
       {resultsToShow.length > 0 && (
-        <Card className="bg-gradient-to-r from-green-50 to-blue-50">
+        <Card className="bg-linear-to-r from-green-50 to-blue-50">
           <CardContent className="pt-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>

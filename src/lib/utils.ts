@@ -33,10 +33,10 @@ export function formatDateTime(date: string | Date): string {
 }
 
 export function getScoreColor(score: number | null): string {
-  if (score === null || score === undefined) return 'text-gray-500';
-  if (score < 0) return 'text-green-600 font-semibold';
-  if (score === 0) return 'text-yellow-600';
-  return 'text-red-600';
+  if (score === null || score === undefined) return 'text-casino-gray';
+  if (score < 0) return 'text-casino-green font-semibold';
+  if (score === 0) return 'text-casino-gold';
+  return 'text-casino-red';
 }
 
 export function formatTimestamp(timestamp: number): string {

@@ -277,6 +277,8 @@ export function transformLiveGolfAPIScores(
   round_2_score: number | null;
   round_3_score: number | null;
   round_4_score: number | null;
+  tee_time: string | null;
+  starting_tee: number | null;
 }> {
   return scorecards
     .map((scorecard) => {
@@ -306,6 +308,10 @@ export function transformLiveGolfAPIScores(
       const round_3 = scorecard.rounds.find((r) => r.round === 3);
       const round_4 = scorecard.rounds.find((r) => r.round === 4);
 
+      // Extract tee time and starting tee from current round (usually Round 1 has this info)
+      const tee_time = currentRound?.teeTime || round_1?.teeTime || null;
+      const starting_tee = currentRound?.startingTee ?? round_1?.startingTee ?? null;
+
       return {
         pgaPlayerId,
         total_score,
@@ -317,6 +323,8 @@ export function transformLiveGolfAPIScores(
         round_2_score: round_2?.score ?? null,
         round_3_score: round_3?.score ?? null,
         round_4_score: round_4?.score ?? null,
+        tee_time,
+        starting_tee,
       };
     })
     .filter(Boolean) as any[];

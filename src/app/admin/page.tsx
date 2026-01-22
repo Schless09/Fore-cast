@@ -73,6 +73,22 @@ export default async function AdminPage() {
           </Card>
         </Link>
 
+        <Link href="/admin/sync-tee-times">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle>Sync Tee Times</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 text-sm mb-4">
+                Fetch tee times and live scores from LiveGolfAPI
+              </p>
+              <Button variant="outline" className="w-full">
+                Sync Data
+              </Button>
+            </CardContent>
+          </Card>
+        </Link>
+
         <Link href="/admin/odds">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader>

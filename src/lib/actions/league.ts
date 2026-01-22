@@ -3,12 +3,37 @@
 import { createClient } from '@/lib/supabase/server';
 
 export async function createLeague(leagueName: string, password: string) {
-  const supabase = await createClient();
+  let supabase;
+  let user;
   
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  
-  if (userError || !user) {
-    return { success: false, error: 'Not authenticated' };
+  try {
+    supabase = await createClient();
+    
+    const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) {
+      console.error('Auth error in createLeague:', userError);
+      return { 
+        success: false, 
+        error: 'Authentication failed. Please try refreshing the page or logging out and back in.' 
+      };
+    }
+    
+    if (!authUser) {
+      console.error('No user found in createLeague');
+      return { 
+        success: false, 
+        error: 'Session expired. Please refresh the page and try again.' 
+      };
+    }
+    
+    user = authUser;
+  } catch (err) {
+    console.error('Unexpected error getting user in createLeague:', err);
+    return { 
+      success: false, 
+      error: 'An unexpected error occurred. Please refresh the page and try again.' 
+    };
   }
 
   // Validate league name
@@ -69,12 +94,37 @@ export async function createLeague(leagueName: string, password: string) {
 }
 
 export async function joinLeague(leagueName: string, password: string) {
-  const supabase = await createClient();
+  let supabase;
+  let user;
   
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  
-  if (userError || !user) {
-    return { success: false, error: 'Not authenticated' };
+  try {
+    supabase = await createClient();
+    
+    const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) {
+      console.error('Auth error in joinLeague:', userError);
+      return { 
+        success: false, 
+        error: 'Authentication failed. Please try refreshing the page or logging out and back in.' 
+      };
+    }
+    
+    if (!authUser) {
+      console.error('No user found in joinLeague');
+      return { 
+        success: false, 
+        error: 'Session expired. Please refresh the page and try again.' 
+      };
+    }
+    
+    user = authUser;
+  } catch (err) {
+    console.error('Unexpected error getting user in joinLeague:', err);
+    return { 
+      success: false, 
+      error: 'An unexpected error occurred. Please refresh the page and try again.' 
+    };
   }
 
   // Find the league by name

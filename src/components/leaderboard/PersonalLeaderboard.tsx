@@ -143,16 +143,16 @@ export function PersonalLeaderboard({
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
           <div className="flex-1">
-            <CardTitle className="text-lg sm:text-xl">{roster.roster_name}</CardTitle>
+            <CardTitle className="text-lg sm:text-xl text-casino-text">{roster.roster_name}</CardTitle>
             {roster.tournament && (
-              <p className="text-xs sm:text-sm text-gray-600 mt-1">
+              <p className="text-xs sm:text-sm text-casino-gray mt-1">
                 {roster.tournament.name}
               </p>
             )}
           </div>
           <div className="text-left sm:text-right">
-            <p className="text-xs sm:text-sm text-gray-600">Total Winnings</p>
-            <p className="text-2xl sm:text-3xl font-bold text-green-600">
+            <p className="text-xs sm:text-sm text-casino-gray">Total Winnings</p>
+            <p className="text-2xl sm:text-3xl font-bold text-casino-green">
               ${totalWinnings.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </p>
           </div>
@@ -162,29 +162,29 @@ export function PersonalLeaderboard({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-300">
-                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <tr className="border-b border-casino-gold/30">
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
                   #
                 </th>
-                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
                   Player
                 </th>
-                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
                   Pos
                 </th>
-                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
                   Total
                 </th>
-                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-casino-gray uppercase tracking-wider hidden sm:table-cell">
                   Today
                 </th>
-                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-casino-gray uppercase tracking-wider hidden md:table-cell">
                   Thru
                 </th>
-                <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-medium text-casino-gray uppercase tracking-wider">
                   Prize
                 </th>
-                <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-medium text-casino-gray uppercase tracking-wider hidden sm:table-cell">
                   Cut
                 </th>
               </tr>

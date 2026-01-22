@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { joinLeague, createLeague } from '@/lib/actions/league';
 
 interface JoinLeagueModalProps {
   onClose?: () => void;
@@ -26,9 +25,20 @@ export function JoinLeagueModal({ onClose, canClose = false }: JoinLeagueModalPr
     setLoading(true);
 
     try {
-      const result = mode === 'create' 
-        ? await createLeague(leagueName.trim(), password.trim())
-        : await joinLeague(leagueName.trim(), password.trim());
+      const endpoint = mode === 'create' ? '/api/leagues/create' : '/api/leagues/join';
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          leagueName: leagueName.trim(),
+          password: password.trim(),
+        }),
+      });
+
+      const result = await response.json();
 
       if (!result.success) {
         setError(result.error || `Failed to ${mode} league`);
@@ -40,7 +50,8 @@ export function JoinLeagueModal({ onClose, canClose = false }: JoinLeagueModalPr
       router.refresh();
       if (onClose) onClose();
     } catch (err) {
-      setError('An unexpected error occurred');
+      console.error('Error in handleSubmit:', err);
+      setError('An unexpected error occurred. Please try again.');
       setLoading(false);
     }
   };

@@ -64,7 +64,9 @@ export default async function DashboardPage() {
             <div className="px-4 py-2 bg-casino-card border border-casino-gold/30 rounded-lg">
               <p className="text-xs text-casino-gray">League</p>
               <p className="text-lg font-bold text-casino-gold">
-                {(profile.league as any)?.name || 'Unknown'}
+                {typeof profile.league === 'object' && profile.league && 'name' in profile.league 
+                  ? profile.league.name 
+                  : 'Unknown'}
               </p>
             </div>
           )}

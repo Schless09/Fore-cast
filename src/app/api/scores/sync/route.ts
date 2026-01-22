@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Update tournament player scores
+      // Update tournament player scores and tee times
       const { error: updateError } = await supabase
         .from('tournament_players')
         .update({
@@ -110,6 +110,8 @@ export async function POST(request: NextRequest) {
           round_2_score: score.round_2_score || null,
           round_3_score: score.round_3_score || null,
           round_4_score: score.round_4_score || null,
+          tee_time: score.tee_time || null,
+          starting_tee: score.starting_tee || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', tournamentPlayer.id);
