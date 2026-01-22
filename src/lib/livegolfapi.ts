@@ -39,6 +39,12 @@ interface LiveGolfAPIScorecard {
   total: string;
   strokes: string;
   rounds: LiveGolfAPIRound[];
+  // Added dynamically in transform functions
+  calculatedPosition?: number;
+  isTied?: boolean;
+  tiedCount?: number;
+  calculatedIsTied?: boolean;
+  calculatedTiedCount?: number;
 }
 
 const CACHE_DIR = path.join(process.cwd(), '.cache', 'livegolfapi');
@@ -366,7 +372,7 @@ export async function fetchMinimalScoresFromLiveGolfAPI(
     console.log(`[MINIMAL] Raw leaderboard type:`, typeof fullData.leaderboard, Array.isArray(fullData.leaderboard) ? 'array' : 'not array');
     console.log(`[MINIMAL] Raw leaderboard length:`, fullData.leaderboard?.length || 'no data');
     if (fullData.leaderboard && Array.isArray(fullData.leaderboard) && fullData.leaderboard.length > 0) {
-      console.log(`[MINIMAL] Sample raw players:`, fullData.leaderboard.slice(0, 3).map((p: any) => ({ name: p.player, position: p.positionValue })));
+      console.log(`[MINIMAL] Sample raw players:`, fullData.leaderboard.slice(0, 3).map((p: LiveGolfAPIScorecard) => ({ name: p.player, position: p.positionValue })));
     }
 
     if (!fullData.leaderboard || !Array.isArray(fullData.leaderboard) || fullData.leaderboard.length === 0) {
@@ -438,8 +444,11 @@ export async function transformMinimalLiveGolfAPIScores(
     total_score: number;
     thru: string | null;
     tee_time: string | null;
+    calculatedPosition?: number;
+    isTied?: boolean;
+    tiedCount?: number;
   }>,
-  supabaseClient: any
+  supabaseClient: ReturnType<typeof createClient>
 ): Promise<Array<{
   pgaPlayerId: string;
   playerName: string;
@@ -466,7 +475,7 @@ export async function transformMinimalLiveGolfAPIScores(
   const { data: existingPlayers } = await supabaseClient
     .from('pga_players')
     .select('id, name')
-    .in('name', playerNames);
+    .in('name', playerNames as string[]);
 
   const playerMap = new Map(
     existingPlayers?.map(player => [player.name, player.id]) || []
@@ -515,7 +524,16 @@ export async function transformMinimalLiveGolfAPIScores(
   }
 
   const results = sortedScores
-    .map(score => {
+    .map((score: {
+      player: string;
+      position: number | null;
+      total_score: number;
+      thru: string | null;
+      tee_time: string | null;
+      calculatedPosition?: number;
+      isTied?: boolean;
+      tiedCount?: number;
+    }) => {
       const pgaPlayerId = playerMap.get(score.player);
       if (!pgaPlayerId) {
         console.log(`Skipping player not in database: ${score.player}`);
@@ -561,22 +579,10 @@ export async function transformMinimalLiveGolfAPIScores(
  * Transform LiveGolfAPI scorecards to our format
  * Maps player names to our pga_player_ids
  */
-/**
- * Normalize player name for matching
- * Removes qualifiers like (LQ), (SC), (NT) and normalizes special characters
- */
-function normalizePlayerName(name: string): string {
-  return name
-    .replace(/\s*\([A-Z]{2}\)\s*$/i, '') // Remove qualifiers like (LQ), (SC), (NT)
-    .toLowerCase()
-    .trim()
-    .normalize('NFD') // Decompose accented characters
-    .replace(/[\u0300-\u036f]/g, ''); // Remove accent marks
-}
 
 export async function transformLiveGolfAPIScores(
   scorecards: LiveGolfAPIScorecard[],
-  supabaseClient: any // Supabase client to create players
+  supabaseClient: ReturnType<typeof createClient> // Supabase client to create players
 ): Promise<Array<{
   pgaPlayerId: string;
   playerName: string;
@@ -641,7 +647,7 @@ export async function transformLiveGolfAPIScores(
   const { data: existingPlayers } = await supabaseClient
     .from('pga_players')
     .select('id, name')
-    .in('name', playerNames);
+    .in('name', playerNames as string[]);
 
   const playerMap = new Map(
     existingPlayers?.map(player => [player.name, player.id]) || []
@@ -684,7 +690,7 @@ export async function transformLiveGolfAPIScores(
   }
 
   const results = await Promise.all(
-    sortedScorecards.map(async (scorecard, idx) => {
+    sortedScorecards.map(async (scorecard) => {
       // Player name was already cleaned during deduplication
       const cleanPlayerName = scorecard.player.replace(/\s*\([^)]+\)\s*$/, '').trim();
 
