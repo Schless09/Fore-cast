@@ -79,14 +79,14 @@ export default function PlayerStatsToggle({
       <div className="flex gap-2">
         <Button
           onClick={() => setView('recent')}
-          variant={view === 'recent' ? 'default' : 'outline'}
+          variant={view === 'recent' ? 'primary' : 'outline'}
           className={view === 'recent' ? 'bg-green-600 hover:bg-green-700' : ''}
         >
           Last 20 Events
         </Button>
         <Button
           onClick={() => setView('venue')}
-          variant={view === 'venue' ? 'default' : 'outline'}
+          variant={view === 'venue' ? 'primary' : 'outline'}
           className={view === 'venue' ? 'bg-green-600 hover:bg-green-700' : ''}
           disabled={!hasVenueData}
         >
