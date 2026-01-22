@@ -52,7 +52,9 @@ export function PlayerRow({ player, playerWinnings, rank }: PlayerRowProps) {
         {formatScore(player.today_score)}
       </td>
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-casino-text hidden md:table-cell">
-        {player.thru || '-'}
+        {player.thru && player.thru !== 0 ? player.thru :
+         player.tee_time ? player.tee_time :
+         '-'}
       </td>
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-right">
         <span className={`font-semibold ${playerWinnings > 0 ? 'text-casino-green' : 'text-casino-gray'}`}>

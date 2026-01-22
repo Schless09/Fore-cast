@@ -12,8 +12,10 @@ interface WeeklyStandingsPageProps {
   params: Promise<{ tournamentId: string }>;
 }
 
-// Revalidate page every 3 minutes for live tournament updates
-export const revalidate = 180;
+// Force fresh data on every request to prevent caching issues
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function WeeklyStandingsByTournamentPage({
   params,
@@ -21,6 +23,7 @@ export default async function WeeklyStandingsByTournamentPage({
   const { tournamentId } = await params;
   const supabase = await createClient();
   const pageGeneratedAt = new Date().getTime();
+  const cacheBuster = Math.random().toString(36).substring(7);
 
   const {
     data: { user },
@@ -255,7 +258,7 @@ export default async function WeeklyStandingsByTournamentPage({
             <div>
               <CardTitle className="text-lg sm:text-xl">Team Standings</CardTitle>
               <p className="text-xs sm:text-sm text-casino-gray mt-1">
-                Last updated: {formatTimestampCST(pageGeneratedAt)}
+                Last updated: {formatTimestampCST(pageGeneratedAt)} | Cache: {cacheBuster}
               </p>
             </div>
             {tournament.status === 'upcoming' && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
 
@@ -25,11 +25,71 @@ export function ExpandableRosterRow({
   const [players, setPlayers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Subscribe to real-time updates when expanded
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`roster-${roster.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'roster_players',
+          filter: `roster_id=eq.${roster.id}`,
+        },
+        () => {
+          // Refetch players when roster_players change
+          loadPlayers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isExpanded, roster.id]);
+
   const rank = index + 1;
   const winnings = roster.total_winnings || 0;
 
   // Can view roster if: it's your own roster, OR tournament is active/completed
   const canViewRoster = isUserRoster || tournamentStatus === 'active' || tournamentStatus === 'completed';
+
+  const loadPlayers = async () => {
+    setIsLoading(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('roster_players')
+        .select(`
+          player_winnings,
+          tournament_player:tournament_players(
+            position,
+            prize_money,
+            total_score,
+            made_cut,
+            tee_time,
+            starting_tee,
+            pga_players(name, country, image_url)
+          )
+        `)
+        .eq('roster_id', roster.id)
+        .order('player_winnings', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching roster players:', error);
+      } else {
+        setPlayers(data || []);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const toggleExpand = async () => {
     if (!canViewRoster) {
@@ -37,37 +97,7 @@ export function ExpandableRosterRow({
     }
 
     if (!isExpanded && players.length === 0) {
-      // Fetch players
-      setIsLoading(true);
-      try {
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from('roster_players')
-          .select(`
-            player_winnings,
-            tournament_player:tournament_players(
-              position,
-              prize_money,
-              total_score,
-              made_cut,
-              tee_time,
-              starting_tee,
-              pga_players(name, country, image_url)
-            )
-          `)
-          .eq('roster_id', roster.id)
-          .order('player_winnings', { ascending: false });
-
-        if (error) {
-          console.error('Error fetching roster players:', error);
-        } else {
-          setPlayers(data || []);
-        }
-      } catch (err) {
-        console.error('Error:', err);
-      } finally {
-        setIsLoading(false);
-      }
+      await loadPlayers();
     }
 
     setIsExpanded(!isExpanded);
