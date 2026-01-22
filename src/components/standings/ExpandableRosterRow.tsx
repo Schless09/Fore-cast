@@ -232,8 +232,8 @@ export function ExpandableRosterRow({
                                   {new Date(tp.tee_time).toLocaleTimeString('en-US', { 
                                     hour: 'numeric',
                                     minute: '2-digit',
-                                    hour12: true,
-                                    timeZone: 'America/Chicago'
+                                    hour12: true
+                                    // Uses user's local timezone automatically
                                   })}
                                 </span>
                               ) : (

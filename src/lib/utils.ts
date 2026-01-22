@@ -39,14 +39,17 @@ export function getScoreColor(score: number | null): string {
   return 'text-red-600';
 }
 
-export function formatTimestampCST(timestamp: number): string {
+export function formatTimestamp(timestamp: number): string {
   const d = new Date(timestamp);
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    timeZone: 'America/Chicago',
     timeZoneName: 'short',
+    // Uses user's local timezone automatically
   }).format(d);
 }
+
+// Legacy alias for backward compatibility
+export const formatTimestampCST = formatTimestamp;

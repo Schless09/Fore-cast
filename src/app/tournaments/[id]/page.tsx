@@ -338,8 +338,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       {row.tee_time ? new Date(row.tee_time).toLocaleTimeString('en-US', { 
                         hour: 'numeric',
                         minute: '2-digit',
-                        hour12: true,
-                        timeZone: 'America/Chicago'
+                        hour12: true
+                        // Uses user's local timezone automatically
                       }) : '-'}
                     </td>
                     <td className="px-2 sm:px-4 py-2 text-right text-gray-900 text-xs sm:text-sm hidden md:table-cell">
