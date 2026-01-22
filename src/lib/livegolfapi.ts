@@ -293,7 +293,18 @@ export async function fetchScoresFromLiveGolfAPI(
  */
 export async function fetchMinimalScoresFromLiveGolfAPI(
   eventId: string
-): Promise<LiveGolfAPIScoresResult> {
+): Promise<{
+  data: Array<{
+    player: string;
+    position: number | null;
+    total_score: number;
+    thru: string | null;
+    tee_time: string | null;
+  }> | null;
+  source: 'livegolfapi' | 'cache' | 'none';
+  timestamp?: number;
+  error?: string;
+}> {
   const apiKey = process.env.LIVEGOLFAPI_KEY;
 
   if (!apiKey) {
@@ -305,7 +316,13 @@ export async function fetchMinimalScoresFromLiveGolfAPI(
   if (cached && !cached.isStale) {
     console.log(`[LiveGolfAPI] Using fresh cache for ${eventId} (minimal data)`);
     return {
-      data: cached.data,
+      data: cached.data as Array<{
+        player: string;
+        position: number | null;
+        total_score: number;
+        thru: string | null;
+        tee_time: string | null;
+      }> | null,
       source: 'cache',
       timestamp: Date.now() - cached.age
     };
@@ -328,7 +345,13 @@ export async function fetchMinimalScoresFromLiveGolfAPI(
       // Fallback to cache if available
       if (cached) {
         return {
-          data: cached.data,
+          data: cached.data as Array<{
+            player: string;
+            position: number | null;
+            total_score: number;
+            thru: string | null;
+            tee_time: string | null;
+          }> | null,
           source: 'cache',
           timestamp: Date.now() - cached.age,
           error: `API error: ${response.status}`
@@ -388,7 +411,13 @@ export async function fetchMinimalScoresFromLiveGolfAPI(
 
     if (cached) {
       return {
-        data: cached.data,
+        data: cached.data as Array<{
+          player: string;
+          position: number | null;
+          total_score: number;
+          thru: string | null;
+          tee_time: string | null;
+        }> | null,
         source: 'cache',
         timestamp: Date.now() - cached.age,
         error: error?.message
