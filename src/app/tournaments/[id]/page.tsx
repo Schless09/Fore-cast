@@ -99,11 +99,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     .from('user_rosters')
     .select(
       `
-      id,
-      roster_name,
+      *,
       roster_players(
+        *,
         tournament_player:tournament_players(
-          pga_player_id
+          *,
+          pga_player:pga_players(*)
         )
       )
     `
@@ -115,16 +116,24 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   // Get roster players if roster exists
   let existingRosterData = null;
   if (existingRoster) {
-    const playerIds =
-      existingRoster.roster_players?.map(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (rp: any) => rp.tournament_player?.pga_player_id
-      ).filter(Boolean) || [];
+    // Sort roster players by winnings (descending), then by fantasy points as tiebreaker
+    const sortedRosterPlayers = (existingRoster.roster_players || [])
+      .map((rp: any) => ({
+        ...rp,
+        tournament_player: rp.tournament_player || {},
+      }))
+      .sort((a: any, b: any) => {
+        const aWinnings = a.player_winnings || 0;
+        const bWinnings = b.player_winnings || 0;
+        if (aWinnings !== bWinnings) {
+          return bWinnings - aWinnings;
+        }
+        return (b.fantasy_points || 0) - (a.fantasy_points || 0);
+      });
 
     existingRosterData = {
-      id: existingRoster.id,
-      rosterName: existingRoster.roster_name,
-      playerIds,
+      ...existingRoster,
+      roster_players: sortedRosterPlayers,
     };
   }
 
@@ -615,9 +624,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       )}
 
       {/* Show personal leaderboard for active tournaments */}
-      {showPersonalLeaderboard && existingRoster && (
+      {showPersonalLeaderboard && existingRosterData && (
         <div className="mb-6">
-          <PersonalLeaderboard rosterId={existingRoster.id} />
+          <PersonalLeaderboard
+            rosterId={existingRosterData.id}
+            initialRoster={existingRosterData}
+          />
         </div>
       )}
 
