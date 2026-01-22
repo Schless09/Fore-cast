@@ -297,11 +297,12 @@ function normalizePlayerName(name: string): string {
     .replace(/[\u0300-\u036f]/g, ''); // Remove accent marks
 }
 
-export function transformLiveGolfAPIScores(
+export async function transformLiveGolfAPIScores(
   scorecards: LiveGolfAPIScorecard[],
-  playerNameMap: Map<string, string> // Map from player name to our pga_player_id
-): Array<{
+  supabaseClient: any // Supabase client to create players
+): Promise<Array<{
   pgaPlayerId: string;
+  playerName: string;
   total_score: number;
   today_score: number;
   thru: number | string;
@@ -313,23 +314,42 @@ export function transformLiveGolfAPIScores(
   round_4_score: number | null;
   tee_time: string | null;
   starting_tee: number | null;
-}> {
+}>> {
   console.log(`\n=== Transforming ${scorecards.length} scorecards ===`);
   
-  const results = scorecards
-    .map((scorecard, idx) => {
-      // Try exact match first
-      let pgaPlayerId = playerNameMap.get(scorecard.player.toLowerCase().trim());
-      
-      // If no exact match, try normalized name (removes qualifiers and accents)
-      if (!pgaPlayerId) {
-        const normalized = normalizePlayerName(scorecard.player);
-        pgaPlayerId = playerNameMap.get(normalized);
-      }
-      
-      if (!pgaPlayerId) {
-        console.warn(`No mapping found for player: ${scorecard.player}`);
-        return null;
+  const results = await Promise.all(
+    scorecards.map(async (scorecard, idx) => {
+      // Check if player exists in our database
+      let { data: existingPlayer } = await supabaseClient
+        .from('pga_players')
+        .select('id')
+        .eq('name', scorecard.player)
+        .single();
+
+      let pgaPlayerId: string;
+
+      if (!existingPlayer) {
+        // Create the player automatically
+        console.log(`Creating new player: ${scorecard.player}`);
+        const { data: newPlayer, error: createError } = await supabaseClient
+          .from('pga_players')
+          .insert({
+            name: scorecard.player,
+            country: null, // Will be updated later if available
+            world_ranking: null,
+            fedex_cup_ranking: null,
+          })
+          .select('id')
+          .single();
+
+        if (createError || !newPlayer) {
+          console.error(`Failed to create player ${scorecard.player}:`, createError);
+          return null;
+        }
+
+        pgaPlayerId = newPlayer.id;
+      } else {
+        pgaPlayerId = existingPlayer.id;
       }
 
       // Parse total score (tournament cumulative)
@@ -373,13 +393,6 @@ export function transformLiveGolfAPIScores(
         }
       }
       
-      // Log first 3 transformed players
-      if (idx < 3) {
-        console.log(`\n--- Transformed Player ${idx + 1}: ${scorecard.player} ---`);
-        console.log('All rounds:', JSON.stringify(scorecard.rounds, null, 2));
-        console.log('Current Round:', currentRound);
-        console.log('Extracted:', { total_score, today_score, thru });
-      }
 
       // Parse position (positionValue >= 980 means CUT/WD)
       const position = scorecard.positionValue >= 980 ? null : scorecard.positionValue;
@@ -397,6 +410,7 @@ export function transformLiveGolfAPIScores(
 
       return {
         pgaPlayerId,
+        playerName: scorecard.player,
         total_score,
         today_score,
         thru,
@@ -410,8 +424,11 @@ export function transformLiveGolfAPIScores(
         starting_tee,
       };
     })
-    .filter(Boolean) as any[];
+  );
+
+  // Filter out null results
+  const validResults = results.filter(Boolean) as any[];
   
-  console.log(`=== Transformation complete: ${results.length} players matched ===\n`);
-  return results;
+  console.log(`=== Transformation complete: ${validResults.length} players processed ===\n`);
+  return validResults;
 }

@@ -42,10 +42,10 @@ export async function POST(request: NextRequest) {
 
     const scorecards = liveGolfResult.data;
 
-    // Get mapping of player names to our pga_player_ids
-    const { data: tournamentPlayers, error: tpError } = await supabase
+    // Get existing tournament players to avoid duplicates
+    const { data: existingTournamentPlayers, error: tpError } = await supabase
       .from('tournament_players')
-      .select('id, pga_player_id, pga_players(name)')
+      .select('pga_player_id')
       .eq('tournament_id', tournamentId);
 
     if (tpError) {
@@ -55,35 +55,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create a map from player name (lowercase and normalized) to pga_player_id
-    const playerNameMap = new Map<string, string>();
-    tournamentPlayers?.forEach((tp: any) => {
-      if (tp.pga_players?.name) {
-        const name = tp.pga_players.name;
-        // Add both original and normalized versions
-        playerNameMap.set(name.toLowerCase().trim(), tp.pga_player_id);
-        
-        // Also add normalized version (without accents)
-        const normalized = name
-          .toLowerCase()
-          .trim()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '');
-        playerNameMap.set(normalized, tp.pga_player_id);
-      }
-    });
+    const existingPlayerIds = new Set(
+      existingTournamentPlayers?.map(tp => tp.pga_player_id) || []
+    );
 
-    // Transform LiveGolfAPI scores
-    const transformedScores = transformLiveGolfAPIScores(
+    // Transform LiveGolfAPI scores (creates players automatically)
+    const transformedScores = await transformLiveGolfAPIScores(
       scorecards,
-      playerNameMap
+      supabase
     );
 
     if (transformedScores.length === 0) {
       return NextResponse.json(
         {
-          error: 'No matching players found. Ensure player names match.',
-          warning: 'You may need to update player names or add a player ID mapping',
+          error: 'No players could be processed from LiveGolfAPI.',
+          warning: 'Check the API response and database connection',
         },
         { status: 400 }
       );
@@ -104,30 +90,46 @@ export async function POST(request: NextRequest) {
     // Update scores in database
     const updates = [];
     for (const score of transformedScores) {
-      // Find tournament_player record
-      const { data: tournamentPlayer, error: findError } = await supabase
+      let tournamentPlayerId: string;
+
+      // Check if tournament_player record exists
+      const { data: existingTournamentPlayer } = await supabase
         .from('tournament_players')
         .select('id')
         .eq('tournament_id', tournamentId)
         .eq('pga_player_id', score.pgaPlayerId)
         .single();
 
-      if (findError || !tournamentPlayer) {
-        console.log(
-          `[SYNC SKIP] Player not in database - pgaPlayerId: ${score.pgaPlayerId.substring(0, 8)}, position: ${score.position}, thru: ${score.thru} (${typeof score.thru})`
-        );
-        continue;
+      if (existingTournamentPlayer) {
+        tournamentPlayerId = existingTournamentPlayer.id;
+      } else {
+        // Create tournament_player record automatically
+        console.log(`[SYNC] Creating tournament player entry for ${score.playerName}`);
+        const { data: newTournamentPlayer, error: createError } = await supabase
+          .from('tournament_players')
+          .insert({
+            tournament_id: tournamentId,
+            pga_player_id: score.pgaPlayerId,
+            cost: 10000, // Default cost
+          })
+          .select('id')
+          .single();
+
+        if (createError || !newTournamentPlayer) {
+          console.error(`[SYNC ERROR] Failed to create tournament player for ${score.playerName}:`, createError);
+          continue;
+        }
+
+        tournamentPlayerId = newTournamentPlayer.id;
       }
 
       // Log what we're about to store (first 3 players + any with tee time strings)
       if (updates.length < 3 || (typeof score.thru === 'string' && score.thru.includes('PM'))) {
-        console.log(`\n[SYNC] Updating player:`, {
-          name: score.pgaPlayerId.substring(0, 8),
+        console.log(`\n[SYNC] Updating player: ${score.playerName}`, {
           position: score.position,
           total_score: score.total_score,
           today_score: score.today_score,
           thru: score.thru,
-          thru_type: typeof score.thru,
         });
       }
 
@@ -148,14 +150,18 @@ export async function POST(request: NextRequest) {
           starting_tee: score.starting_tee || null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', tournamentPlayer.id);
+        .eq('id', tournamentPlayerId);
 
       if (updateError) {
         console.error('Error updating tournament player:', updateError);
         continue;
       }
 
-      updates.push(score.pgaPlayerId);
+      updates.push({
+        id: tournamentPlayerId,
+        pgaPlayerId: score.pgaPlayerId,
+        playerName: score.playerName,
+      });
     }
 
     // Trigger fantasy points recalculation
