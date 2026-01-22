@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          // Update tournament player scores and tee times
+          // Update tournament player scores, positions, tie info, and tee times
           const { error: updateError } = await supabase
             .from('tournament_players')
             .update({
@@ -195,6 +195,8 @@ export async function POST(request: NextRequest) {
               today_score: score.today_score,
               thru: score.thru,
               position: score.position,
+              is_tied: score.is_tied,
+              tied_with_count: score.tied_with_count,
               made_cut: score.made_cut,
               round_1_score: score.round_1_score || null,
               round_2_score: score.round_2_score || null,
@@ -223,9 +225,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Skip other players to avoid timeout - only update rostered players
+    // Update position/tie info for non-rostered players (lightweight update)
     if (otherUpdates.length > 0) {
-      console.log(`[SYNC] Skipping ${otherUpdates.length} non-rostered players to avoid timeout`);
+      console.log(`[SYNC] Updating position info for ${otherUpdates.length} non-rostered players...`);
+      
+      // Process in batches to avoid timeout
+      const batchSize = 10;
+      const limitedOtherUpdates = otherUpdates.slice(0, 50); // Limit to 50 to avoid timeout
+      
+      for (let i = 0; i < limitedOtherUpdates.length; i += batchSize) {
+        const batch = limitedOtherUpdates.slice(i, i + batchSize);
+        await Promise.all(batch.map(async ({ score, tournamentPlayerId }) => {
+          await supabase
+            .from('tournament_players')
+            .update({
+              total_score: score.total_score,
+              position: score.position,
+              is_tied: score.is_tied,
+              tied_with_count: score.tied_with_count,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tournamentPlayerId);
+        }));
+      }
+      
+      if (otherUpdates.length > 50) {
+        console.log(`[SYNC] Note: Only updated first 50 of ${otherUpdates.length} non-rostered players`);
+      }
     }
 
     // Skip automatic calculations during sync to avoid timeouts on Vercel
