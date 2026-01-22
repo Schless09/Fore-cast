@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         tournamentPlayerId = existingTournamentPlayer.id;
       } else {
         // Create tournament_player record automatically
-        console.log(`[SYNC] Creating tournament player entry for ${score.playerName}`);
+        console.log(`[SYNC] Creating tournament player entry for ${score.playerName} with cost 100.00`);
         const { data: newTournamentPlayer, error: createError } = await supabase
           .from('tournament_players')
           .insert({
@@ -117,11 +117,12 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (createError || !newTournamentPlayer) {
-          console.error(`[SYNC ERROR] Failed to create tournament player for ${score.playerName}:`, createError);
+          console.error(`[SYNC ERROR] Failed to create tournament player for ${score.playerName}:`, JSON.stringify(createError, null, 2));
           continue;
         }
 
         tournamentPlayerId = newTournamentPlayer.id;
+        console.log(`[SYNC] Successfully created tournament player ${tournamentPlayerId} for ${score.playerName}`);
       }
 
       // Log what we're about to store (first 3 players + any with tee time strings)
