@@ -148,12 +148,19 @@ export default async function DashboardPage() {
             <CardTitle>The Money Board</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="w-full" style={{ height: '600px' }}>
-              <iframe 
-                src="https://docs.google.com/spreadsheets/d/e/2PACX-1vTecKBhuY8WNibIiprccOrj7jXqxouPcK5QgnQphyc_ealkISLSU_co1fuzPID8qnXmz-gVfYFR0ina/pubhtml?gid=2031372717&amp;single=true&amp;widget=true&amp;headers=false"
-                className="w-full h-full border-0 rounded"
-                title="Season Leaderboard"
-              />
+            <div className="w-full overflow-hidden" style={{ height: '600px' }}>
+              <div style={{ 
+                transform: 'scale(0.75)', 
+                transformOrigin: 'top left',
+                width: '133.33%',
+                height: '133.33%'
+              }}>
+                <iframe 
+                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vTecKBhuY8WNibIiprccOrj7jXqxouPcK5QgnQphyc_ealkISLSU_co1fuzPID8qnXmz-gVfYFR0ina/pubhtml?gid=2031372717&amp;single=true&amp;widget=true&amp;headers=false"
+                  className="w-full h-full border-0 rounded"
+                  title="Season Leaderboard"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
