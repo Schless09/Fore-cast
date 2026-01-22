@@ -42,11 +42,11 @@ export function Hero() {
           </h1>
           
           <div className="flex items-center justify-center gap-4 text-2xl sm:text-3xl md:text-4xl font-bold text-casino-text">
-            <span className="glow-gold">Predict</span>
-            <span className="text-casino-gold">•</span>
-            <span className="glow-green">Play</span>
-            <span className="text-casino-green">•</span>
-            <span className="glow-blue">Win</span>
+            <span className="text-casino-gold" style={{ textShadow: '0 0 20px rgba(251, 191, 36, 0.5), 0 0 40px rgba(251, 191, 36, 0.3)' }}>Predict</span>
+            <span className="text-casino-gold/50">•</span>
+            <span className="text-casino-green" style={{ textShadow: '0 0 20px rgba(16, 185, 129, 0.5), 0 0 40px rgba(16, 185, 129, 0.3)' }}>Play</span>
+            <span className="text-casino-green/50">•</span>
+            <span className="text-casino-blue" style={{ textShadow: '0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3)' }}>Win</span>
           </div>
           
           <p className="text-base sm:text-lg md:text-xl text-casino-gray max-w-3xl mx-auto leading-relaxed">
