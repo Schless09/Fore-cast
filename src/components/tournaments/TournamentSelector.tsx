@@ -33,7 +33,7 @@ export function TournamentSelector({
     <select
       value={currentTournamentId}
       onChange={handleChange}
-      className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900"
+      className="w-full px-4 py-2 border border-casino-gold/30 rounded-lg shadow-sm focus:ring-2 focus:ring-casino-gold focus:border-casino-gold bg-casino-card text-casino-text hover:border-casino-gold/50 transition-colors"
     >
       {tournaments.map((t) => {
         const isCurrentWeek = t.id === currentWeekTournamentId;
@@ -44,7 +44,7 @@ export function TournamentSelector({
           '✅ ';
         
         return (
-          <option key={t.id} value={t.id}>
+          <option key={t.id} value={t.id} className="bg-casino-card text-casino-text">
             {statusEmoji}{t.name}{isCurrentWeek ? ' (Current Week)' : ''}
           </option>
         );

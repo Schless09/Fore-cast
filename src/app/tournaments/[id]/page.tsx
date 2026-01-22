@@ -4,6 +4,7 @@ import { RosterBuilder } from '@/components/roster/RosterBuilder';
 import { PersonalLeaderboard } from '@/components/leaderboard/PersonalLeaderboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { TournamentSelector } from '@/components/tournaments/TournamentSelector';
 import Link from 'next/link';
 import { formatDate, formatScore, getScoreColor, formatTimestampCST } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
@@ -366,6 +367,38 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Tournament Selector */}
+      {sortedTournaments && sortedTournaments.length > 1 && (
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+              <label className="block text-sm font-medium text-casino-gray">
+                Select Tournament
+              </label>
+              {currentWeekTournament && currentWeekTournament.id !== id && (
+                <Link href={`/tournaments/${currentWeekTournament.id}`} className="w-full sm:w-auto">
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">
+                    View Current Week →
+                  </Button>
+                </Link>
+              )}
+            </div>
+            <TournamentSelector
+              tournaments={sortedTournaments}
+              currentTournamentId={id}
+              currentWeekTournamentId={currentWeekTournament?.id || null}
+              basePath="/tournaments"
+            />
+            {currentWeekTournament?.id === id && (
+              <p className="mt-3 text-xs text-casino-green flex items-center gap-1">
+                <span>⭐</span>
+                <span>This is the current week&apos;s tournament</span>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tournament Header */}
       <Card className="mb-8">
         <CardHeader>
