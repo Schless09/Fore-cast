@@ -66,11 +66,10 @@ export default function AdminTournamentsPage() {
       console.log('Updating tournament:', tournamentId, 'to status:', newStatus);
       
       // Use API route which has service role access
-      const response = await fetch('/api/admin/tournaments/update-status', {
-        method: 'PATCH',
+      const response = await fetch(`/api/admin/tournaments/${tournamentId}/status`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tournamentId,
           status: newStatus,
         }),
       });
@@ -102,6 +101,35 @@ export default function AdminTournamentsPage() {
       setTimeout(() => setError(null), 3000);
       // Revert optimistic update on error
       await fetchTournaments();
+    }
+  };
+
+  const deleteTournament = async (tournamentId: string, tournamentName: string) => {
+    if (!confirm(`Are you sure you want to delete "${tournamentName}"? This will also delete all rosters and player data for this tournament.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/tournaments/${tournamentId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete tournament');
+      }
+
+      // Update local state to remove the tournament
+      setTournaments(prevTournaments => prevTournaments.filter(t => t.id !== tournamentId));
+
+      setMessage(`Tournament "${tournamentName}" deleted successfully`);
+
+      // Clear message after 3 seconds
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Failed to delete tournament:', err);
+      setError(err.message || 'Failed to delete tournament');
+      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -295,6 +323,15 @@ export default function AdminTournamentsPage() {
                           Auto-syncing scores
                         </span>
                       )}
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteTournament(tournament.id, tournament.name)}
+                        className="border-red-300 text-red-600 hover:bg-red-50 text-xs mt-2"
+                      >
+                        Delete Tournament
+                      </Button>
                     </div>
                   </div>
                 </div>
