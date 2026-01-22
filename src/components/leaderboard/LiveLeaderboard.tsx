@@ -51,8 +51,6 @@ export function LiveLeaderboard({
     setSelectedPlayer(player);
     setShowScorecard(true);
   };
-  const [selectedPlayer, setSelectedPlayer] = useState<LeaderboardRow | null>(null);
-  const [showScorecard, setShowScorecard] = useState(false);
 
   useEffect(() => {
     // Subscribe to real-time updates for tournament players
