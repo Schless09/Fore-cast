@@ -2,7 +2,6 @@
 
 import { TournamentPlayer, PGAPlayer } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 // Convert country code to flag emoji
@@ -140,13 +139,9 @@ export function PlayerSelector({
                               {rank}
                             </div>
                             <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                              <Link
-                                href={`/players/${playerId}?${tournamentId ? `tournament=${tournamentId}` : ''}${venueId ? `&venue=${venueId}` : ''}`}
-                                className="truncate font-medium text-gray-900 hover:text-green-600 hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
+                              <span className="truncate font-medium text-gray-900">
                                 {pgaPlayer.name}
-                              </Link>
+                              </span>
                               {pgaPlayer.country && (
                                 <span className="text-xs flex-shrink-0" title={pgaPlayer.country}>
                                   {getCountryFlag(pgaPlayer.country)}
