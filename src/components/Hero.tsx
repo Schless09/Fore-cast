@@ -4,21 +4,11 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 
 /**
- * Hero section with a looping background video.
- * Uses public/PuntaEspada.mp4 (golf course montage).
+ * Hero section with animated background.
  */
 export function Hero() {
   return (
     <section className="relative w-full min-h-screen flex items-center justify-center overflow-hidden">
-      <video
-        className="absolute inset-0 h-full w-full object-cover opacity-20"
-        src="/PuntaEspada.mp4"
-        autoPlay
-        loop
-        muted
-        playsInline
-        preload="metadata"
-      />
       <div className="absolute inset-0 bg-linear-to-br from-casino-bg via-casino-elevated/95 to-casino-bg" />
       
       {/* Animated casino lights effect */}
