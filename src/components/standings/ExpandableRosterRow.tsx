@@ -45,12 +45,25 @@ export function ExpandableRosterRow({
           loadPlayers();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tournament_players',
+          filter: `tournament_id=eq.${tournamentId}`,
+        },
+        () => {
+          // Refetch players when tournament_players change (for any player in this tournament)
+          loadPlayers();
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isExpanded, roster.id]);
+  }, [isExpanded, roster.id, tournamentId]);
 
   const rank = index + 1;
   const winnings = roster.total_winnings || 0;
