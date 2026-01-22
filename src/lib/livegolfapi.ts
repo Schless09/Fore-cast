@@ -511,26 +511,26 @@ export async function transformMinimalLiveGolfAPIScores(
     return (a.position || 999) - (b.position || 999);
   });
 
-  // Assign sequential positions and handle ties
-  let currentPosition = 1;
-  let currentScore = sortedScores[0]?.total_score;
-  let tieCount = 1;
+  // First pass: Count players at each score to determine tie counts
+  const scoreCounts = new Map<number, number>();
+  for (const score of sortedScores) {
+    scoreCounts.set(score.total_score, (scoreCounts.get(score.total_score) || 0) + 1);
+  }
 
-  for (let i = 0; i < sortedScores.length; i++) {
-    const score = sortedScores[i];
+  // Second pass: Assign positions based on score ranking
+  // Position is determined by how many players have a BETTER (lower) score
+  const scoreToPosition = new Map<number, number>();
+  let position = 1;
+  const uniqueScores = Array.from(scoreCounts.keys()).sort((a, b) => a - b);
+  for (const score of uniqueScores) {
+    scoreToPosition.set(score, position);
+    position += scoreCounts.get(score) || 1; // Next position jumps by tie count
+  }
 
-    if (score.total_score === currentScore) {
-      // Same score = tie
-      tieCount++;
-    } else {
-      // Different score = new position
-      currentPosition += tieCount;
-      currentScore = score.total_score;
-      tieCount = 1;
-    }
-
-    // Assign calculated position
-    score.calculatedPosition = currentPosition;
+  // Third pass: Assign calculated values to each player
+  for (const score of sortedScores) {
+    const tieCount = scoreCounts.get(score.total_score) || 1;
+    score.calculatedPosition = scoreToPosition.get(score.total_score) || 1;
     score.isTied = tieCount > 1;
     score.tiedCount = tieCount;
   }
@@ -677,27 +677,28 @@ export async function transformLiveGolfAPIScores(
     return (a.positionValue || 999) - (b.positionValue || 999);
   });
 
-  // Assign sequential positions and handle ties
-  let currentPosition = 1;
-  let currentScore = parseScore(sortedScorecards[0]?.total);
-  let tieCount = 1;
-
-  for (let i = 0; i < sortedScorecards.length; i++) {
-    const scorecard = sortedScorecards[i];
+  // First pass: Count players at each score to determine tie counts
+  const scoreCounts = new Map<number, number>();
+  for (const scorecard of sortedScorecards) {
     const score = parseScore(scorecard.total);
+    scoreCounts.set(score, (scoreCounts.get(score) || 0) + 1);
+  }
 
-    if (score === currentScore) {
-      // Same score = tie
-      tieCount++;
-    } else {
-      // Different score = new position
-      currentPosition += tieCount;
-      currentScore = score;
-      tieCount = 1;
-    }
+  // Second pass: Assign positions based on score ranking
+  // Position is determined by how many players have a BETTER (lower) score
+  const scoreToPosition = new Map<number, number>();
+  let position = 1;
+  const uniqueScores = Array.from(scoreCounts.keys()).sort((a, b) => a - b);
+  for (const score of uniqueScores) {
+    scoreToPosition.set(score, position);
+    position += scoreCounts.get(score) || 1; // Next position jumps by tie count
+  }
 
-    // Assign the position to the scorecard
-    scorecard.calculatedPosition = currentPosition;
+  // Third pass: Assign calculated values to each scorecard
+  for (const scorecard of sortedScorecards) {
+    const score = parseScore(scorecard.total);
+    const tieCount = scoreCounts.get(score) || 1;
+    scorecard.calculatedPosition = scoreToPosition.get(score) || 1;
     scorecard.isTied = tieCount > 1;
     scorecard.tiedCount = tieCount;
   }
