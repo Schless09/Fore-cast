@@ -54,6 +54,15 @@ export default async function SeasonStandingsPage() {
     redirect('/auth/login');
   }
 
+  // Get user's league
+  const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('league_id')
+    .eq('id', user.id)
+    .single();
+
+  const userLeagueId = userProfile?.league_id;
+
   // Get all completed rosters with winnings
   // Note: We need to filter by tournament status, so we'll get tournaments first
   const { data: tournaments, error: tournamentsError } = await supabase
@@ -83,11 +92,12 @@ export default async function SeasonStandingsPage() {
         user_id,
         roster_name,
         total_winnings,
-        profiles(username),
+        profiles!inner(username, league_id),
         tournament:tournaments(id, name, status, start_date)
       `
       )
       .in('tournament_id', tournamentIds)
+      .eq('profiles.league_id', userLeagueId)
       .order('created_at', { ascending: false });
 
     rosters = (result.data as unknown as RosterData[]) || [];

@@ -16,6 +16,13 @@ export default async function DashboardPage() {
     redirect('/auth/login');
   }
 
+  // Get user's profile with league info
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*, league:leagues(name)')
+    .eq('id', user.id)
+    .single();
+
   // Get user's rosters with details
   const { data: rosters } = await supabase
     .from('user_rosters')
@@ -46,10 +53,22 @@ export default async function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">
-          Your Dashboard
-        </h1>
-        <p className="text-gray-300">Manage your fantasy golf rosters</p>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Your Dashboard
+            </h1>
+            <p className="text-gray-300">Manage your fantasy golf rosters</p>
+          </div>
+          {profile?.league && (
+            <div className="px-4 py-2 bg-casino-card border border-casino-gold/30 rounded-lg">
+              <p className="text-xs text-casino-gray">League</p>
+              <p className="text-lg font-bold text-casino-gold">
+                {(profile.league as any)?.name || 'Unknown'}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -124,7 +143,7 @@ export default async function DashboardPage() {
       <div className="mb-8">
         <Card>
           <CardHeader>
-            <CardTitle>Season Leaderboard</CardTitle>
+            <CardTitle>The Money Board</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="w-full" style={{ height: '600px' }}>

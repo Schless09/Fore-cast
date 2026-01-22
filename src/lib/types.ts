@@ -1,9 +1,18 @@
 // TypeScript types for the FORE!cast Golf application
 
+export interface League {
+  id: string;
+  name: string;
+  password: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Profile {
   id: string;
   username: string;
   email: string;
+  league_id: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -30,6 +30,15 @@ export default async function WeeklyStandingsByTournamentPage({
     redirect('/auth/login');
   }
 
+  // Get user's league
+  const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('league_id')
+    .eq('id', user.id)
+    .single();
+
+  const userLeagueId = userProfile?.league_id;
+
   // Get tournament
   const { data: tournament, error: tournamentError } = await supabase
     .from('tournaments')
@@ -53,6 +62,7 @@ export default async function WeeklyStandingsByTournamentPage({
   }
 
   // Get all rosters for this tournament, ranked by total_winnings
+  // Filter by user's league to show only rosters from the same league
   const { data: rosters, error: rostersError } = await supabase
     .from('user_rosters')
     .select(
@@ -61,11 +71,12 @@ export default async function WeeklyStandingsByTournamentPage({
       roster_name,
       total_winnings,
       user_id,
-      profiles(username),
+      profiles!inner(username, league_id),
       tournament:tournaments(name, status)
     `
     )
     .eq('tournament_id', tournamentId)
+    .eq('profiles.league_id', userLeagueId)
     .order('total_winnings', { ascending: false });
 
   if (rostersError) {

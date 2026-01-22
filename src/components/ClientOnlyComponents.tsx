@@ -11,11 +11,16 @@ const EnvWarningBanner = dynamic(() => import('@/components/EnvWarningBanner').t
   ssr: false,
 });
 
+const LeagueCheck = dynamic(() => import('@/components/leagues/LeagueCheck').then(mod => ({ default: mod.LeagueCheck })), {
+  ssr: false,
+});
+
 export function ClientOnlyComponents() {
   return (
     <>
       <ErrorHandler />
       <EnvWarningBanner />
+      <LeagueCheck />
     </>
   );
 }
