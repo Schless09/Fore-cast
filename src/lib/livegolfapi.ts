@@ -325,37 +325,19 @@ export async function transformLiveGolfAPIScores(
   const results = await Promise.all(
     scorecards.map(async (scorecard, idx) => {
       // Check if player exists in our database
-      let { data: existingPlayer } = await supabaseClient
+      const { data: existingPlayer } = await supabaseClient
         .from('pga_players')
         .select('id')
         .eq('name', scorecard.player)
         .single();
 
-      let pgaPlayerId: string;
-
       if (!existingPlayer) {
-        // Create the player automatically
-        console.log(`Creating new player: ${scorecard.player}`);
-        const { data: newPlayer, error: createError } = await supabaseClient
-          .from('pga_players')
-          .insert({
-            name: scorecard.player,
-            country: null, // Will be updated later if available
-            world_ranking: null,
-            fedex_cup_ranking: null,
-          })
-          .select('id')
-          .single();
-
-        if (createError || !newPlayer) {
-          console.error(`Failed to create player ${scorecard.player}:`, createError);
-          return null;
-        }
-
-        pgaPlayerId = newPlayer.id;
-      } else {
-        pgaPlayerId = existingPlayer.id;
+        // Skip players that don't exist in our database
+        console.log(`Skipping player not in database: ${scorecard.player}`);
+        return null;
       }
+
+      const pgaPlayerId = existingPlayer.id;
 
       // Parse total score (tournament cumulative)
       const total_score = parseScore(scorecard.total);

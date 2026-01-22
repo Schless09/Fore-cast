@@ -91,8 +91,6 @@ export async function POST(request: NextRequest) {
     // Update scores in database
     const updates = [];
     for (const score of transformedScores) {
-      let tournamentPlayerId: string;
-
       // Check if tournament_player record exists
       const { data: existingTournamentPlayer } = await supabase
         .from('tournament_players')
@@ -101,29 +99,13 @@ export async function POST(request: NextRequest) {
         .eq('pga_player_id', score.pgaPlayerId)
         .single();
 
-      if (existingTournamentPlayer) {
-        tournamentPlayerId = existingTournamentPlayer.id;
-      } else {
-        // Create tournament_player record automatically
-        console.log(`[SYNC] Creating tournament player entry for ${score.playerName} with cost 100.00`);
-        const { data: newTournamentPlayer, error: createError } = await supabase
-          .from('tournament_players')
-          .insert({
-            tournament_id: tournamentId,
-            pga_player_id: score.pgaPlayerId,
-            cost: 100.00, // Default cost (fits DECIMAL(5,2) constraint)
-          })
-          .select('id')
-          .single();
-
-        if (createError || !newTournamentPlayer) {
-          console.error(`[SYNC ERROR] Failed to create tournament player for ${score.playerName}:`, JSON.stringify(createError, null, 2));
-          continue;
-        }
-
-        tournamentPlayerId = newTournamentPlayer.id;
-        console.log(`[SYNC] Successfully created tournament player ${tournamentPlayerId} for ${score.playerName}`);
+      if (!existingTournamentPlayer) {
+        // Skip players that aren't in this tournament
+        console.log(`[SYNC] Skipping player not in tournament: ${score.playerName}`);
+        continue;
       }
+
+      const tournamentPlayerId = existingTournamentPlayer.id;
 
       // Log what we're about to store (first 3 players + any with tee time strings)
       if (updates.length < 3 || (typeof score.thru === 'string' && score.thru.includes('PM'))) {
