@@ -60,13 +60,13 @@ export function PlayerRow({ player, playerWinnings, rank }: PlayerRowProps) {
         </span>
       </td>
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center hidden sm:table-cell">
-        {player.made_cut ? (
-          <span className="px-2 py-1 bg-casino-green/20 text-casino-green border border-casino-green/30 rounded-full text-xs font-medium">
+        {player.made_cut === false ? (
+          <span className="px-2 py-1 bg-casino-red/20 text-casino-red border border-casino-red/30 rounded-full text-xs font-medium">
             Cut
           </span>
         ) : (
-          <span className="px-2 py-1 bg-casino-red/20 text-casino-red border border-casino-red/30 rounded-full text-xs font-medium">
-            Cut
+          <span className="px-2 py-1 bg-casino-green/20 text-casino-green border border-casino-green/30 rounded-full text-xs font-medium">
+            Active
           </span>
         )}
       </td>

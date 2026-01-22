@@ -23,19 +23,18 @@ function RefreshButton() {
   );
 }
 
-// Revalidate page every 30 seconds for debugging
-// This works in conjunction with the LiveGolfAPI cache layer
-export const revalidate = 30;
-
-// Add dynamic rendering to ensure fresh data
+// Force fresh data on every request to prevent caching issues
+export const revalidate = 0;
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function TournamentPage({ params }: TournamentPageProps) {
   const { id } = await params;
   const supabase = await createClient();
 
-  // Add timestamp for debugging revalidation
+  // Add timestamp for debugging revalidation and cache busting
   const pageGeneratedAt = new Date().getTime();
+  const cacheBuster = Math.random().toString(36).substring(7);
 
   const {
     data: { user },
@@ -134,6 +133,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     existingRosterData = {
       ...existingRoster,
       roster_players: sortedRosterPlayers,
+      playerIds: sortedRosterPlayers
+        .map((rp: any) => rp.tournament_player?.pga_player_id)
+        .filter(Boolean),
     };
   }
 
@@ -204,6 +206,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       `
       )
       .eq('tournament_id', id)
+      .not('position', 'is', null)
       .order('position', { ascending: true });
 
     // Prize money calculation is now handled manually by admin via the prize money page
@@ -444,7 +447,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 ? 'Cache'
                 : leaderboardSource === 'livegolfapi'
                 ? 'LiveGolfAPI'
-                : 'Unknown'}
+                : 'Unknown'} | Cache: {cacheBuster}
             </span>
             <span className="text-casino-gray">
               Page generated: {formatTimestampCST(pageGeneratedAt)}

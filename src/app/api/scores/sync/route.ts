@@ -88,8 +88,29 @@ export async function POST(request: NextRequest) {
       })));
     }
 
-    // Update scores in database
+    // Get all players that are in user rosters for this tournament (prioritize these)
+    const { data: rosteredPlayers } = await supabase
+      .from('roster_players')
+      .select(`
+        tournament_player:tournament_players!inner(
+          id,
+          pga_player_id,
+          pga_players(name)
+        )
+      `)
+      .eq('tournament_players.tournament_id', tournamentId);
+
+    const rosteredPlayerIds = new Set(
+      rosteredPlayers?.map(rp => rp.tournament_player?.pga_player_id).filter(Boolean) || []
+    );
+
+    console.log(`[SYNC] Found ${rosteredPlayerIds.size} players in user rosters for this tournament`);
+
+    // Update scores in database - prioritize rostered players
     const updates = [];
+    const rosteredUpdates = [];
+    const otherUpdates = [];
+
     for (const score of transformedScores) {
       // Check if tournament_player record exists
       const { data: existingTournamentPlayer } = await supabase
@@ -100,12 +121,24 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!existingTournamentPlayer) {
-                  // Skip players that aren't in this tournament
-                  console.log(`[SYNC] Skipping player not in tournament: ${score.playerName} (clean: ${score.playerName.replace(/\s*\([^)]+\)\s*$/, '').trim()})`);
-                  continue;
+        // Skip players that aren't in this tournament
+        console.log(`[SYNC] Skipping player not in tournament: ${score.playerName} (clean: ${score.playerName.replace(/\s*\([^)]+\)\s*$/, '').trim()})`);
+        continue;
       }
 
       const tournamentPlayerId = existingTournamentPlayer.id;
+      const isRostered = rosteredPlayerIds.has(score.pgaPlayerId);
+
+      if (isRostered) {
+        rosteredUpdates.push({ score, tournamentPlayerId });
+      } else {
+        otherUpdates.push({ score, tournamentPlayerId });
+      }
+    }
+
+    // Process rostered players first (higher priority)
+    console.log(`[SYNC] Processing ${rosteredUpdates.length} rostered players first...`);
+    for (const { score, tournamentPlayerId } of rosteredUpdates) {
 
       // Log what we're about to store (first 3 players + any with tee time strings)
       if (updates.length < 3 || (typeof score.thru === 'string' && score.thru.includes('PM'))) {
@@ -146,6 +179,11 @@ export async function POST(request: NextRequest) {
         pgaPlayerId: score.pgaPlayerId,
         playerName: score.playerName,
       });
+    }
+
+    // Skip other players to avoid timeout - only update rostered players
+    if (otherUpdates.length > 0) {
+      console.log(`[SYNC] Skipping ${otherUpdates.length} non-rostered players to avoid timeout`);
     }
 
     // Trigger fantasy points recalculation
