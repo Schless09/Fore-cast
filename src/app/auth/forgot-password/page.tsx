@@ -66,7 +66,7 @@ export default function ForgotPasswordPage() {
                   Didn't receive the email? Check your spam folder or try again in a few minutes.
                 </p>
                 
-                <Link href="/auth/login">
+                <Link href="/auth">
                   <Button variant="outline" className="w-full">
                     Back to Sign In
                   </Button>
@@ -128,7 +128,7 @@ export default function ForgotPasswordPage() {
               <p className="text-center text-sm text-gray-600">
                 Remember your password?{' '}
                 <Link
-                  href="/auth/login"
+                  href="/auth"
                   className="text-green-600 hover:text-green-700 font-medium"
                 >
                   Sign in

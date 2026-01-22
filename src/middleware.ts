@@ -55,19 +55,20 @@ export async function middleware(request: NextRequest) {
 
   // Protected routes
   const protectedPaths = ['/dashboard', '/tournaments', '/players', '/admin'];
-  const authPaths = ['/auth/login', '/auth/signup'];
+  const authPaths = ['/auth'];
 
   const isProtectedPath = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );
   const isAuthPath = authPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
+    request.nextUrl.pathname === path || 
+    request.nextUrl.pathname.startsWith(path + '/')
   );
 
-  // Redirect to login if accessing protected route without auth
+  // Redirect to auth if accessing protected route without auth
   if (isProtectedPath && !user) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/auth/login';
+    redirectUrl.pathname = '/auth';
     redirectUrl.searchParams.set('redirect', request.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }

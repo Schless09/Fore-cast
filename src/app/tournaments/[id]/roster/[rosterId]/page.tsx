@@ -18,7 +18,7 @@ export default async function RosterPage({ params }: RosterPageProps) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth');
   }
 
   // Get roster with full details

@@ -14,7 +14,7 @@ export default async function WeeklyStandingsPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth');
   }
 
   // Priority:

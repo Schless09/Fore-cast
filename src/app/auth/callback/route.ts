@@ -29,10 +29,10 @@ export async function GET(request: NextRequest) {
           errorStatus: error.status,
         }, error as Error);
         
-        // Redirect to login with error message
-        const loginUrl = new URL('/auth/login', requestUrl.origin);
-        loginUrl.searchParams.set('error', 'Invalid or expired confirmation link');
-        return NextResponse.redirect(loginUrl);
+        // Redirect to auth with error message
+        const authUrl = new URL('/auth', requestUrl.origin);
+        authUrl.searchParams.set('error', 'Invalid or expired confirmation link');
+        return NextResponse.redirect(authUrl);
       }
 
       if (data.session) {
@@ -47,16 +47,16 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(redirectUrl);
       }
 
-      // If no session, redirect to login
+      // If no session, redirect to auth
       logger.warn('No session after code exchange', {
         hasUser: !!data.user,
       });
-      return NextResponse.redirect(new URL('/auth/login', requestUrl.origin));
+      return NextResponse.redirect(new URL('/auth', requestUrl.origin));
     } catch (error) {
       logger.error('Unexpected error in auth callback', {}, error as Error);
-      const loginUrl = new URL('/auth/login', requestUrl.origin);
-      loginUrl.searchParams.set('error', 'An error occurred during confirmation');
-      return NextResponse.redirect(loginUrl);
+      const authUrl = new URL('/auth', requestUrl.origin);
+      authUrl.searchParams.set('error', 'An error occurred during confirmation');
+      return NextResponse.redirect(authUrl);
     }
   }
 

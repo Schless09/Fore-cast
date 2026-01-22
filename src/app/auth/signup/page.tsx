@@ -1,32 +1,33 @@
-import { SignupForm } from '@/components/auth/SignupForm';
+'use client';
 
-interface SignupPageProps {
-  searchParams: Promise<{ invite?: string; league?: string }>;
-}
+import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default async function SignupPage({ searchParams }: SignupPageProps) {
-  const { invite, league } = await searchParams;
-  
+function SignupRedirect() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Preserve any query params (like invite code) when redirecting
+    const params = new URLSearchParams(searchParams);
+    const queryString = params.toString();
+    router.replace(`/auth${queryString ? `?${queryString}` : ''}`);
+  }, [router, searchParams]);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">FORE!cast Golf</h1>
-          <p className="text-lg font-semibold text-green-600 mb-1">Predict. Play. Win.</p>
-          {invite && league ? (
-            <div className="mt-4">
-              <p className="text-gray-600 mb-2">You&apos;ve been invited to join</p>
-              <p className="text-2xl font-bold text-green-700">{decodeURIComponent(league)}</p>
-              <p className="text-sm text-gray-500 mt-1">Create your account to accept the invite</p>
-            </div>
-          ) : (
-            <p className="text-gray-600">
-              {invite ? 'Create your account to join the league' : 'Create your account to start playing'}
-            </p>
-          )}
-        </div>
-        <SignupForm inviteCode={invite} />
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-green-50 to-green-100">
+      <div className="text-center">
+        <p className="text-gray-600">Redirecting...</p>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>Loading...</p></div>}>
+      <SignupRedirect />
+    </Suspense>
   );
 }

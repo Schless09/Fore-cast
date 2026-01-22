@@ -33,12 +33,12 @@ export default async function InvitePage({ params }: InvitePageProps) {
 
     if (inviteError) {
       console.error('[INVITE] Error fetching invite:', inviteError);
-      redirect(`/auth/signup?invite=${code}`);
+      redirect(`/auth?invite=${code}`);
     }
 
     if (!invite) {
       console.log('[INVITE] No active invite found with code:', code);
-      redirect(`/auth/signup?invite=${code}`);
+      redirect(`/auth?invite=${code}`);
     }
 
     if (invite?.league_id) {
@@ -54,11 +54,11 @@ export default async function InvitePage({ params }: InvitePageProps) {
       
       if (leagueError) {
         console.error('[INVITE] Error fetching league:', leagueError);
-        redirect(`/auth/signup?invite=${code}`);
+        redirect(`/auth?invite=${code}`);
       }
       
       if (league?.name) {
-        const redirectUrl = `/auth/signup?invite=${code}&league=${encodeURIComponent(league.name)}`;
+        const redirectUrl = `/auth?invite=${code}&league=${encodeURIComponent(league.name)}`;
         console.log('[INVITE] Redirecting to:', redirectUrl);
         redirect(redirectUrl);
       }
@@ -66,7 +66,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
     
     // Fallback redirect without league name if fetch fails
     console.log('[INVITE] Falling back to redirect without league name');
-    redirect(`/auth/signup?invite=${code}`);
+    redirect(`/auth?invite=${code}`);
   }
 
   // User is authenticated, try to accept the invite

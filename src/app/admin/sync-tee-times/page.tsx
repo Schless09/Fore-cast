@@ -8,7 +8,7 @@ export default async function SyncTeeTimesPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth');
   }
 
   // Get all tournaments with their LiveGolfAPI IDs

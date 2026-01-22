@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth');
   }
 
   // Get user's profile with active league info

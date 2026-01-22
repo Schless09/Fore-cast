@@ -11,7 +11,7 @@ export default async function AdminPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth');
   }
 
   // TODO: Add admin role check

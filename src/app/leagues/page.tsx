@@ -8,7 +8,7 @@ export default async function LeaguesPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth');
   }
 
   // Get all leagues user is a member of

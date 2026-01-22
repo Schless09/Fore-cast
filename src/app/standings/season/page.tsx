@@ -51,7 +51,7 @@ export default async function SeasonStandingsPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth');
   }
 
   // Get user's active league

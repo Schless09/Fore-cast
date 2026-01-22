@@ -52,6 +52,7 @@ Visit `/env-check` in your browser to verify your environment variables are set 
 ### Optional
 - `NEXT_PUBLIC_APP_URL` - Your app URL (defaults to `http://localhost:3000`)
 - `LIVEGOLFAPI_KEY` - API key for LiveGolfAPI.com integration
+- `CRON_SECRET` - Secret key for Vercel Cron authentication (required for auto score sync)
 
 ## Common Issues
 

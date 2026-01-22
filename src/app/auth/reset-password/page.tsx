@@ -66,9 +66,9 @@ export default function ResetPasswordPage() {
 
       setSuccess(true);
       
-      // Redirect to login after 2 seconds
+      // Redirect to auth after 2 seconds
       setTimeout(() => {
-        router.push('/auth/login?message=Password updated successfully. Please sign in with your new password.');
+        router.push('/auth?message=Password updated successfully. Please sign in with your new password.');
       }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
@@ -112,7 +112,7 @@ export default function ResetPasswordPage() {
                   </Button>
                 </Link>
                 
-                <Link href="/auth/login">
+                <Link href="/auth">
                   <Button variant="outline" className="w-full">
                     Back to Sign In
                   </Button>
@@ -238,7 +238,7 @@ export default function ResetPasswordPage() {
               <p className="text-center text-sm text-gray-600">
                 Remember your password?{' '}
                 <Link
-                  href="/auth/login"
+                  href="/auth"
                   className="text-green-600 hover:text-green-700 font-medium"
                 >
                   Sign in

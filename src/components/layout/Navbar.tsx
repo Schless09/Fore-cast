@@ -78,15 +78,9 @@ export function Navbar() {
             FORE!CAST
           </Link>
           <div className="hidden md:flex items-center gap-4">
-            <Link
-              href="/auth/login"
-              className="text-casino-text hover:text-casino-gold font-medium transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link href="/auth/signup">
+            <Link href="/auth">
               <button className="btn-casino-gold px-6 py-2 rounded-lg font-semibold">
-                Sign Up
+                Get Started
               </button>
             </Link>
           </div>
@@ -111,16 +105,9 @@ export function Navbar() {
         {isMobileMenuOpen && (
           <div className="md:hidden mt-4 pb-4 border-t border-casino-gold/20">
             <div className="flex flex-col gap-4 pt-4">
-              <Link
-                href="/auth/login"
-                className="text-casino-text hover:text-casino-gold font-medium transition-colors px-4 py-2"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Sign In
-              </Link>
-              <Link href="/auth/signup" onClick={() => setIsMobileMenuOpen(false)}>
+              <Link href="/auth" onClick={() => setIsMobileMenuOpen(false)}>
                 <button className="btn-casino-gold px-6 py-2 rounded-lg font-semibold w-full">
-                  Sign Up
+                  Get Started
                 </button>
               </Link>
             </div>

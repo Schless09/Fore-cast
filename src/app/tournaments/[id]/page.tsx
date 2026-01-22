@@ -27,7 +27,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth');
   }
 
   // Get tournament

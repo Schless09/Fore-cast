@@ -10,10 +10,12 @@ export function LeagueCheck() {
   const [checking, setChecking] = useState(true);
   const pathname = usePathname();
 
+  // Don't show modal on auth pages
+  const isAuthPage = pathname?.startsWith('/auth/');
+
   useEffect(() => {
-    // Don't show modal on auth pages
-    if (pathname?.startsWith('/auth/')) {
-      setChecking(false);
+    // Skip the check if on auth pages
+    if (isAuthPage) {
       return;
     }
 
@@ -30,10 +32,11 @@ export function LeagueCheck() {
       setChecking(false);
     }
     checkLeague();
-  }, [pathname]);
+  }, [pathname, isAuthPage]);
 
-  if (checking) {
-    return null; // Or a subtle loading indicator
+  // Don't render anything on auth pages or while checking
+  if (isAuthPage || checking) {
+    return null;
   }
 
   if (!showModal) {
