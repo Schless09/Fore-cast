@@ -25,6 +25,16 @@ export function ExpandableRosterRow({
   const [players, setPlayers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Can view roster if: it's your own roster, OR tournament is active/completed
+  const canViewRoster = isUserRoster || tournamentStatus === 'active' || tournamentStatus === 'completed';
+
+  // Load initial data when component mounts
+  useEffect(() => {
+    if (canViewRoster && players.length === 0) {
+      loadPlayers();
+    }
+  }, [canViewRoster]);
+
   // Subscribe to real-time updates when expanded
   useEffect(() => {
     if (!isExpanded) return;
@@ -68,9 +78,6 @@ export function ExpandableRosterRow({
   const rank = index + 1;
   const winnings = roster.total_winnings || 0;
 
-  // Can view roster if: it's your own roster, OR tournament is active/completed
-  const canViewRoster = isUserRoster || tournamentStatus === 'active' || tournamentStatus === 'completed';
-
   const loadPlayers = async () => {
     setIsLoading(true);
     try {
@@ -83,6 +90,7 @@ export function ExpandableRosterRow({
             position,
             prize_money,
             total_score,
+            thru,
             made_cut,
             tee_time,
             starting_tee,
