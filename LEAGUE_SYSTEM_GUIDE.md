@@ -2,20 +2,22 @@
 
 ## Overview
 
-The league system allows multiple friend groups to run separate competitions. Users must join a league when they sign up, and all standings are filtered to only show users from the same league.
+The league system allows multiple friend groups to run separate competitions. **Users can belong to multiple leagues simultaneously** and switch between them to view different standings. Each league maintains its own isolated leaderboard and prize structure.
 
 ## Quick Start
 
-### 1. Run the Migration
+### 1. Run the Migrations
 
-First, apply the database migration to create the leagues table:
+First, apply the database migrations to create the leagues system:
 
 ```bash
 # If using Supabase CLI (local development)
 npx supabase migration up
 
 # Or apply directly in Supabase Dashboard:
-# Go to SQL Editor and run: supabase/migrations/010_add_leagues.sql
+# Go to SQL Editor and run: 
+# - supabase/migrations/010_add_leagues.sql (initial league system)
+# - supabase/migrations/011_multi_league_support.sql (multi-league support)
 ```
 
 ### 2. Default League
@@ -77,9 +79,18 @@ VALUES ('GolfBuddies2026', 'eagles123');
 - `password` - League password (plain text for simplicity)
 - `created_at`, `updated_at` - Timestamps
 
+**league_members table (junction table):**
+- `id` - UUID primary key
+- `user_id` - Foreign key to profiles
+- `league_id` - Foreign key to leagues
+- `joined_at` - When user joined this league
+- `is_active` - Whether this is the user's currently active league
+- Unique constraint on (user_id, league_id)
+
 **profiles table (updated):**
-- Added `league_id` - Foreign key to leagues table
-- Users belong to one league
+- `league_id` - Deprecated, kept for backward compatibility
+- `active_league_id` - The league user is currently viewing
+- Users can belong to multiple leagues via league_members table
 
 ### Standings Filtering
 
@@ -99,9 +110,10 @@ All standings pages now filter by the user's league:
 
 ### Security & Privacy
 
-- **RLS Policies**: Users can view any league name (for joining) but only see their own league membership
+- **RLS Policies**: Users can view any league name (for joining) but only manage their own league memberships
 - **Standalone Leaderboards**: Each league is completely isolated
-- **No Cross-League Visibility**: Users can't see rosters or standings from other leagues
+- **No Cross-League Visibility**: Users can't see rosters or standings from other leagues (only their active league)
+- **Active League Context**: All standings automatically filtered by user's active league selection
 
 ## User Experience
 
@@ -129,9 +141,44 @@ All standings pages now filter by the user's league:
 
 ### Existing User Experience
 
-- Dashboard shows league badge in top-right corner
-- All standings automatically filtered to show only league members
-- No changes needed - users already in "BamaBoys2026"
+- Dashboard shows active league badge in top-right corner
+- All standings automatically filtered to show only active league members
+- Navigate to /leagues to manage league memberships
+- Switch between leagues to view different standings
+- No changes needed for BamaBoys2026 members - already migrated
+
+## Managing Multiple Leagues
+
+### League Management Page
+
+Access at `/leagues` or click "Leagues" in the navbar.
+
+**Features:**
+- View all leagues you're a member of
+- See which league is currently active (⭐)
+- Switch between leagues
+- Leave leagues you no longer want to be in
+- Create or join new leagues
+
+**Switching Leagues:**
+1. Go to `/leagues`
+2. Click "Switch To" on any non-active league
+3. All standings pages will now show that league's data
+4. Your selection persists across sessions
+
+**Leaving a League:**
+1. Go to `/leagues`
+2. Click "Leave" next to any league
+3. Confirm the action (cannot be undone)
+4. If you leave your active league, another league becomes active automatically
+
+### Multi-League Benefits
+
+- **Multiple Friend Groups**: Join different leagues for work, college friends, family, etc.
+- **Separate Competitions**: Each league has its own leaderboard and prizes
+- **Shared Rosters**: Your rosters are visible across all leagues
+- **Easy Switching**: Toggle between leagues without losing data
+- **Flexible Participation**: Join new leagues anytime, leave when you want
 
 ## Troubleshooting
 
@@ -171,28 +218,58 @@ SELECT * FROM leagues ORDER BY created_at DESC;
 ### View Users in a League
 
 ```sql
-SELECT p.id, p.username, p.email, l.name as league_name
-FROM profiles p
-JOIN leagues l ON p.league_id = l.id
-WHERE l.name = 'BamaBoys2026';
+SELECT p.id, p.username, u.email, l.name as league_name, lm.joined_at
+FROM league_members lm
+JOIN profiles p ON lm.user_id = p.id
+JOIN auth.users u ON p.id = u.id
+JOIN leagues l ON lm.league_id = l.id
+WHERE l.name = 'BamaBoys2026'
+ORDER BY lm.joined_at DESC;
 ```
 
-### Move User to Different League
+### View All Leagues a User Belongs To
 
 ```sql
+SELECT l.name as league_name, lm.joined_at, 
+       (p.active_league_id = l.id) as is_active
+FROM league_members lm
+JOIN leagues l ON lm.league_id = l.id
+JOIN profiles p ON lm.user_id = p.id
+WHERE p.id = 'user-uuid-here'
+ORDER BY lm.joined_at DESC;
+```
+
+### Add User to Another League (manually)
+
+```sql
+-- Add user to a new league
+INSERT INTO league_members (user_id, league_id)
+VALUES ('user-uuid-here', (SELECT id FROM leagues WHERE name = 'NewLeagueName'))
+ON CONFLICT (user_id, league_id) DO NOTHING;
+
+-- Optionally set it as their active league
 UPDATE profiles
-SET league_id = (SELECT id FROM leagues WHERE name = 'NewLeagueName')
+SET active_league_id = (SELECT id FROM leagues WHERE name = 'NewLeagueName')
 WHERE id = 'user-uuid-here';
+```
+
+### Remove User from a League
+
+```sql
+DELETE FROM league_members
+WHERE user_id = 'user-uuid-here' 
+  AND league_id = (SELECT id FROM leagues WHERE name = 'LeagueName');
 ```
 
 ### Delete a League
 
 ```sql
--- First, move or delete users from the league
-UPDATE profiles SET league_id = NULL WHERE league_id = 'league-uuid';
-
--- Then delete the league
+-- First, remove all members (CASCADE will handle this automatically)
+-- Just delete the league - league_members will cascade delete
 DELETE FROM leagues WHERE id = 'league-uuid';
+
+-- Or by name:
+DELETE FROM leagues WHERE name = 'LeagueName';
 ```
 
 ## Future Enhancements
@@ -200,14 +277,19 @@ DELETE FROM leagues WHERE id = 'league-uuid';
 Potential improvements for the league system:
 
 - [x] League creation UI ✅ (Completed)
-- [ ] League admin dashboard
+- [x] Multi-league support ✅ (Completed)
+- [x] League switching ✅ (Completed)
+- [x] League management page ✅ (Completed)
+- [ ] League admin dashboard (assign commissioners)
 - [ ] Invite-only leagues (remove password requirement)
 - [ ] League settings (buy-in amount, payout structure)
 - [ ] Cross-league challenges
 - [ ] League chat/comments
 - [ ] League statistics and analytics
-- [ ] League member list/management
+- [ ] League member list with roles
 - [ ] Password reset/change functionality
+- [ ] League join notifications
+- [ ] Export league standings to CSV
 
 ## Support
 
