@@ -1,5 +1,30 @@
--- Fix RLS policies for user_rosters to allow league members to view each other's rosters
+-- Fix RLS policies for user_rosters AND profiles to allow league members to view each other's data
 -- This is necessary for the standings pages to show all league members
+
+-- ===== FIX PROFILES TABLE RLS =====
+-- Users need to be able to view profiles of other users in their league
+-- This is required because the standings query joins user_rosters with profiles
+
+-- Drop old restrictive profile view policies
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can view own league" ON profiles;
+
+-- Create new policy: Users can view profiles of users in their league
+CREATE POLICY "Users can view profiles in their league" ON profiles
+  FOR SELECT
+  TO authenticated
+  USING (
+    active_league_id IN (
+      SELECT active_league_id
+      FROM profiles
+      WHERE id = auth.uid()
+    )
+  );
+
+-- Keep existing insert/update policies (unchanged)
+-- Users can still only update their own profile
+
+-- ===== FIX USER_ROSTERS TABLE RLS =====
 
 -- Drop existing restrictive policies
 DROP POLICY IF EXISTS "Users can view own rosters" ON user_rosters;
