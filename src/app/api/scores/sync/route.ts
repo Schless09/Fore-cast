@@ -194,59 +194,10 @@ export async function POST(request: NextRequest) {
       console.log(`[SYNC] Skipping ${otherUpdates.length} non-rostered players to avoid timeout`);
     }
 
-    // Trigger fantasy points recalculation
-    try {
-      const recalcResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_APP_URL}/api/scores/calculate`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tournamentId }),
-        }
-      );
-    } catch (recalcError) {
-      console.error('Error triggering recalculation:', recalcError);
-    }
-
-    // Check if tournament is active and has prize money distribution
-    // If so, automatically calculate prize money for real-time updates
-    try {
-      const { data: tournament, error: tournamentError } = await supabase
-        .from('tournaments')
-        .select('status')
-        .eq('id', tournamentId)
-        .single();
-
-      if (!tournamentError && tournament?.status === 'active') {
-        // Check if prize money distribution exists
-        const { data: prizeDistributions } = await supabase
-          .from('prize_money_distributions')
-          .select('id')
-          .eq('tournament_id', tournamentId)
-          .limit(1);
-
-        if (prizeDistributions && prizeDistributions.length > 0) {
-          console.log(`[PRIZE MONEY] Tournament ${tournamentId} is active with prize distribution - calculating real-time winnings`);
-
-          const winningsResponse = await fetch(
-            `${process.env.NEXT_PUBLIC_APP_URL}/api/scores/calculate-winnings`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tournamentId }),
-            }
-          );
-
-          if (!winningsResponse.ok) {
-            console.error('Error calculating prize money:', await winningsResponse.text());
-          } else {
-            console.log(`[PRIZE MONEY] Successfully updated prize money for tournament ${tournamentId}`);
-          }
-        }
-      }
-    } catch (winningsError) {
-      console.error('Error triggering prize money calculation:', winningsError);
-    }
+    // Skip automatic calculations during sync to avoid timeouts on Vercel
+    // These can be run separately via cron jobs or manual triggers
+    console.log(`[SYNC] Skipping automatic calculations to complete within timeout limits`);
+    console.log(`[SYNC] Run calculate-winnings and calculate APIs separately if needed`);
 
     return NextResponse.json({
       success: true,
