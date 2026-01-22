@@ -5,19 +5,41 @@
 -- Users need to be able to view profiles of other users in their league
 -- This is required because the standings query joins user_rosters with profiles
 
--- Drop old restrictive profile view policies
-DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+-- IMPORTANT: Don't drop "Users can view own profile" - it's needed for basic functionality
+-- Only drop the conflicting league policy
 DROP POLICY IF EXISTS "Users can view own league" ON profiles;
 
+-- Ensure "Users can view own profile" exists
+-- (This is safe - will error if it exists, but that's fine since we want it to exist)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE tablename = 'profiles' 
+    AND policyname = 'Users can view own profile'
+  ) THEN
+    CREATE POLICY "Users can view own profile" ON profiles
+      FOR SELECT
+      TO public
+      USING (auth.uid() = id);
+  END IF;
+END $$;
+
 -- Create new policy: Users can view profiles of users in their league
+-- This is IN ADDITION to viewing own profile
+DROP POLICY IF EXISTS "Users can view profiles in their league" ON profiles;
 CREATE POLICY "Users can view profiles in their league" ON profiles
   FOR SELECT
   TO authenticated
   USING (
-    active_league_id IN (
-      SELECT active_league_id
-      FROM profiles
-      WHERE id = auth.uid()
+    -- Allow viewing profiles of users in the same league
+    -- But only if both users have an active_league_id set
+    active_league_id IS NOT NULL 
+    AND EXISTS (
+      SELECT 1
+      FROM profiles AS user_profile
+      WHERE user_profile.id = auth.uid()
+      AND user_profile.active_league_id = profiles.active_league_id
     )
   );
 
