@@ -43,9 +43,9 @@ interface LiveGolfAPIScorecard {
 
 const CACHE_DIR = path.join(process.cwd(), '.cache', 'livegolfapi');
 
-// Cache TTL: 30 seconds for debugging live data issues
-// This prevents excessive API calls when users refresh frequently
-const CACHE_TTL_MS = 30 * 1000; // 30 seconds
+// Cache TTL: 5 minutes for production use
+// This prevents excessive API calls while keeping data reasonably fresh
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface CacheEntry {
   data: any;
@@ -337,11 +337,26 @@ export async function fetchMinimalScoresFromLiveGolfAPI(
 
     const fullData = await response.json();
 
-    // Extract only minimal data we need
-    const minimalData = fullData.data?.map((scorecard: LiveGolfAPIScorecard) => {
-      const currentRound = getCurrentRound(scorecard.rounds);
+    console.log(`[MINIMAL] Raw API response keys:`, Object.keys(fullData));
+    console.log(`[MINIMAL] Raw leaderboard type:`, typeof fullData.leaderboard, Array.isArray(fullData.leaderboard) ? 'array' : 'not array');
+    console.log(`[MINIMAL] Raw leaderboard length:`, fullData.leaderboard?.length || 'no data');
+
+    if (!fullData.leaderboard || !Array.isArray(fullData.leaderboard) || fullData.leaderboard.length === 0) {
+      console.log(`[MINIMAL] No leaderboard data in API response, returning empty`);
+      await writeCache(eventId, []);
       return {
-        player: scorecard.player.replace(/\s*\([^)]+\)\s*$/, '').trim(), // Clean name
+        data: [],
+        source: 'livegolfapi',
+        timestamp: Date.now()
+      };
+    }
+
+    // Extract only minimal data we need
+    const minimalData = fullData.leaderboard?.map((scorecard: LiveGolfAPIScorecard) => {
+      const currentRound = getCurrentRound(scorecard.rounds);
+      const cleanName = scorecard.player.replace(/\s*\([^)]+\)\s*$/, '').trim();
+      return {
+        player: cleanName,
         position: scorecard.positionValue || null,
         total_score: parseScore(scorecard.total),
         thru: currentRound?.thru || null,
@@ -350,6 +365,9 @@ export async function fetchMinimalScoresFromLiveGolfAPI(
     }) || [];
 
     console.log(`[LiveGolfAPI] ✅ Extracted minimal data: ${minimalData.length} players`);
+    if (minimalData.length > 0) {
+      console.log(`[MINIMAL] First 3 players:`, minimalData.slice(0, 3).map(p => p.player));
+    }
 
     // Cache the minimal data
     await writeCache(eventId, minimalData);
@@ -402,6 +420,8 @@ export async function transformMinimalLiveGolfAPIScores(
 
   // Batch lookup all players
   const playerNames = minimalScores.map(score => score.player);
+  console.log(`[MINIMAL] Looking up ${playerNames.length} players:`, playerNames.slice(0, 5));
+
   const { data: existingPlayers } = await supabaseClient
     .from('pga_players')
     .select('id, name')
@@ -411,7 +431,16 @@ export async function transformMinimalLiveGolfAPIScores(
     existingPlayers?.map(player => [player.name, player.id]) || []
   );
 
-  console.log(`Found ${playerMap.size} out of ${playerNames.length} players in database`);
+  console.log(`[MINIMAL] Found ${playerMap.size} out of ${playerNames.length} players in database`);
+  if (playerMap.size === 0 && playerNames.length > 0) {
+    console.log(`[MINIMAL] No matches found. API names:`, playerNames.slice(0, 3));
+    // Check what players actually exist in database
+    const { data: allPlayers } = await supabaseClient
+      .from('pga_players')
+      .select('name')
+      .limit(5);
+    console.log(`[MINIMAL] Sample database players:`, allPlayers?.map(p => p.name));
+  }
 
   const results = minimalScores
     .map(score => {
