@@ -340,6 +340,9 @@ export async function fetchMinimalScoresFromLiveGolfAPI(
     console.log(`[MINIMAL] Raw API response keys:`, Object.keys(fullData));
     console.log(`[MINIMAL] Raw leaderboard type:`, typeof fullData.leaderboard, Array.isArray(fullData.leaderboard) ? 'array' : 'not array');
     console.log(`[MINIMAL] Raw leaderboard length:`, fullData.leaderboard?.length || 'no data');
+    if (fullData.leaderboard && Array.isArray(fullData.leaderboard) && fullData.leaderboard.length > 0) {
+      console.log(`[MINIMAL] Sample raw players:`, fullData.leaderboard.slice(0, 3).map(p => ({ name: p.player, position: p.positionValue })));
+    }
 
     if (!fullData.leaderboard || !Array.isArray(fullData.leaderboard) || fullData.leaderboard.length === 0) {
       console.log(`[MINIMAL] No leaderboard data in API response, returning empty`);
