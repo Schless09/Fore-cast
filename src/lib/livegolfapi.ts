@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySupabaseClient = any;
 
 /**
  * Helper functions for integrating with LiveGolfAPI.com
@@ -459,7 +460,7 @@ export async function transformMinimalLiveGolfAPIScores(
     isTied?: boolean;
     tiedCount?: number;
   }>,
-  supabaseClient: SupabaseClient
+  supabaseClient: AnySupabaseClient
 ): Promise<Array<{
   pgaPlayerId: string;
   playerName: string;
@@ -564,7 +565,7 @@ export async function transformMinimalLiveGolfAPIScores(
 
       const position = score.calculatedPosition ?? null;
       return {
-        pgaPlayerId,
+        pgaPlayerId: pgaPlayerId as string,
         playerName: score.player,
         total_score: score.total_score,
         today_score: score.total_score, // For round 1, today = total
@@ -573,12 +574,12 @@ export async function transformMinimalLiveGolfAPIScores(
         is_tied: score.isTied || false,
         tied_with_count: score.tiedCount || 1,
         made_cut: position !== null && position <= 65,
-        round_1_score: null, // Minimal API doesn't provide round scores
-        round_2_score: null,
-        round_3_score: null,
-        round_4_score: null,
+        round_1_score: null as number | null, // Minimal API doesn't provide round scores
+        round_2_score: null as number | null,
+        round_3_score: null as number | null,
+        round_4_score: null as number | null,
         tee_time: score.tee_time,
-        starting_tee: null, // Minimal API doesn't provide starting tee
+        starting_tee: null as number | null, // Minimal API doesn't provide starting tee
       };
     })
     .filter((result): result is NonNullable<typeof result> => result !== null);
@@ -594,7 +595,7 @@ export async function transformMinimalLiveGolfAPIScores(
 
 export async function transformLiveGolfAPIScores(
   scorecards: LiveGolfAPIScorecard[],
-  supabaseClient: ReturnType<typeof createClient> // Supabase client to create players
+  supabaseClient: AnySupabaseClient
 ): Promise<Array<{
   pgaPlayerId: string;
   playerName: string;
@@ -772,7 +773,7 @@ export async function transformLiveGolfAPIScores(
       const starting_tee = currentRound?.startingTee ?? round_1?.startingTee ?? null;
 
       return {
-        pgaPlayerId,
+        pgaPlayerId: pgaPlayerId as string,
         playerName: cleanPlayerName,
         total_score,
         today_score,
