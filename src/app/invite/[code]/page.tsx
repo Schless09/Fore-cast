@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { acceptLeagueInvite } from '@/lib/actions/league';
@@ -19,16 +20,28 @@ export default async function InvitePage({ params }: InvitePageProps) {
   } = await supabase.auth.getUser();
 
   if (!user) {
+    // Use service role client to bypass RLS for public invite info
+    const supabaseAdmin = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     // Fetch league info before redirecting
     try {
-      const { data: invite, error: inviteError } = await supabase
+      const { data: invite, error: inviteError } = await supabaseAdmin
         .from('league_invites')
         .select('league_id')
         .eq('invite_code', code)
         .maybeSingle();
 
       if (invite?.league_id) {
-        const { data: league } = await supabase
+        const { data: league } = await supabaseAdmin
           .from('leagues')
           .select('name')
           .eq('id', invite.league_id)
