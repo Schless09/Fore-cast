@@ -447,7 +447,38 @@ export async function transformMinimalLiveGolfAPIScores(
     console.log(`[MINIMAL] Sample database players:`, allPlayers?.map(p => p.name));
   }
 
-  const results = minimalScores
+  // Sort by score and assign proper sequential positions
+  const sortedScores = minimalScores.sort((a, b) => {
+    // Sort by total score ascending (lower is better in golf), then by original position as tiebreaker
+    if (a.total_score !== b.total_score) return a.total_score - b.total_score;
+    return (a.position || 999) - (b.position || 999);
+  });
+
+  // Assign sequential positions and handle ties
+  let currentPosition = 1;
+  let currentScore = sortedScores[0]?.total_score;
+  let tieCount = 1;
+
+  for (let i = 0; i < sortedScores.length; i++) {
+    const score = sortedScores[i];
+
+    if (score.total_score === currentScore) {
+      // Same score = tie
+      tieCount++;
+    } else {
+      // Different score = new position
+      currentPosition += tieCount;
+      currentScore = score.total_score;
+      tieCount = 1;
+    }
+
+    // Assign calculated position
+    score.calculatedPosition = currentPosition;
+    score.isTied = tieCount > 1;
+    score.tiedCount = tieCount;
+  }
+
+  const results = sortedScores
     .map(score => {
       const pgaPlayerId = playerMap.get(score.player);
       if (!pgaPlayerId) {
@@ -472,8 +503,10 @@ export async function transformMinimalLiveGolfAPIScores(
         total_score: score.total_score,
         today_score: score.total_score, // For round 1, today = total
         thru,
-        position: score.position,
-        made_cut: score.position !== null && score.position <= 65, // Basic cut logic
+        position: score.calculatedPosition,
+        made_cut: score.calculatedPosition !== null && score.calculatedPosition <= 65,
+        is_tied: score.isTied || false,
+        tied_with_count: score.tiedCount || 1,
         tee_time: score.tee_time,
       };
     })
@@ -510,6 +543,8 @@ export async function transformLiveGolfAPIScores(
   today_score: number;
   thru: number | string;
   position: number | null;
+  is_tied: boolean;
+  tied_with_count: number;
   made_cut: boolean;
   round_1_score: number | null;
   round_2_score: number | null;
@@ -573,8 +608,42 @@ export async function transformLiveGolfAPIScores(
 
   console.log(`Found ${playerMap.size} out of ${playerNames.length} players in database`);
 
+  // Assign proper sequential positions based on ranking
+  const sortedScorecards = Array.from(deduplicatedScorecards.values()).sort((a, b) => {
+    // Sort by total score ascending (lower is better in golf), then by positionValue as tiebreaker
+    const scoreA = parseScore(a.total);
+    const scoreB = parseScore(b.total);
+    if (scoreA !== scoreB) return scoreA - scoreB;
+    return (a.positionValue || 999) - (b.positionValue || 999);
+  });
+
+  // Assign sequential positions and handle ties
+  let currentPosition = 1;
+  let currentScore = parseScore(sortedScorecards[0]?.total);
+  let tieCount = 1;
+
+  for (let i = 0; i < sortedScorecards.length; i++) {
+    const scorecard = sortedScorecards[i];
+    const score = parseScore(scorecard.total);
+
+    if (score === currentScore) {
+      // Same score = tie
+      tieCount++;
+    } else {
+      // Different score = new position
+      currentPosition += tieCount;
+      currentScore = score;
+      tieCount = 1;
+    }
+
+    // Assign the position to the scorecard
+    scorecard.calculatedPosition = currentPosition;
+    scorecard.isTied = tieCount > 1;
+    scorecard.tiedCount = tieCount;
+  }
+
   const results = await Promise.all(
-    Array.from(deduplicatedScorecards.values()).map(async (scorecard, idx) => {
+    sortedScorecards.map(async (scorecard, idx) => {
       // Player name was already cleaned during deduplication
       const cleanPlayerName = scorecard.player.replace(/\s*\([^)]+\)\s*$/, '').trim();
 
@@ -627,9 +696,11 @@ export async function transformLiveGolfAPIScores(
       }
       
 
-      // Parse position (positionValue >= 980 means CUT/WD)
-      const position = scorecard.positionValue >= 980 ? null : scorecard.positionValue;
-      const made_cut = scorecard.positionValue < 980;
+      // Use calculated position instead of API position
+      const position = scorecard.calculatedPosition;
+      const is_tied = scorecard.isTied || scorecard.calculatedIsTied || false;
+      const tied_with_count = scorecard.tiedCount || scorecard.calculatedTiedCount || 1;
+      const made_cut = position !== null && position <= 65;
 
       // Extract round scores
       const round_1 = scorecard.rounds.find((r) => r.round === 1);
@@ -648,6 +719,8 @@ export async function transformLiveGolfAPIScores(
         today_score,
         thru,
         position,
+        is_tied,
+        tied_with_count,
         made_cut,
         round_1_score: round_1?.score ?? null,
         round_2_score: round_2?.score ?? null,
