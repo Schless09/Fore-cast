@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
+import { REFRESH_INTERVAL_MS } from '@/lib/config';
 
 interface RosterData {
   id: string;
@@ -38,8 +39,6 @@ interface LiveTeamStandingsProps {
   tournamentStatus: string;
   userLeagueId?: string;
 }
-
-const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour (reduce API calls during development)
 
 // Helper to parse scores
 const parseScore = (score: string | number | null): number => {

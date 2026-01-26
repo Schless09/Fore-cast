@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/prize-money';
+import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 
@@ -44,8 +45,6 @@ interface LiveSeasonStandingsProps {
   }>;
   userLeagueId?: string;
 }
-
-const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 // Normalize name for matching
 const normalizeName = (name: string): string => {

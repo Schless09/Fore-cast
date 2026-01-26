@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { CACHE_TTL_MS } from '@/lib/config';
 
 /**
  * Fetch live scores from RapidAPI Live Golf Data
@@ -13,9 +14,6 @@ import { createServiceClient } from '@/lib/supabase/service';
 
 const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com';
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '4786f7c55amshbe62b07d4f84965p1a07a0jsn6aef3153473b';
-
-// Cache configuration
-const CACHE_TTL_MS = 60 * 1000; // 60 seconds cache
 
 // In-memory cache
 interface CacheEntry {

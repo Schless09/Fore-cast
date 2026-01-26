@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { formatScore, getScoreColor } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
+import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import { ScorecardModal } from './ScorecardModal';
 
 interface LeaderboardRow {
@@ -30,9 +31,6 @@ interface LiveLeaderboardProps {
   playerNameToIdMap: Map<string, string>;
   liveGolfAPITournamentId?: string;
 }
-
-// Refresh interval (1 hour during development, change to 3 * 60 * 1000 for production)
-const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
 // Helper to parse scores from API
 const parseScore = (score: string | number | null): number => {

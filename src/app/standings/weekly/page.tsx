@@ -19,8 +19,9 @@ export default async function WeeklyStandingsPage() {
 
   // Priority:
   // 1) Active tournament (currently in progress)
-  // 2) After Monday noon CST: Next upcoming tournament
-  // 3) Before Monday noon CST: Most recent completed tournament
+  // 2) Most recent completed (if ended today or yesterday - to let users see final results)
+  // 3) Next upcoming tournament
+  // 4) Most recent completed (fallback)
   
   const { data: activeTournament } = await supabase
     .from('tournaments')
@@ -34,7 +35,7 @@ export default async function WeeklyStandingsPage() {
     .from('tournaments')
     .select('*')
     .eq('status', 'completed')
-    .order('start_date', { ascending: false })
+    .order('end_date', { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -46,15 +47,30 @@ export default async function WeeklyStandingsPage() {
     .limit(1)
     .maybeSingle();
 
-  // Check if it's after Monday noon CST
-  const isAfterMondayNoonCST = () => {
-    const now = new Date();
-    const cstTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
-    const dayOfWeek = cstTime.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const hour = cstTime.getHours();
+  // Check if the completed tournament ended today or yesterday
+  // If so, keep showing it to let users review final results
+  const shouldShowCompletedTournament = () => {
+    if (!completedTournament?.end_date) return false;
     
-    // After Monday noon: Monday after 12pm, or any day Tuesday-Sunday
-    return dayOfWeek === 1 ? hour >= 12 : dayOfWeek !== 0;
+    // Get today's date in CST using Intl.DateTimeFormat for accurate timezone handling
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', { 
+      timeZone: 'America/Chicago',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const today = formatter.format(now); // YYYY-MM-DD format
+    
+    // Get yesterday's date in CST
+    const yesterdayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const yesterday = formatter.format(yesterdayDate);
+    
+    // Extract just the date part from end_date
+    const endDate = completedTournament.end_date.split('T')[0];
+    
+    // Show completed if it ended today or yesterday
+    return endDate === today || endDate === yesterday;
   };
 
   let tournament;
@@ -62,12 +78,15 @@ export default async function WeeklyStandingsPage() {
   if (activeTournament) {
     // Active tournament takes priority
     tournament = activeTournament;
-  } else if (isAfterMondayNoonCST()) {
-    // After Monday noon CST: show next upcoming tournament
-    tournament = upcomingTournament || completedTournament;
+  } else if (shouldShowCompletedTournament()) {
+    // Show completed tournament if it ended today or yesterday
+    tournament = completedTournament;
+  } else if (upcomingTournament) {
+    // Otherwise show next upcoming
+    tournament = upcomingTournament;
   } else {
-    // Before Monday noon CST: show most recent completed tournament
-    tournament = completedTournament || upcomingTournament;
+    // Fallback to most recent completed
+    tournament = completedTournament;
   }
 
   if (!tournament) {

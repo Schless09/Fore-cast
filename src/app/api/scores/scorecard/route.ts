@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CACHE_TTL_MS } from '@/lib/config';
 
 /**
  * Fetch player scorecard from RapidAPI Live Golf Data
@@ -6,9 +7,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com';
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '4786f7c55amshbe62b07d4f84965p1a07a0jsn6aef3153473b';
-
-// Cache configuration (5 minutes for scorecards)
-const CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface CacheEntry {
   data: any;
