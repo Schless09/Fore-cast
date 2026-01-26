@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { formatScore, getScoreColor } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
 
@@ -14,12 +13,6 @@ interface LeaderboardRow {
   thru: string | number;
   prize_money: number;
   name: string;
-  prize_distribution?: {
-    position: number;
-    percentage: number | null;
-    amount: number;
-    total_purse: number;
-  };
 }
 
 interface LiveLeaderboardProps {
@@ -33,7 +26,22 @@ interface LiveLeaderboardProps {
   }>;
   userRosterPlayerIds: string[];
   playerNameToIdMap: Map<string, string>;
+  liveGolfAPITournamentId?: string;
 }
+
+// Refresh interval (1 hour during development, change to 3 * 60 * 1000 for production)
+const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+
+// Helper to parse scores from API
+const parseScore = (score: string | number | null): number => {
+  if (score === null || score === undefined) return 0;
+  if (typeof score === 'number') return score;
+  if (score === 'E') return 0;
+  const s = score.toString().trim();
+  if (s.startsWith('+')) return parseInt(s.slice(1), 10) || 0;
+  if (s.startsWith('-')) return -parseInt(s.slice(1), 10) || 0;
+  return parseInt(s, 10) || 0;
+};
 
 export function LiveLeaderboard({
   initialData,
@@ -41,79 +49,199 @@ export function LiveLeaderboard({
   prizeDistributions,
   userRosterPlayerIds,
   playerNameToIdMap,
+  liveGolfAPITournamentId,
 }: LiveLeaderboardProps) {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardRow[]>(initialData);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [tournamentStatus, setTournamentStatus] = useState<string>('In Progress');
+  const hasInitialSynced = useRef(false);
 
-  useEffect(() => {
-    // Subscribe to real-time updates for tournament players
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`leaderboard-${tournamentId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tournament_players',
-          filter: `tournament_id=eq.${tournamentId}`,
-        },
-        async () => {
-          // Refetch leaderboard data when tournament_players table changes
-          const { data: freshData } = await supabase
-            .from('tournament_players')
-            .select(
-              `
-              position,
-              is_tied,
-              tied_with_count,
-              total_score,
-              today_score,
-              thru,
-              prize_money,
-              pga_players ( name )
-            `
-            )
-            .eq('tournament_id', tournamentId)
-            .not('position', 'is', null)
-            .order('position', { ascending: true });
+  // Check if tournament is completed
+  const isCompleted = tournamentStatus === 'Official';
 
-          if (freshData) {
-            const processedData = freshData.map((row: any) => ({
-              position: row.position ?? null,
-              is_tied: row.is_tied ?? false,
-              tied_with_count: row.tied_with_count ?? 1,
-              total_score: row.total_score ?? 0,
-              today_score: row.today_score ?? 0,
-              thru: row.thru ?? '-',
-              prize_money: row.prize_money ?? 0,
-              name: row.pga_players?.name || 'Unknown',
-            }));
-
-            setLeaderboardData(processedData);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [tournamentId]);
-
-  const prizeDistributionMap = new Map(
-    prizeDistributions.map((dist) => [
-      dist.position,
-      {
-        position: dist.position,
-        percentage: dist.percentage,
-        amount: dist.amount,
-        total_purse: dist.total_purse,
-      },
-    ])
+  // Create prize distribution map (memoized)
+  const prizeDistributionMap = useMemo(() => 
+    new Map(prizeDistributions.map((dist) => [dist.position, dist.amount])),
+    [prizeDistributions]
   );
 
+  // Function to fetch directly from API and transform
+  const fetchFromAPI = useCallback(async () => {
+    if (!liveGolfAPITournamentId || isRefreshing) return;
+    
+    // Don't fetch if tournament is already completed
+    if (isCompleted) {
+      console.log('[LiveLeaderboard] Tournament completed, skipping fetch');
+      return;
+    }
+
+    setIsRefreshing(true);
+    setSyncError(null);
+
+    try {
+      // Fetch directly from our API route that calls LiveGolfAPI
+      const response = await fetch(`/api/scores/live?eventId=${liveGolfAPITournamentId}`);
+      const result = await response.json();
+
+      if (!response.ok || !result.data) {
+        const errorMsg = result.error || 'Failed to fetch scores';
+        if (errorMsg.includes('502') || errorMsg.includes('unavailable')) {
+          setSyncError('LiveGolfAPI is currently unavailable. Showing cached data.');
+        } else {
+          setSyncError(errorMsg);
+        }
+        return;
+      }
+
+      // Update tournament status
+      if (result.tournamentStatus) {
+        setTournamentStatus(result.tournamentStatus);
+      }
+
+      // Transform API data directly to display format
+      const scores = result.data;
+      const transformed: LeaderboardRow[] = scores.map((scorecard: any) => {
+        // Handle both RapidAPI and LiveGolfAPI formats
+        const position = scorecard.positionValue || 
+          (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null);
+        const isTied = scorecard.position?.startsWith('T') || false;
+        
+        // Get today's score - RapidAPI provides currentRoundScore directly
+        const todayScore = scorecard.currentRoundScore 
+          ? parseScore(scorecard.currentRoundScore)
+          : parseScore(scorecard.total);
+        
+        // Calculate prize money based on position
+        const prizeMoney = position && prizeDistributionMap.has(position) 
+          ? prizeDistributionMap.get(position) || 0 
+          : 0;
+
+        return {
+          position,
+          is_tied: isTied,
+          tied_with_count: 1,
+          total_score: parseScore(scorecard.total),
+          today_score: todayScore,
+          thru: scorecard.thru || '-',
+          prize_money: prizeMoney,
+          name: scorecard.player || 'Unknown',
+        };
+      });
+
+      // Sort by position
+      transformed.sort((a, b) => {
+        if (a.position === null) return 1;
+        if (b.position === null) return -1;
+        return a.position - b.position;
+      });
+
+      setLeaderboardData(transformed);
+      setLastRefresh(new Date());
+      setSyncError(null);
+      console.log('[LiveLeaderboard] Refreshed directly from API at', new Date().toLocaleTimeString());
+
+    } catch (error) {
+      setSyncError('Network error - unable to refresh scores');
+      console.error('[LiveLeaderboard] Error fetching from API:', error);
+    } finally {
+      setIsRefreshing(false);
+      setNextRefreshIn(REFRESH_INTERVAL_MS / 1000);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveGolfAPITournamentId, prizeDistributionMap, isCompleted]);
+
+  // Trigger initial fetch on mount
+  useEffect(() => {
+    if (liveGolfAPITournamentId && !hasInitialSynced.current) {
+      hasInitialSynced.current = true;
+      console.log('[LiveLeaderboard] Fetching initial data from API...');
+      fetchFromAPI();
+    }
+  }, [liveGolfAPITournamentId, fetchFromAPI]);
+
+  useEffect(() => {
+    // Don't poll if tournament is completed
+    if (isCompleted) {
+      console.log('[LiveLeaderboard] Tournament completed, stopping polling');
+      return;
+    }
+
+    // Set up polling interval
+    const pollInterval = setInterval(() => {
+      fetchFromAPI();
+    }, REFRESH_INTERVAL_MS);
+
+    // Countdown timer for next refresh
+    const countdownInterval = setInterval(() => {
+      setNextRefreshIn((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => {
+      clearInterval(pollInterval);
+      clearInterval(countdownInterval);
+    };
+  }, [fetchFromAPI, isCompleted]);
+
+  // Format countdown
+  const formatCountdown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className="overflow-x-auto">
+    <div>
+      {/* Refresh Status Bar */}
+      {liveGolfAPITournamentId && (
+        <div className="mb-4 space-y-2">
+          <div className="flex items-center justify-between p-2 bg-casino-elevated rounded-lg border border-casino-gold/20">
+            <div className="flex items-center gap-2 text-xs text-casino-gray">
+              {isCompleted ? (
+                <>
+                  <span className="text-casino-gold">🏆</span>
+                  <span className="text-casino-gold font-medium">Tournament Completed</span>
+                </>
+              ) : isRefreshing ? (
+                <>
+                  <span className="animate-spin">🔄</span>
+                  <span>Refreshing live scores...</span>
+                </>
+              ) : syncError ? (
+                <>
+                  <span className="text-yellow-500">⚠</span>
+                  <span>Retry in {formatCountdown(nextRefreshIn)}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-green-500">●</span>
+                  <span>Live updates active</span>
+                  <span className="text-casino-gray-dark">|</span>
+                  <span>Next refresh in {formatCountdown(nextRefreshIn)}</span>
+                </>
+              )}
+            </div>
+            {!isCompleted && (
+              <button
+                onClick={fetchFromAPI}
+                disabled={isRefreshing}
+                className="text-xs px-3 py-1 bg-casino-gold/20 hover:bg-casino-gold/30 text-casino-gold rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isRefreshing ? 'Refreshing...' : 'Refresh Now'}
+              </button>
+            )}
+          </div>
+          {syncError && (
+            <div className="p-2 bg-yellow-900/30 border border-yellow-600/50 rounded-lg text-xs text-yellow-300">
+              ⚠️ {syncError}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
@@ -142,12 +270,10 @@ export function LiveLeaderboard({
             const totalClass = getScoreColor(row.total_score);
             const todayClass = getScoreColor(row.today_score);
 
-            // Use calculated prize_money from database first, then fall back to distribution
+            // Use prize_money from row, or look up from prize distribution
             const prizeAmount = row.prize_money ||
-              row.prize_distribution?.amount ||
-              (row.position && prizeDistributionMap.has(row.position)
-                ? prizeDistributionMap.get(row.position)?.amount
-                : 0);
+              (row.position ? prizeDistributionMap.get(row.position) : 0) ||
+              0;
 
             return (
               <tr
@@ -182,6 +308,7 @@ export function LiveLeaderboard({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

@@ -2,10 +2,12 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { RosterBuilder } from '@/components/roster/RosterBuilder';
 import { PersonalLeaderboard } from '@/components/leaderboard/PersonalLeaderboard';
+import { LivePersonalLeaderboard } from '@/components/leaderboard/LivePersonalLeaderboard';
 import { LiveLeaderboard } from '@/components/leaderboard/LiveLeaderboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { TournamentSelector } from '@/components/tournaments/TournamentSelector';
+import { LiveRoundBadge } from '@/components/tournaments/LiveRoundBadge';
 import Link from 'next/link';
 import { formatDate, formatScore, getScoreColor, formatTimestampCST } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
@@ -15,14 +17,6 @@ interface TournamentPageProps {
   params: Promise<{ id: string }>;
 }
 
-// Simple refresh link (server component safe)
-function RefreshButton() {
-  return (
-    <span className="text-casino-gray text-xs">
-      (Page auto-refreshes every 3 minutes)
-    </span>
-  );
-}
 
 // Force fresh data on every request to prevent caching issues
 export const revalidate = 0;
@@ -458,12 +452,6 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 Data updated: {formatTimestampCST(lastUpdated)} ({Math.round((Date.now() - lastUpdated) / 1000 / 60)} minutes ago)
               </span>
             )}
-            {tournament.status === 'active' && (
-              <span className="text-casino-green">
-                🔄 Real-time updates enabled
-              </span>
-            )}
-            <RefreshButton />
           </div>
         </CardHeader>
         <CardContent>
@@ -473,6 +461,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             prizeDistributions={prizeDistributions}
             userRosterPlayerIds={userRosterPlayerIds}
             playerNameToIdMap={playerNameToIdMap}
+            liveGolfAPITournamentId={tournament.livegolfapi_event_id}
           />
         </CardContent>
       </Card>
@@ -541,9 +530,16 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                   {formatDate(tournament.end_date)}
                 </span>
                 {tournament.status === 'active' && (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                    Round {tournament.current_round}/4
-                  </span>
+                  tournament.livegolfapi_event_id ? (
+                    <LiveRoundBadge 
+                      liveGolfAPITournamentId={tournament.livegolfapi_event_id}
+                      fallbackRound={tournament.current_round || 1}
+                    />
+                  ) : (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                      Round {tournament.current_round}/4
+                    </span>
+                  )
                 )}
               </div>
             </div>
@@ -573,10 +569,23 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       {/* Show personal leaderboard for active tournaments */}
       {showPersonalLeaderboard && existingRosterData && (
         <div className="mb-6">
-          <PersonalLeaderboard
-            rosterId={existingRosterData.id}
-            initialRoster={existingRosterData}
-          />
+          {tournament.status === 'active' && tournament.livegolfapi_event_id ? (
+            <LivePersonalLeaderboard
+              rosterId={existingRosterData.id}
+              rosterName={existingRosterData.roster_name}
+              tournamentName={tournament.name}
+              liveGolfAPITournamentId={tournament.livegolfapi_event_id}
+              prizeDistributions={(prizeDistributions || []).map((p: any) => ({
+                position: p.position,
+                amount: p.amount || 0,
+              }))}
+            />
+          ) : (
+            <PersonalLeaderboard
+              rosterId={existingRosterData.id}
+              initialRoster={existingRosterData}
+            />
+          )}
         </div>
       )}
 

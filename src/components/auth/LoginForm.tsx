@@ -58,7 +58,7 @@ export function LoginForm() {
         userId: signInData.user?.id,
       });
 
-      router.push('/dashboard');
+      router.push('/the-money-board');
       router.refresh();
     } catch (err) {
       const error = err as Error;

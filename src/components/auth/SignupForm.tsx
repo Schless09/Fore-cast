@@ -95,7 +95,7 @@ export function SignupForm({ inviteCode }: SignupFormProps) {
         if (inviteCode) {
           router.push(`/invite/${inviteCode}`);
         } else {
-          router.push('/dashboard');
+          router.push('/the-money-board');
         }
         router.refresh();
       } else {

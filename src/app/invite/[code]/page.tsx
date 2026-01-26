@@ -95,5 +95,5 @@ export default async function InvitePage({ params }: InvitePageProps) {
   }
 
   // Success - redirect to dashboard
-  redirect('/dashboard?joined=true');
+  redirect('/the-money-board?joined=true');
 }

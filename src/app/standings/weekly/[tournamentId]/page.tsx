@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { TournamentSelector } from '@/components/tournaments/TournamentSelector';
 import { ExpandableRosterRow } from '@/components/standings/ExpandableRosterRow';
+import { LiveTeamStandings } from '@/components/standings/LiveTeamStandings';
 
 interface WeeklyStandingsPageProps {
   params: Promise<{ tournamentId: string }>;
@@ -63,6 +64,16 @@ export default async function WeeklyStandingsByTournamentPage({
       </div>
     );
   }
+
+  // Get prize distributions for live calculations
+  const { data: prizeDistributions } = await supabase
+    .from('prize_money_distributions')
+    .select('position, percentage, amount')
+    .eq('tournament_id', tournamentId)
+    .order('position', { ascending: true });
+
+  // Check if we should use live standings (active tournament with API ID)
+  const useLiveStandings = tournament.status === 'active' && tournament.livegolfapi_event_id;
 
   // Get all rosters for this tournament, ranked by total_winnings
   // Filter by user's league to show only rosters from the same league
@@ -257,9 +268,11 @@ export default async function WeeklyStandingsByTournamentPage({
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
               <CardTitle className="text-lg sm:text-xl">Team Standings</CardTitle>
-              <p className="text-xs sm:text-sm text-casino-gray mt-1">
-                Last updated: {formatTimestampCST(pageGeneratedAt)} | Cache: {cacheBuster}
-              </p>
+              {!useLiveStandings && (
+                <p className="text-xs sm:text-sm text-casino-gray mt-1">
+                  Last updated: {formatTimestampCST(pageGeneratedAt)} | Cache: {cacheBuster}
+                </p>
+              )}
             </div>
             {tournament.status === 'upcoming' && (
               <div className="text-xs text-casino-gray bg-casino-card border border-casino-gold/20 px-3 py-1 rounded-md whitespace-nowrap self-start">
@@ -269,7 +282,19 @@ export default async function WeeklyStandingsByTournamentPage({
           </div>
         </CardHeader>
         <CardContent>
-          {rosters && rosters.length > 0 ? (
+          {useLiveStandings ? (
+            <LiveTeamStandings
+              tournamentId={tournamentId}
+              liveGolfAPITournamentId={tournament.livegolfapi_event_id}
+              prizeDistributions={(prizeDistributions || []).map((p) => ({
+                position: p.position,
+                amount: p.amount || 0,
+              }))}
+              currentUserId={user.id}
+              tournamentStatus={tournament.status}
+              userLeagueId={userLeagueId}
+            />
+          ) : rosters && rosters.length > 0 ? (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -324,8 +349,8 @@ export default async function WeeklyStandingsByTournamentPage({
         </CardContent>
       </Card>
 
-      {/* User's Rank Summary */}
-      {userRank && (
+      {/* User's Rank Summary - Only show for non-live standings (live has its own) */}
+      {!useLiveStandings && userRank && (
         <Card className="mt-6 border-2 border-casino-green/30">
           <CardContent className="pt-6">
             <div className="grid grid-cols-2 gap-4 sm:gap-6">

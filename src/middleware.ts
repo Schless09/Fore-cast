@@ -54,7 +54,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected routes
-  const protectedPaths = ['/dashboard', '/tournaments', '/players', '/admin'];
+  const protectedPaths = ['/the-money-board', '/tournaments', '/players', '/admin'];
   const authPaths = ['/auth'];
 
   const isProtectedPath = protectedPaths.some((path) =>
@@ -73,9 +73,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Redirect to dashboard if accessing auth pages while logged in
+  // Redirect to the-money-board if accessing auth pages while logged in
   if (isAuthPath && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL('/the-money-board', request.url));
   }
 
   return response;
@@ -88,7 +88,7 @@ export const config = {
      * Skip homepage, auth pages initially, and all static assets
      * Removed /standings to reduce auth API calls (handled in page components)
      */
-    '/dashboard/:path*',
+    '/the-money-board/:path*',
     '/tournaments/:path*',
     '/players/:path*',
     '/admin/:path*',

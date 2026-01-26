@@ -1,22 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { formatCurrency } from '@/lib/prize-money';
-import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
 import { logger } from '@/lib/logger';
-
-interface SeasonStanding {
-  user_id: string;
-  username: string;
-  total_winnings: number;
-  tournaments_played: number;
-  rosters: Array<{
-    roster_name: string;
-    tournament_name: string;
-    winnings: number;
-  }>;
-}
+import { LiveSeasonStandings } from '@/components/standings/LiveSeasonStandings';
 
 interface RosterData {
   id: string;
@@ -63,11 +48,10 @@ export default async function SeasonStandingsPage() {
 
   const userLeagueId = userProfile?.active_league_id;
 
-  // Get all completed rosters with winnings
-  // Note: We need to filter by tournament status, so we'll get tournaments first
+  // Get all tournaments (completed and active)
   const { data: tournaments, error: tournamentsError } = await supabase
     .from('tournaments')
-    .select('id')
+    .select('id, name, status, livegolfapi_event_id')
     .in('status', ['completed', 'active']);
 
   if (tournamentsError) {
@@ -78,6 +62,24 @@ export default async function SeasonStandingsPage() {
   }
 
   const tournamentIds = tournaments?.map(t => t.id) || [];
+  
+  // Find active tournament
+  const activeTournamentData = tournaments?.find(t => t.status === 'active');
+  
+  // Get prize distributions for active tournament
+  let prizeDistributions: Array<{ position: number; amount: number }> = [];
+  if (activeTournamentData) {
+    const { data: prizeData } = await supabase
+      .from('prize_money_distributions')
+      .select('position, amount')
+      .eq('tournament_id', activeTournamentData.id)
+      .order('position', { ascending: true });
+    
+    prizeDistributions = (prizeData || []).map(p => ({
+      position: p.position,
+      amount: p.amount || 0,
+    }));
+  }
 
   // Only query rosters if we have tournaments
   let rosters: RosterData[] = [];
@@ -113,8 +115,21 @@ export default async function SeasonStandingsPage() {
     }, rostersError);
   }
 
-  // Aggregate winnings by user
-  const standingsMap = new Map<string, SeasonStanding>();
+  // Aggregate winnings by user (only completed tournaments for base winnings)
+  interface CompletedStanding {
+    user_id: string;
+    username: string;
+    completed_winnings: number;
+    tournaments_played: number;
+    rosters: Array<{
+      roster_name: string;
+      tournament_name: string;
+      winnings: number;
+      is_active: boolean;
+    }>;
+  }
+  
+  const standingsMap = new Map<string, CompletedStanding>();
 
   // Sort rosters by tournament start_date manually since we can't order by nested field
   const sortedRosters = [...rosters].sort((a: RosterData, b: RosterData) => {
@@ -126,38 +141,44 @@ export default async function SeasonStandingsPage() {
   sortedRosters.forEach((roster: RosterData) => {
     const userId = roster.user_id;
     const username = roster.profiles?.username || 'Unknown';
-    const winnings = roster.total_winnings || 0;
     const tournamentName = roster.tournament?.name || 'Unknown Tournament';
+    const isActive = roster.tournament?.status === 'active';
+    
+    // Only count completed tournament winnings in base (live will be added client-side)
+    const winnings = isActive ? 0 : (roster.total_winnings || 0);
 
     if (!standingsMap.has(userId)) {
       standingsMap.set(userId, {
         user_id: userId,
         username,
-        total_winnings: 0,
+        completed_winnings: 0,
         tournaments_played: 0,
         rosters: [],
       });
     }
 
     const standing = standingsMap.get(userId)!;
-    standing.total_winnings += winnings;
+    standing.completed_winnings += winnings;
     standing.tournaments_played += 1;
     standing.rosters.push({
       roster_name: roster.roster_name,
       tournament_name: tournamentName,
-      winnings,
+      winnings: isActive ? 0 : (roster.total_winnings || 0), // Will be updated live for active
+      is_active: isActive,
     });
   });
 
-  // Convert to array and sort by total winnings
-  const standings = Array.from(standingsMap.values()).sort(
-    (a, b) => b.total_winnings - a.total_winnings
+  // Convert to array and sort by completed winnings (live will re-sort client-side)
+  const completedStandings = Array.from(standingsMap.values()).sort(
+    (a, b) => b.completed_winnings - a.completed_winnings
   );
 
-  // Find user's rank
-  const userStandingIndex = standings.findIndex((s) => s.user_id === user.id);
-  const userRank = userStandingIndex !== -1 ? userStandingIndex + 1 : null;
-  const userStanding = userStandingIndex !== -1 ? standings[userStandingIndex] : null;
+  // Prepare active tournament info
+  const activeTournament = activeTournamentData && activeTournamentData.livegolfapi_event_id ? {
+    id: activeTournamentData.id,
+    name: activeTournamentData.name,
+    liveGolfAPITournamentId: activeTournamentData.livegolfapi_event_id,
+  } : undefined;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -168,163 +189,13 @@ export default async function SeasonStandingsPage() {
         </p>
       </div>
 
-      {/* User's Season Summary */}
-      {userStanding && (
-        <Card className="mb-6 border-2 border-casino-green/30">
-          <CardHeader>
-            <CardTitle>Your Season Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div>
-                <p className="text-sm text-casino-gray mb-1">Season Rank</p>
-                <p className="text-3xl font-bold text-casino-gold font-orbitron">
-                  #{userRank} <span className="text-xl text-casino-gray-dark">of {standings.length}</span>
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-casino-gray mb-1">Total Winnings</p>
-                <p className="text-3xl font-bold text-casino-green font-orbitron">
-                  {formatCurrency(userStanding.total_winnings)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-casino-gray mb-1">Tournaments Played</p>
-                <p className="text-3xl font-bold text-casino-text font-orbitron">
-                  {userStanding.tournaments_played}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Season Standings Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Season Leaderboard</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {standings.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-300">
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Rank
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Player
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Winnings
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                      Tournaments
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                      Avg. Winnings
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {standings.map((standing, index) => {
-                    const rank = index + 1;
-                    const isUser = standing.user_id === user.id;
-                    const avgWinnings =
-                      standing.tournaments_played > 0
-                        ? standing.total_winnings / standing.tournaments_played
-                        : 0;
-
-                    return (
-                      <tr
-                        key={standing.user_id}
-                        className={`border-b border-gray-200 transition-colors ${
-                          isUser
-                            ? 'bg-green-50 hover:bg-green-100'
-                            : 'hover:bg-gray-50'
-                        }`}
-                      >
-                        <td className="px-2 sm:px-4 py-3 sm:py-4">
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <span className="text-xs sm:text-sm font-medium text-gray-900">
-                              {rank}
-                            </span>
-                            {rank === 1 && (
-                              <span className="text-base sm:text-lg">🏆</span>
-                            )}
-                            {isUser && (
-                              <span className="px-1.5 sm:px-2 py-0.5 bg-green-200 text-green-800 rounded text-xs font-medium">
-                                You
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-4 py-3 sm:py-4">
-                          <span className="font-medium text-gray-900 text-xs sm:text-sm">
-                            {standing.username}
-                          </span>
-                        </td>
-                        <td className="px-2 sm:px-4 py-3 sm:py-4 text-right">
-                          <span className="font-semibold text-green-600 text-xs sm:text-sm">
-                            {formatCurrency(standing.total_winnings)}
-                          </span>
-                        </td>
-                        <td className="px-2 sm:px-4 py-3 sm:py-4 text-center text-xs sm:text-sm text-gray-600 hidden sm:table-cell">
-                          {standing.tournaments_played}
-                        </td>
-                        <td className="px-2 sm:px-4 py-3 sm:py-4 text-right text-xs sm:text-sm text-gray-600 hidden md:table-cell">
-                          {formatCurrency(avgWinnings)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-casino-gray mb-4">
-                No completed tournaments yet. Check back after tournaments finish!
-              </p>
-              <Link href="/tournaments">
-                <Button>Browse Tournaments</Button>
-              </Link>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* User's Tournament Breakdown */}
-      {userStanding && userStanding.rosters.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Your Tournament Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {userStanding.rosters
-                .sort((a, b) => b.winnings - a.winnings)
-                .map((roster, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-casino-card/50 border border-casino-gold/10 rounded-lg hover:border-casino-gold/30 transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium text-casino-text">{roster.roster_name}</p>
-                      <p className="text-sm text-casino-gray">{roster.tournament_name}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-casino-green font-orbitron">
-                        {formatCurrency(roster.winnings)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <LiveSeasonStandings
+        completedStandings={completedStandings}
+        currentUserId={user.id}
+        activeTournament={activeTournament}
+        prizeDistributions={prizeDistributions}
+        userLeagueId={userLeagueId}
+      />
     </div>
   );
 }

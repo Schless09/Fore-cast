@@ -80,7 +80,7 @@ export function UnifiedAuthForm({ inviteCode }: UnifiedAuthFormProps) {
 
       // Sign in successful
       logger.info('Login successful', { userId: signInData.user?.id });
-      router.push('/dashboard');
+      router.push('/the-money-board');
       router.refresh();
     } catch (err) {
       const error = err as Error;
@@ -132,7 +132,7 @@ export function UnifiedAuthForm({ inviteCode }: UnifiedAuthFormProps) {
       if (inviteCode) {
         router.push(`/invite/${inviteCode}`);
       } else {
-        router.push('/dashboard');
+        router.push('/the-money-board');
       }
       router.refresh();
     } catch (err) {

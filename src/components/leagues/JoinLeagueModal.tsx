@@ -48,7 +48,7 @@ export function JoinLeagueModal({ onClose, canClose = false }: JoinLeagueModalPr
 
       // Success! Redirect to dashboard
       if (onClose) onClose();
-      router.push('/dashboard');
+      router.push('/the-money-board');
       router.refresh();
     } catch (err) {
       console.error('Error in handleSubmit:', err);
