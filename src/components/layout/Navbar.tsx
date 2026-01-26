@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useUser, useClerk, SignInButton } from '@clerk/nextjs';
+import { useUser, useClerk, SignUpButton } from '@clerk/nextjs';
 
 export function Navbar() {
   const router = useRouter();
@@ -36,11 +36,11 @@ export function Navbar() {
             FORE!SIGHT
           </Link>
           <div className="hidden md:flex items-center gap-4">
-            <SignInButton mode="modal">
+            <SignUpButton mode="modal">
               <button className="btn-casino-gold px-6 py-2 rounded-lg font-semibold">
                 Get Started
               </button>
-            </SignInButton>
+            </SignUpButton>
           </div>
           
           {/* Mobile menu button */}
@@ -63,11 +63,11 @@ export function Navbar() {
         {isMobileMenuOpen && (
           <div className="md:hidden mt-4 pb-4 border-t border-casino-gold/20">
             <div className="flex flex-col gap-4 pt-4">
-              <SignInButton mode="modal">
+              <SignUpButton mode="modal">
                 <button className="btn-casino-gold px-6 py-2 rounded-lg font-semibold w-full">
                   Get Started
                 </button>
-              </SignInButton>
+              </SignUpButton>
             </div>
           </div>
         )}

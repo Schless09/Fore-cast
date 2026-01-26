@@ -46,7 +46,7 @@ export function Hero() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-4">
-          <Link href="/auth" className="w-full sm:w-auto">
+          <Link href="/auth/signup" className="w-full sm:w-auto">
             <button className="btn-casino-gold w-full sm:w-auto px-10 py-4 text-lg rounded-xl font-bold tracking-wide">
               🏌️ Start Playing
             </button>

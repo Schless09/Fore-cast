@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { logger } from '@/lib/logger';
 import { Hero } from '@/components/Hero';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -96,9 +97,11 @@ export default function Home() {
               Join thousands of players competing for weekly glory and season championships. 
               Make your picks weekly before the golfers tee off.
             </p>
-            <button className="btn-casino-gold px-8 py-3 rounded-lg text-lg font-bold">
-              Join the Action →
-            </button>
+            <Link href="/auth/signup">
+              <button className="btn-casino-gold px-8 py-3 rounded-lg text-lg font-bold">
+                Join the Action →
+              </button>
+            </Link>
           </div>
         </div>
       </main>
