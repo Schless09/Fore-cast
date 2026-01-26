@@ -80,10 +80,10 @@ export default function ResetPasswordPage() {
   // Show loading while checking session
   if (isValidSession === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-green-50 to-green-100 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-casino-bg via-casino-elevated to-casino-bg px-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-casino-gold mx-auto"></div>
+          <p className="mt-4 text-casino-gray">Loading...</p>
         </div>
       </div>
     );
@@ -92,16 +92,21 @@ export default function ResetPasswordPage() {
   // Show error if no valid session
   if (isValidSession === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-green-50 to-green-100 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-casino-bg via-casino-elevated to-casino-bg px-4">
         <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-casino-gold mb-2 font-orbitron tracking-wider">FORE!SIGHT</h1>
+            <p className="text-lg font-semibold text-casino-green mb-1">Predict. Play. Win.</p>
+          </div>
+          
           <Card>
             <CardHeader>
               <CardTitle>Invalid or Expired Link</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-800">
+                <div className="p-4 bg-red-950/50 border border-red-800/50 rounded-lg">
+                  <p className="text-sm text-red-400">
                     This password reset link is invalid or has expired. Please request a new one.
                   </p>
                 </div>
@@ -127,19 +132,24 @@ export default function ResetPasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-green-50 to-green-100 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-casino-bg via-casino-elevated to-casino-bg px-4">
         <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-casino-gold mb-2 font-orbitron tracking-wider">FORE!SIGHT</h1>
+            <p className="text-lg font-semibold text-casino-green mb-1">Predict. Play. Win.</p>
+          </div>
+          
           <Card>
             <CardHeader>
               <CardTitle>Password Updated!</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-800">
+                <div className="p-4 bg-casino-green/10 border border-casino-green/30 rounded-lg">
+                  <p className="text-sm text-casino-green">
                     ✅ Your password has been successfully updated.
                   </p>
-                  <p className="text-sm text-gray-600 mt-2">
+                  <p className="text-sm text-casino-gray mt-2">
                     Redirecting you to the login page...
                   </p>
                 </div>
@@ -152,12 +162,12 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-green-50 to-green-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-casino-bg via-casino-elevated to-casino-bg px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">FORE!cast Golf</h1>
-          <p className="text-lg font-semibold text-green-600 mb-1">Predict. Play. Win.</p>
-          <p className="text-gray-600">Set Your New Password</p>
+          <h1 className="text-4xl font-bold text-casino-gold mb-2 font-orbitron tracking-wider">FORE!SIGHT</h1>
+          <p className="text-lg font-semibold text-casino-green mb-1">Predict. Play. Win.</p>
+          <p className="text-casino-gray">Set Your New Password</p>
         </div>
         
         <Card>
@@ -167,7 +177,7 @@ export default function ResetPasswordPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg">
+                <div className="p-3 text-sm text-red-400 bg-red-950/50 border border-red-800/50 rounded-lg">
                   {error}
                 </div>
               )}
@@ -175,7 +185,7 @@ export default function ResetPasswordPage() {
               <div>
                 <label
                   htmlFor="password"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-medium text-casino-text mb-1"
                 >
                   New Password
                 </label>
@@ -187,13 +197,14 @@ export default function ResetPasswordPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 placeholder:text-gray-400 bg-white"
+                    autoFocus
+                    className="w-full px-3 py-2 pr-10 border border-casino-gold/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-casino-gold bg-casino-card text-casino-text placeholder:text-casino-gray"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-casino-gray hover:text-casino-gold transition-colors"
                   >
                     {showPassword ? (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,7 +218,7 @@ export default function ResetPasswordPage() {
                     )}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-casino-gray mt-1">
                   Must be at least 6 characters long
                 </p>
               </div>
@@ -215,7 +226,7 @@ export default function ResetPasswordPage() {
               <div>
                 <label
                   htmlFor="confirmPassword"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-medium text-casino-text mb-1"
                 >
                   Confirm New Password
                 </label>
@@ -226,7 +237,7 @@ export default function ResetPasswordPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 placeholder:text-gray-400 bg-white"
+                  className="w-full px-3 py-2 border border-casino-gold/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-casino-gold bg-casino-card text-casino-text placeholder:text-casino-gray"
                   placeholder="••••••••"
                 />
               </div>
@@ -235,11 +246,11 @@ export default function ResetPasswordPage() {
                 Update Password
               </Button>
 
-              <p className="text-center text-sm text-gray-600">
+              <p className="text-center text-sm text-casino-gray">
                 Remember your password?{' '}
                 <Link
                   href="/auth"
-                  className="text-green-600 hover:text-green-700 font-medium"
+                  className="text-casino-green hover:text-casino-gold font-medium transition-colors"
                 >
                   Sign in
                 </Link>

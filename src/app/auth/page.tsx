@@ -41,7 +41,7 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-casino-bg via-casino-elevated to-casino-bg px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-casino-gold mb-2 font-orbitron tracking-wider">FORE!CAST</h1>
+          <h1 className="text-4xl font-bold text-casino-gold mb-2 font-orbitron tracking-wider">FORE!SIGHT</h1>
           <p className="text-lg font-semibold text-casino-green mb-1">Predict. Play. Win.</p>
           <p className="text-casino-gray">Fantasy Golf Leaderboard</p>
         </div>

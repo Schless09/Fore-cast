@@ -39,11 +39,11 @@ export default function ForgotPasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-green-50 to-green-100 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-casino-bg via-casino-elevated to-casino-bg px-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">FORE!cast Golf</h1>
-            <p className="text-lg font-semibold text-green-600 mb-1">Predict. Play. Win.</p>
+            <h1 className="text-4xl font-bold text-casino-gold mb-2 font-orbitron tracking-wider">FORE!SIGHT</h1>
+            <p className="text-lg font-semibold text-casino-green mb-1">Predict. Play. Win.</p>
           </div>
           
           <Card>
@@ -52,17 +52,17 @@ export default function ForgotPasswordPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-800 mb-2">
+                <div className="p-4 bg-casino-green/10 border border-casino-green/30 rounded-lg">
+                  <p className="text-sm text-casino-green mb-2">
                     ✅ Password reset email sent!
                   </p>
-                  <p className="text-sm text-gray-600">
-                    We've sent a password reset link to <strong>{email}</strong>. 
+                  <p className="text-sm text-casino-text">
+                    We've sent a password reset link to <strong className="text-casino-gold">{email}</strong>. 
                     Please check your email and click the link to reset your password.
                   </p>
                 </div>
                 
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-xs text-casino-gray text-center">
                   Didn't receive the email? Check your spam folder or try again in a few minutes.
                 </p>
                 
@@ -80,12 +80,12 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-green-50 to-green-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-casino-bg via-casino-elevated to-casino-bg px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">FORE!cast Golf</h1>
-          <p className="text-lg font-semibold text-green-600 mb-1">Predict. Play. Win.</p>
-          <p className="text-gray-600">Reset Your Password</p>
+          <h1 className="text-4xl font-bold text-casino-gold mb-2 font-orbitron tracking-wider">FORE!SIGHT</h1>
+          <p className="text-lg font-semibold text-casino-green mb-1">Predict. Play. Win.</p>
+          <p className="text-casino-gray">Reset Your Password</p>
         </div>
         
         <Card>
@@ -95,7 +95,7 @@ export default function ForgotPasswordPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg">
+                <div className="p-3 text-sm text-red-400 bg-red-950/50 border border-red-800/50 rounded-lg">
                   {error}
                 </div>
               )}
@@ -103,7 +103,7 @@ export default function ForgotPasswordPage() {
               <div>
                 <label
                   htmlFor="email"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-medium text-casino-text mb-1"
                 >
                   Email Address
                 </label>
@@ -113,10 +113,11 @@ export default function ForgotPasswordPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 placeholder:text-gray-400 bg-white"
+                  autoFocus
+                  className="w-full px-3 py-2 border border-casino-gold/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-casino-gold bg-casino-card text-casino-text placeholder:text-casino-gray"
                   placeholder="your@email.com"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-casino-gray mt-1">
                   Enter the email address associated with your account
                 </p>
               </div>
@@ -125,11 +126,11 @@ export default function ForgotPasswordPage() {
                 Send Reset Link
               </Button>
 
-              <p className="text-center text-sm text-gray-600">
+              <p className="text-center text-sm text-casino-gray">
                 Remember your password?{' '}
                 <Link
                   href="/auth"
-                  className="text-green-600 hover:text-green-700 font-medium"
+                  className="text-casino-green hover:text-casino-gold font-medium transition-colors"
                 >
                   Sign in
                 </Link>

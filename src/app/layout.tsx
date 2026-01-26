@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FORE!cast Golf - Predict. Play. Win.",
+  title: "FORE!SIGHT Golf - Predict. Play. Win.",
   description: "Predict. Play. Win. Create rosters of PGA Tour players and track their performance in real-time",
 };
 

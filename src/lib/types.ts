@@ -1,4 +1,4 @@
-// TypeScript types for the FORE!cast Golf application
+// TypeScript types for the FORE!SIGHT Golf application
 
 export interface League {
   id: string;

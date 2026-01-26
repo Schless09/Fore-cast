@@ -74,7 +74,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
 
   if (!result.success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-green-900 to-gray-900 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-green-900 to-gray-900 flex items-center justify-center px-4">
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle className="text-2xl text-red-400">❌ Invalid Invite</CardTitle>
