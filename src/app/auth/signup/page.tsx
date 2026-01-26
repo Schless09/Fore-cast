@@ -12,15 +12,15 @@ function SignUpContent() {
       appearance={{
         elements: {
           rootBox: 'w-full',
-          card: 'bg-casino-card border border-casino-gold/20 shadow-xl',
+          card: 'bg-casino-card border border-casino-gold/30 shadow-xl',
           headerTitle: 'text-casino-gold font-orbitron',
           headerSubtitle: 'text-casino-gray',
-          socialButtonsBlockButton: 'bg-casino-elevated border-casino-gold/30 text-casino-text hover:bg-casino-card',
+          socialButtonsBlockButton: 'bg-casino-elevated border border-casino-gold/50 text-casino-text hover:bg-casino-card hover:border-casino-gold/70',
           formFieldLabel: 'text-casino-text',
-          formFieldInput: 'bg-casino-card border-casino-gold/30 text-casino-text',
+          formFieldInput: 'bg-casino-elevated border border-casino-gold/50 text-casino-text focus:border-casino-gold focus:ring-1 focus:ring-casino-gold/50',
           footerActionLink: 'text-casino-green hover:text-casino-gold',
           formButtonPrimary: 'bg-casino-gold hover:bg-casino-gold/90 text-black',
-          dividerLine: 'bg-casino-gold/20',
+          dividerLine: 'bg-casino-gold/30',
           dividerText: 'text-casino-gray',
         },
         variables: {

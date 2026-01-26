@@ -19,11 +19,11 @@ export default function ForgotPasswordPage() {
           appearance={{
             elements: {
               rootBox: 'w-full',
-              card: 'bg-casino-card border border-casino-gold/20 shadow-xl',
+              card: 'bg-casino-card border border-casino-gold/30 shadow-xl',
               headerTitle: 'text-casino-gold font-orbitron',
               headerSubtitle: 'text-casino-gray',
               formFieldLabel: 'text-casino-text',
-              formFieldInput: 'bg-casino-card border-casino-gold/30 text-casino-text',
+              formFieldInput: 'bg-casino-elevated border border-casino-gold/50 text-casino-text focus:border-casino-gold',
               footerActionLink: 'text-casino-green hover:text-casino-gold',
               formButtonPrimary: 'bg-casino-gold hover:bg-casino-gold/90 text-black',
             },
