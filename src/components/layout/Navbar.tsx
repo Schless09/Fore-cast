@@ -1,64 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/ui/Button';
+import { useUser, useClerk, SignInButton } from '@clerk/nextjs';
 
 export function Navbar() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
+  const { user, isLoaded, isSignedIn } = useUser();
+  const { signOut } = useClerk();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
-      setIsLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Load user profile when user is available
-  useEffect(() => {
-    if (user) {
-      const supabase = createClient();
-      supabase
-        .from('profiles')
-        .select('username, email')
-        .eq('id', user.id)
-        .single()
-        .then(({ data, error }) => {
-          if (!error && data) {
-            setProfile(data);
-          } else {
-            // Fallback to user email if profile not found
-            setProfile({ username: user.email?.split('@')[0] || 'User', email: user.email });
-          }
-        });
-    } else {
-      setProfile(null);
-    }
-  }, [user]);
-
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOut();
     router.push('/');
-    router.refresh();
   };
 
-  if (isLoading) {
+  if (!isLoaded) {
     return (
       <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -70,7 +28,7 @@ export function Navbar() {
     );
   }
 
-  if (!user) {
+  if (!isSignedIn) {
     return (
       <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50 shadow-[0_4px_20px_rgba(251,191,36,0.1)]">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -78,11 +36,11 @@ export function Navbar() {
             FORE!SIGHT
           </Link>
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/auth">
+            <SignInButton mode="modal">
               <button className="btn-casino-gold px-6 py-2 rounded-lg font-semibold">
                 Get Started
               </button>
-            </Link>
+            </SignInButton>
           </div>
           
           {/* Mobile menu button */}
@@ -105,17 +63,19 @@ export function Navbar() {
         {isMobileMenuOpen && (
           <div className="md:hidden mt-4 pb-4 border-t border-casino-gold/20">
             <div className="flex flex-col gap-4 pt-4">
-              <Link href="/auth" onClick={() => setIsMobileMenuOpen(false)}>
+              <SignInButton mode="modal">
                 <button className="btn-casino-gold px-6 py-2 rounded-lg font-semibold w-full">
                   Get Started
                 </button>
-              </Link>
+              </SignInButton>
             </div>
           </div>
         )}
       </nav>
     );
   }
+
+  const displayName = user?.username || user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] || 'User';
 
   return (
       <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50 shadow-[0_4px_20px_rgba(251,191,36,0.1)]">
@@ -157,11 +117,9 @@ export function Navbar() {
             Season
           </Link>
           <div className="flex items-center gap-3 pl-6 border-l border-casino-gold/30">
-            {profile && (
-              <span className="text-sm text-casino-gold font-semibold tracking-wide">
-                {profile.username || profile.email?.split('@')[0] || 'User'}
-              </span>
-            )}
+            <span className="text-sm text-casino-gold font-semibold tracking-wide">
+              {displayName}
+            </span>
             <button
               onClick={handleSignOut}
               className="text-casino-gray hover:text-casino-text text-sm font-medium transition-colors"
@@ -227,11 +185,9 @@ export function Navbar() {
               Season Standings
             </Link>
             <div className="border-t border-casino-gold/20 mt-2 pt-2 px-4">
-              {profile && (
-                <p className="text-sm text-casino-gold font-semibold mb-3">
-                  {profile.username || profile.email?.split('@')[0] || 'User'}
-                </p>
-              )}
+              <p className="text-sm text-casino-gold font-semibold mb-3">
+                {displayName}
+              </p>
               <button
                 onClick={() => {
                   handleSignOut();

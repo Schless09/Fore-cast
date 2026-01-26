@@ -1,29 +1,67 @@
-import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { LeagueManager } from '@/components/leagues/LeagueManager';
+import { createServiceClient } from '@/lib/supabase/service';
+
+async function getProfileForClerkUser() {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return null;
+  }
+
+  const user = await currentUser();
+  if (!user) {
+    return null;
+  }
+
+  const supabase = createServiceClient();
+  
+  // Try to find existing profile by clerk_id
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('clerk_id', userId)
+    .single();
+
+  if (existingProfile) {
+    return existingProfile;
+  }
+
+  // Create profile if it doesn't exist
+  const email = user.emailAddresses?.[0]?.emailAddress || '';
+  const username = user.username || user.firstName || email.split('@')[0];
+  
+  const { data: newProfile, error: createError } = await supabase
+    .from('profiles')
+    .insert({
+      clerk_id: userId,
+      email: email,
+      username: username,
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error('Error creating profile:', createError);
+    return null;
+  }
+
+  return newProfile;
+}
 
 export default async function LeaguesPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Auth is handled by middleware, but we need the profile for data access
+  const profile = await getProfileForClerkUser();
 
-  if (!user) {
-    redirect('/auth');
-  }
+  const supabase = createServiceClient();
 
   // Get all leagues user is a member of
   const { data: memberships } = await supabase
     .from('league_members')
     .select('league_id, joined_at, leagues(id, name)')
-    .eq('user_id', user.id)
+    .eq('user_id', profile?.id)
     .order('joined_at', { ascending: false });
-
-  // Get active league
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('active_league_id')
-    .eq('id', user.id)
-    .single();
 
   const leagues = memberships?.map(m => ({
     id: (m.leagues as any)?.id,

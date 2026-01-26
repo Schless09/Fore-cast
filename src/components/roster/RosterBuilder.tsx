@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import { TournamentPlayer, PGAPlayer } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { PlayerSelector } from './PlayerSelector';
@@ -27,6 +28,7 @@ export function RosterBuilder({
   existingRoster,
 }: RosterBuilderProps) {
   const router = useRouter();
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const [tournamentPlayers, setTournamentPlayers] = useState<
     (TournamentPlayer & { pga_player?: PGAPlayer; pga_players?: PGAPlayer })[]
   >([]);
@@ -40,32 +42,16 @@ export function RosterBuilder({
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [submittedRosterId, setSubmittedRosterId] = useState<string | null>(null);
 
-  const loadUserProfile = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', user.id)
-          .single();
-
-        if (!profileError && profile) {
-          setUsername(profile.username);
-        } else {
-          // Fallback to email username if profile not found
-          setUsername(user.email?.split('@')[0] || 'User');
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load user profile:', err);
-      setUsername('User');
+  // Set username from Clerk user
+  useEffect(() => {
+    if (clerkLoaded && clerkUser) {
+      const displayName = clerkUser.username || 
+        clerkUser.firstName || 
+        clerkUser.emailAddresses?.[0]?.emailAddress?.split('@')[0] || 
+        'User';
+      setUsername(displayName);
     }
-  }, []);
+  }, [clerkUser, clerkLoaded]);
 
   const loadTournamentPlayers = useCallback(async () => {
     try {
@@ -93,8 +79,7 @@ export function RosterBuilder({
 
   useEffect(() => {
     loadTournamentPlayers();
-    loadUserProfile();
-  }, [loadTournamentPlayers, loadUserProfile]);
+  }, [loadTournamentPlayers]);
 
   function handleTogglePlayer(playerId: string) {
     setSelectedPlayerIds((prev) => {

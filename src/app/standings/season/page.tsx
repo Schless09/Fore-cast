@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getProfile } from '@/lib/auth/profile';
+import { createServiceClient } from '@/lib/supabase/service';
 import { logger } from '@/lib/logger';
 import { LiveSeasonStandings } from '@/components/standings/LiveSeasonStandings';
 
@@ -29,24 +30,15 @@ interface SupabaseError extends Error {
 export const revalidate = 180;
 
 export default async function SeasonStandingsPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  // Auth is handled by middleware
+  const profile = await getProfile();
+  if (!profile) {
     redirect('/auth');
   }
+  
+  const supabase = createServiceClient();
 
-  // Get user's active league
-  const { data: userProfile } = await supabase
-    .from('profiles')
-    .select('active_league_id')
-    .eq('id', user.id)
-    .single();
-
-  const userLeagueId = userProfile?.active_league_id;
+  const userLeagueId = profile.active_league_id;
 
   // Get all tournaments (completed and active)
   const { data: tournaments, error: tournamentsError } = await supabase
@@ -191,10 +183,10 @@ export default async function SeasonStandingsPage() {
 
       <LiveSeasonStandings
         completedStandings={completedStandings}
-        currentUserId={user.id}
+        currentUserId={profile.id}
         activeTournament={activeTournament}
         prizeDistributions={prizeDistributions}
-        userLeagueId={userLeagueId}
+        userLeagueId={userLeagueId || undefined}
       />
     </div>
   );

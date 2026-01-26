@@ -1,15 +1,10 @@
-import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { SyncTeeTimesForm } from '@/components/admin/SyncTeeTimesForm';
 
 export default async function SyncTeeTimesPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/auth');
-  }
+  // Auth is handled by Clerk middleware
+  const supabase = createServiceClient();
 
   // Get all tournaments with their LiveGolfAPI IDs
   const { data: tournaments } = await supabase

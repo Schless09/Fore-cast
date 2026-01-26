@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getProfile } from '@/lib/auth/profile';
+import { createServiceClient } from '@/lib/supabase/service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/prize-money';
 import { formatTimestampCST } from '@/lib/utils';
@@ -22,26 +23,18 @@ export default async function WeeklyStandingsByTournamentPage({
   params,
 }: WeeklyStandingsPageProps) {
   const { tournamentId } = await params;
-  const supabase = await createClient();
+  
+  // Auth is handled by middleware
+  const profile = await getProfile();
+  if (!profile) {
+    redirect('/auth');
+  }
+  
+  const supabase = createServiceClient();
   const pageGeneratedAt = new Date().getTime();
   const cacheBuster = Math.random().toString(36).substring(7);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/auth');
-  }
-
-  // Get user's active league
-  const { data: userProfile } = await supabase
-    .from('profiles')
-    .select('active_league_id')
-    .eq('id', user.id)
-    .single();
-
-  const userLeagueId = userProfile?.active_league_id;
+  const userLeagueId = profile.active_league_id;
 
   // Get tournament
   const { data: tournament, error: tournamentError } = await supabase
@@ -99,7 +92,7 @@ export default async function WeeklyStandingsByTournamentPage({
 
   // Get user's roster rank
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const userRosterIndex = rosters?.findIndex((r: any) => r.user_id === user.id);
+  const userRosterIndex = rosters?.findIndex((r: any) => r.user_id === profile.id);
   const userRank = userRosterIndex !== undefined && userRosterIndex !== -1 ? userRosterIndex + 1 : null;
 
   // Get all tournaments for selector, prioritizing active tournaments
@@ -290,9 +283,9 @@ export default async function WeeklyStandingsByTournamentPage({
                 position: p.position,
                 amount: p.amount || 0,
               }))}
-              currentUserId={user.id}
+              currentUserId={profile.id}
               tournamentStatus={tournament.status}
-              userLeagueId={userLeagueId}
+              userLeagueId={userLeagueId || undefined}
             />
           ) : rosters && rosters.length > 0 ? (
             <>
@@ -314,7 +307,7 @@ export default async function WeeklyStandingsByTournamentPage({
                   <tbody>
                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {rosters.map((roster: any, index: number) => {
-                      const isUserRoster = roster.user_id === user.id;
+                      const isUserRoster = roster.user_id === profile.id;
 
                       return (
                         <ExpandableRosterRow
@@ -324,7 +317,7 @@ export default async function WeeklyStandingsByTournamentPage({
                           isUserRoster={isUserRoster}
                           tournamentId={tournamentId}
                           tournamentStatus={tournament.status}
-                          currentUserId={user.id}
+                          currentUserId={profile.id}
                         />
                       );
                     })}
@@ -365,7 +358,7 @@ export default async function WeeklyStandingsByTournamentPage({
                 <p className="text-xl sm:text-2xl font-bold text-casino-green font-orbitron">
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {formatCurrency(
-                    rosters?.find((r: any) => r.user_id === user.id)?.total_winnings || 0
+                    rosters?.find((r: any) => r.user_id === profile.id)?.total_winnings || 0
                   )}
                 </p>
               </div>

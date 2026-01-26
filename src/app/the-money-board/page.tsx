@@ -1,16 +1,8 @@
-import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 
 export default async function TheMoneyBoardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/auth');
-  }
+  // Authentication is handled by Clerk middleware
+  // If user gets here, they are authenticated
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">

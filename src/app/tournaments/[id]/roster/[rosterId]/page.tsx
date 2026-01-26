@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getProfile } from '@/lib/auth/profile';
+import { createServiceClient } from '@/lib/supabase/service';
 import { PersonalLeaderboard } from '@/components/leaderboard/PersonalLeaderboard';
 import { RosterWithDetails } from '@/lib/types';
 import Link from 'next/link';
@@ -11,15 +12,14 @@ interface RosterPageProps {
 
 export default async function RosterPage({ params }: RosterPageProps) {
   const { id: tournamentId, rosterId } = await params;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  
+  // Auth is handled by middleware
+  const profile = await getProfile();
+  if (!profile) {
     redirect('/auth');
   }
+  
+  const supabase = createServiceClient();
 
   // Get roster with full details
   const { data: roster, error } = await supabase
@@ -38,7 +38,7 @@ export default async function RosterPage({ params }: RosterPageProps) {
     `
     )
     .eq('id', rosterId)
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id)
     .single();
 
   if (error || !roster) {

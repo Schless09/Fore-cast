@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getProfile } from '@/lib/auth/profile';
+import { createServiceClient } from '@/lib/supabase/service';
 import { RosterBuilder } from '@/components/roster/RosterBuilder';
 import { PersonalLeaderboard } from '@/components/leaderboard/PersonalLeaderboard';
 import { LivePersonalLeaderboard } from '@/components/leaderboard/LivePersonalLeaderboard';
@@ -25,19 +26,18 @@ export const fetchCache = 'force-no-store';
 
 export default async function TournamentPage({ params }: TournamentPageProps) {
   const { id } = await params;
-  const supabase = await createClient();
+  
+  // Auth is handled by middleware, get profile for user-specific data
+  const profile = await getProfile();
+  if (!profile) {
+    redirect('/auth');
+  }
+  
+  const supabase = createServiceClient();
 
   // Add timestamp for debugging revalidation and cache busting
   const pageGeneratedAt = new Date().getTime();
   const cacheBuster = Math.random().toString(36).substring(7);
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/auth');
-  }
 
   // Get tournament
   const { data: tournament, error: tournamentError } = await supabase
@@ -103,7 +103,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       )
     `
     )
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id)
     .eq('tournament_id', id)
     .maybeSingle();
 

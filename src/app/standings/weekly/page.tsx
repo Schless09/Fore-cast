@@ -1,21 +1,12 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { formatCurrency } from '@/lib/prize-money';
+import { Card, CardContent } from '@/components/ui/Card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { createServiceClient } from '@/lib/supabase/service';
 
 export default async function WeeklyStandingsPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/auth');
-  }
+  // Auth is handled by middleware
+  const supabase = createServiceClient();
 
   // Priority:
   // 1) Active tournament (currently in progress)

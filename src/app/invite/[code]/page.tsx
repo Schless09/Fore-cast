@@ -1,9 +1,10 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { acceptLeagueInvite } from '@/lib/actions/league';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { createServiceClient } from '@/lib/supabase/service';
 
 interface InvitePageProps {
   params: Promise<{ code: string }>;
@@ -11,61 +12,32 @@ interface InvitePageProps {
 
 export default async function InvitePage({ params }: InvitePageProps) {
   const { code } = await params;
-  const supabase = await createClient();
+  const { userId } = await auth();
 
-  // Check if user is authenticated first
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    // Fetch league info before redirecting (now using public RLS policies)
-    console.log('[INVITE] Fetching invite with code:', code);
+  if (!userId) {
+    // Not authenticated - redirect to sign in with invite code
+    // Fetch league info to show in auth page
+    const supabase = createServiceClient();
     
-    const { data: invite, error: inviteError } = await supabase
+    const { data: invite } = await supabase
       .from('league_invites')
       .select('league_id, is_active')
       .eq('invite_code', code)
       .eq('is_active', true)
       .maybeSingle();
 
-    console.log('[INVITE] Invite query result:', { invite, inviteError });
-
-    if (inviteError) {
-      console.error('[INVITE] Error fetching invite:', inviteError);
-      redirect(`/auth?invite=${code}`);
-    }
-
-    if (!invite) {
-      console.log('[INVITE] No active invite found with code:', code);
-      redirect(`/auth?invite=${code}`);
-    }
-
     if (invite?.league_id) {
-      console.log('[INVITE] Fetching league with id:', invite.league_id);
-      
-      const { data: league, error: leagueError } = await supabase
+      const { data: league } = await supabase
         .from('leagues')
         .select('name')
         .eq('id', invite.league_id)
         .single();
       
-      console.log('[INVITE] League query result:', { league, leagueError });
-      
-      if (leagueError) {
-        console.error('[INVITE] Error fetching league:', leagueError);
-        redirect(`/auth?invite=${code}`);
-      }
-      
       if (league?.name) {
-        const redirectUrl = `/auth?invite=${code}&league=${encodeURIComponent(league.name)}`;
-        console.log('[INVITE] Redirecting to:', redirectUrl);
-        redirect(redirectUrl);
+        redirect(`/auth?invite=${code}&league=${encodeURIComponent(league.name)}`);
       }
     }
     
-    // Fallback redirect without league name if fetch fails
-    console.log('[INVITE] Falling back to redirect without league name');
     redirect(`/auth?invite=${code}`);
   }
 
@@ -77,7 +49,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
       <div className="min-h-screen bg-linear-to-br from-gray-900 via-green-900 to-gray-900 flex items-center justify-center px-4">
         <Card className="max-w-md w-full">
           <CardHeader>
-            <CardTitle className="text-2xl text-red-400">❌ Invalid Invite</CardTitle>
+            <CardTitle className="text-2xl text-red-400">Invalid Invite</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-casino-gray mb-4">

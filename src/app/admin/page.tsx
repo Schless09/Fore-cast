@@ -1,21 +1,10 @@
-import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 
 export default async function AdminPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/auth');
-  }
-
-  // TODO: Add admin role check
-  // For now, allow any authenticated user to access admin
+  // Auth is handled by Clerk middleware
+  // TODO: Add admin role check using Clerk roles
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">

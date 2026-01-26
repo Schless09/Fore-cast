@@ -1,38 +1,42 @@
 'use client';
 
-import { Suspense } from 'react';
+import { SignIn } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
-import { UnifiedAuthForm } from '@/components/auth/UnifiedAuthForm';
-import { Card, CardContent } from '@/components/ui/Card';
+import { Suspense } from 'react';
 
 function AuthContent() {
   const searchParams = useSearchParams();
-  const error = searchParams.get('error');
-  const message = searchParams.get('message');
   const invite = searchParams.get('invite');
-  const league = searchParams.get('league');
+  const redirectUrl = invite ? `/invite/${invite}` : '/the-money-board';
 
   return (
-    <>
-      {(error || message) && (
-        <Card className="mb-4">
-          <CardContent className="pt-6">
-            {error && (
-              <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg">
-                {error}
-              </div>
-            )}
-            {message && (
-              <div className="p-3 text-sm text-green-600 bg-green-50 rounded-lg">
-                {message}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-      
-      <UnifiedAuthForm inviteCode={invite || undefined} />
-    </>
+    <SignIn 
+      routing="hash"
+      afterSignInUrl={redirectUrl}
+      afterSignUpUrl={redirectUrl}
+      appearance={{
+        elements: {
+          rootBox: 'w-full',
+          card: 'bg-casino-card border border-casino-gold/20 shadow-xl',
+          headerTitle: 'text-casino-gold font-orbitron',
+          headerSubtitle: 'text-casino-gray',
+          socialButtonsBlockButton: 'bg-casino-elevated border-casino-gold/30 text-casino-text hover:bg-casino-card',
+          formFieldLabel: 'text-casino-text',
+          formFieldInput: 'bg-casino-card border-casino-gold/30 text-casino-text',
+          footerActionLink: 'text-casino-green hover:text-casino-gold',
+          formButtonPrimary: 'bg-casino-gold hover:bg-casino-gold/90 text-black',
+          dividerLine: 'bg-casino-gold/20',
+          dividerText: 'text-casino-gray',
+        },
+        variables: {
+          colorPrimary: '#fbbf24',
+          colorBackground: '#1a1a2e',
+          colorText: '#e5e5e5',
+          colorTextSecondary: '#9ca3af',
+          borderRadius: '0.5rem',
+        },
+      }}
+    />
   );
 }
 

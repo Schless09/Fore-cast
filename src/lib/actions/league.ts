@@ -1,40 +1,66 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { createServiceClient } from '@/lib/supabase/service';
+
+async function getProfileForClerkUser() {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return { profile: null, error: 'Not authenticated' };
+  }
+
+  const user = await currentUser();
+  if (!user) {
+    return { profile: null, error: 'User not found' };
+  }
+
+  const supabase = createServiceClient();
+  
+  // Try to find existing profile by clerk_id
+  const { data: existingProfile, error: fetchError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('clerk_id', userId)
+    .single();
+
+  if (existingProfile) {
+    return { profile: existingProfile, error: null };
+  }
+
+  // Create profile if it doesn't exist
+  const email = user.emailAddresses?.[0]?.emailAddress || '';
+  const username = user.username || user.firstName || email.split('@')[0];
+  
+  const { data: newProfile, error: createError } = await supabase
+    .from('profiles')
+    .insert({
+      clerk_id: userId,
+      email: email,
+      username: username,
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error('Error creating profile:', createError);
+    return { profile: null, error: 'Failed to create profile' };
+  }
+
+  return { profile: newProfile, error: null };
+}
 
 export async function createLeague(leagueName: string, password: string) {
-  let supabase;
-  let user;
+  const { profile, error: authError } = await getProfileForClerkUser();
   
-  try {
-    supabase = await createClient();
-    
-    const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError) {
-      console.error('Auth error in createLeague:', userError);
-      return { 
-        success: false, 
-        error: 'Authentication failed. Please try refreshing the page or logging out and back in.' 
-      };
-    }
-    
-    if (!authUser) {
-      console.error('No user found in createLeague');
-      return { 
-        success: false, 
-        error: 'Session expired. Please refresh the page and try again.' 
-      };
-    }
-    
-    user = authUser;
-  } catch (err) {
-    console.error('Unexpected error getting user in createLeague:', err);
+  if (authError || !profile) {
     return { 
       success: false, 
-      error: 'An unexpected error occurred. Please refresh the page and try again.' 
+      error: authError || 'Authentication failed. Please try refreshing the page.' 
     };
   }
+
+  const supabase = createServiceClient();
 
   // Validate league name
   if (!leagueName || leagueName.trim().length < 3) {
@@ -71,7 +97,7 @@ export async function createLeague(leagueName: string, password: string) {
   const { error: memberError } = await supabase
     .from('league_members')
     .insert({ 
-      user_id: user.id, 
+      user_id: profile.id, 
       league_id: newLeague.id,
       is_active: true 
     });
@@ -84,7 +110,7 @@ export async function createLeague(leagueName: string, password: string) {
   const { error: updateError } = await supabase
     .from('profiles')
     .update({ active_league_id: newLeague.id })
-    .eq('id', user.id);
+    .eq('id', profile.id);
 
   if (updateError) {
     return { success: false, error: 'Failed to set active league' };
@@ -94,38 +120,16 @@ export async function createLeague(leagueName: string, password: string) {
 }
 
 export async function joinLeague(leagueName: string, password: string) {
-  let supabase;
-  let user;
+  const { profile, error: authError } = await getProfileForClerkUser();
   
-  try {
-    supabase = await createClient();
-    
-    const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError) {
-      console.error('Auth error in joinLeague:', userError);
-      return { 
-        success: false, 
-        error: 'Authentication failed. Please try refreshing the page or logging out and back in.' 
-      };
-    }
-    
-    if (!authUser) {
-      console.error('No user found in joinLeague');
-      return { 
-        success: false, 
-        error: 'Session expired. Please refresh the page and try again.' 
-      };
-    }
-    
-    user = authUser;
-  } catch (err) {
-    console.error('Unexpected error getting user in joinLeague:', err);
+  if (authError || !profile) {
     return { 
       success: false, 
-      error: 'An unexpected error occurred. Please refresh the page and try again.' 
+      error: authError || 'Authentication failed. Please try refreshing the page.' 
     };
   }
+
+  const supabase = createServiceClient();
 
   // Find the league by name
   const { data: league, error: leagueError } = await supabase
@@ -147,7 +151,7 @@ export async function joinLeague(leagueName: string, password: string) {
   const { data: existingMember } = await supabase
     .from('league_members')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id)
     .eq('league_id', league.id)
     .single();
 
@@ -156,7 +160,7 @@ export async function joinLeague(leagueName: string, password: string) {
     await supabase
       .from('profiles')
       .update({ active_league_id: league.id })
-      .eq('id', user.id);
+      .eq('id', profile.id);
     
     return { success: true, leagueName: league.name };
   }
@@ -165,7 +169,7 @@ export async function joinLeague(leagueName: string, password: string) {
   const { error: memberError } = await supabase
     .from('league_members')
     .insert({ 
-      user_id: user.id, 
+      user_id: profile.id, 
       league_id: league.id,
       is_active: true 
     });
@@ -178,7 +182,7 @@ export async function joinLeague(leagueName: string, password: string) {
   const { error: updateError } = await supabase
     .from('profiles')
     .update({ active_league_id: league.id })
-    .eq('id', user.id);
+    .eq('id', profile.id);
 
   if (updateError) {
     return { success: false, error: 'Failed to set active league' };
@@ -188,33 +192,26 @@ export async function joinLeague(leagueName: string, password: string) {
 }
 
 export async function checkUserLeague() {
-  const supabase = await createClient();
+  const { profile, error: authError } = await getProfileForClerkUser();
   
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  
-  if (userError || !user) {
+  if (authError || !profile) {
     return { isAuthenticated: false, hasLeague: false, leagueName: null, leagues: [] };
   }
+
+  const supabase = createServiceClient();
 
   // Get all leagues user is a member of
   const { data: memberships } = await supabase
     .from('league_members')
     .select('league_id, leagues(id, name)')
-    .eq('user_id', user.id);
+    .eq('user_id', profile.id);
 
   if (!memberships || memberships.length === 0) {
     return { isAuthenticated: true, hasLeague: false, leagueName: null, leagues: [] };
   }
 
-  // Get active league
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('active_league_id')
-    .eq('id', user.id)
-    .single();
-
   const activeLeague = memberships.find(
-    m => (m.leagues as any)?.id === profile?.active_league_id
+    m => (m.leagues as any)?.id === profile.active_league_id
   );
 
   return { 
@@ -226,27 +223,20 @@ export async function checkUserLeague() {
 }
 
 export async function getUserLeagues() {
-  const supabase = await createClient();
+  const { profile, error: authError } = await getProfileForClerkUser();
   
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  
-  if (userError || !user) {
+  if (authError || !profile) {
     return { leagues: [], activeLeagueId: null };
   }
+
+  const supabase = createServiceClient();
 
   // Get all leagues user is a member of
   const { data: memberships } = await supabase
     .from('league_members')
     .select('league_id, joined_at, leagues(id, name)')
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id)
     .order('joined_at', { ascending: false });
-
-  // Get active league
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('active_league_id')
-    .eq('id', user.id)
-    .single();
 
   return {
     leagues: memberships?.map(m => ({
@@ -254,24 +244,24 @@ export async function getUserLeagues() {
       name: (m.leagues as any)?.name,
       joined_at: m.joined_at
     })) || [],
-    activeLeagueId: profile?.active_league_id || null
+    activeLeagueId: profile.active_league_id || null
   };
 }
 
 export async function switchLeague(leagueId: string) {
-  const supabase = await createClient();
+  const { profile, error: authError } = await getProfileForClerkUser();
   
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  
-  if (userError || !user) {
+  if (authError || !profile) {
     return { success: false, error: 'Not authenticated' };
   }
+
+  const supabase = createServiceClient();
 
   // Verify user is a member of this league
   const { data: membership } = await supabase
     .from('league_members')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id)
     .eq('league_id', leagueId)
     .single();
 
@@ -283,7 +273,7 @@ export async function switchLeague(leagueId: string) {
   const { error: updateError } = await supabase
     .from('profiles')
     .update({ active_league_id: leagueId })
-    .eq('id', user.id);
+    .eq('id', profile.id);
 
   if (updateError) {
     return { success: false, error: 'Failed to switch league' };
@@ -293,19 +283,19 @@ export async function switchLeague(leagueId: string) {
 }
 
 export async function leaveLeague(leagueId: string) {
-  const supabase = await createClient();
+  const { profile, error: authError } = await getProfileForClerkUser();
   
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  
-  if (userError || !user) {
+  if (authError || !profile) {
     return { success: false, error: 'Not authenticated' };
   }
+
+  const supabase = createServiceClient();
 
   // Delete membership
   const { error: deleteError } = await supabase
     .from('league_members')
     .delete()
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id)
     .eq('league_id', leagueId);
 
   if (deleteError) {
@@ -313,18 +303,12 @@ export async function leaveLeague(leagueId: string) {
   }
 
   // If this was active league, switch to another one
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('active_league_id')
-    .eq('id', user.id)
-    .single();
-
-  if (profile?.active_league_id === leagueId) {
+  if (profile.active_league_id === leagueId) {
     // Get another league to switch to
     const { data: otherLeagues } = await supabase
       .from('league_members')
       .select('league_id')
-      .eq('user_id', user.id)
+      .eq('user_id', profile.id)
       .limit(1)
       .single();
 
@@ -332,13 +316,13 @@ export async function leaveLeague(leagueId: string) {
       await supabase
         .from('profiles')
         .update({ active_league_id: otherLeagues.league_id })
-        .eq('id', user.id);
+        .eq('id', profile.id);
     } else {
       // No other leagues, set to null
       await supabase
         .from('profiles')
         .update({ active_league_id: null })
-        .eq('id', user.id);
+        .eq('id', profile.id);
     }
   }
 
@@ -347,19 +331,19 @@ export async function leaveLeague(leagueId: string) {
 
 // Create an invite link for a league
 export async function createLeagueInvite(leagueId: string) {
-  const supabase = await createClient();
+  const { profile, error: authError } = await getProfileForClerkUser();
   
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  
-  if (userError || !user) {
+  if (authError || !profile) {
     return { success: false, error: 'Not authenticated' };
   }
+
+  const supabase = createServiceClient();
 
   // Verify user is a member of this league
   const { data: membership } = await supabase
     .from('league_members')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id)
     .eq('league_id', leagueId)
     .single();
 
@@ -381,7 +365,7 @@ export async function createLeagueInvite(leagueId: string) {
     .insert({
       league_id: leagueId,
       invite_code: codeResult,
-      created_by: user.id,
+      created_by: profile.id,
     })
     .select('id, invite_code')
     .single();
@@ -399,13 +383,13 @@ export async function createLeagueInvite(leagueId: string) {
 
 // Accept an invite and join the league
 export async function acceptLeagueInvite(inviteCode: string) {
-  const supabase = await createClient();
+  const { profile, error: authError } = await getProfileForClerkUser();
   
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  
-  if (userError || !user) {
+  if (authError || !profile) {
     return { success: false, error: 'Not authenticated', requiresAuth: true };
   }
+
+  const supabase = createServiceClient();
 
   // Get invite details
   const { data: invite, error: inviteError } = await supabase
@@ -446,7 +430,7 @@ export async function acceptLeagueInvite(inviteCode: string) {
   const { data: existingMember } = await supabase
     .from('league_members')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id)
     .eq('league_id', invite.league_id)
     .single();
 
@@ -455,7 +439,7 @@ export async function acceptLeagueInvite(inviteCode: string) {
     await supabase
       .from('profiles')
       .update({ active_league_id: invite.league_id })
-      .eq('id', user.id);
+      .eq('id', profile.id);
     
     return { 
       success: true, 
@@ -468,7 +452,7 @@ export async function acceptLeagueInvite(inviteCode: string) {
   const { error: memberError } = await supabase
     .from('league_members')
     .insert({ 
-      user_id: user.id, 
+      user_id: profile.id, 
       league_id: invite.league_id,
       is_active: true
     });
@@ -481,7 +465,7 @@ export async function acceptLeagueInvite(inviteCode: string) {
   await supabase
     .from('profiles')
     .update({ active_league_id: invite.league_id })
-    .eq('id', user.id);
+    .eq('id', profile.id);
 
   // Increment invite usage count
   await supabase

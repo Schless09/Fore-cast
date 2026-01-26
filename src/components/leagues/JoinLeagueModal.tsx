@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 
@@ -17,7 +16,6 @@ export function JoinLeagueModal({ onClose, canClose = false }: JoinLeagueModalPr
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,10 +44,8 @@ export function JoinLeagueModal({ onClose, canClose = false }: JoinLeagueModalPr
         return;
       }
 
-      // Success! Redirect to dashboard
-      if (onClose) onClose();
-      router.push('/the-money-board');
-      router.refresh();
+      // Success! Hard redirect to ensure fresh data
+      window.location.href = '/the-money-board';
     } catch (err) {
       console.error('Error in handleSubmit:', err);
       setError('An unexpected error occurred. Please try again.');

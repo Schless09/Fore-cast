@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -26,21 +27,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className="dark">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased relative`}
-        suppressHydrationWarning
-      >
-        <ClientOnlyComponents />
-        <ErrorBoundary>
-          <div className="relative z-10">
-            <Navbar />
-            <main className="relative">
-              {children}
-            </main>
-          </div>
-        </ErrorBoundary>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning className="dark">
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased relative`}
+          suppressHydrationWarning
+        >
+          <ClientOnlyComponents />
+          <ErrorBoundary>
+            <div className="relative z-10">
+              <Navbar />
+              <main className="relative">
+                {children}
+              </main>
+            </div>
+          </ErrorBoundary>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

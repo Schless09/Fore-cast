@@ -1,5 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { createServiceClient } from '@/lib/supabase/service';
+
+async function getProfileForClerkUser() {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return { profile: null, error: 'Not authenticated' };
+  }
+
+  const user = await currentUser();
+  if (!user) {
+    return { profile: null, error: 'User not found' };
+  }
+
+  const supabase = createServiceClient();
+  
+  // Try to find existing profile by clerk_id
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('clerk_id', userId)
+    .single();
+
+  if (existingProfile) {
+    return { profile: existingProfile, error: null };
+  }
+
+  // Create profile if it doesn't exist
+  const email = user.emailAddresses?.[0]?.emailAddress || '';
+  const username = user.username || user.firstName || email.split('@')[0];
+  
+  const { data: newProfile, error: createError } = await supabase
+    .from('profiles')
+    .insert({
+      clerk_id: userId,
+      email: email,
+      username: username,
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error('Error creating profile:', createError);
+    return { profile: null, error: 'Failed to create profile' };
+  }
+
+  return { profile: newProfile, error: null };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,17 +60,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const { profile, error: authError } = await getProfileForClerkUser();
     
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      console.error('Auth error in join league API:', userError);
+    if (authError || !profile) {
+      console.error('Auth error in join league API:', authError);
       return NextResponse.json(
         { success: false, error: 'Not authenticated' },
         { status: 401 }
       );
     }
+
+    const supabase = createServiceClient();
 
     // Find the league by name
     const { data: league, error: leagueError } = await supabase
@@ -50,7 +98,7 @@ export async function POST(request: NextRequest) {
     const { data: existingMember } = await supabase
       .from('league_members')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', profile.id)
       .eq('league_id', league.id)
       .single();
 
@@ -59,7 +107,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('profiles')
         .update({ active_league_id: league.id })
-        .eq('id', user.id);
+        .eq('id', profile.id);
       
       return NextResponse.json({ 
         success: true, 
@@ -72,7 +120,7 @@ export async function POST(request: NextRequest) {
     const { error: memberError } = await supabase
       .from('league_members')
       .insert({ 
-        user_id: user.id, 
+        user_id: profile.id, 
         league_id: league.id,
         is_active: true 
       });
@@ -89,7 +137,7 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ active_league_id: league.id })
-      .eq('id', user.id);
+      .eq('id', profile.id);
 
     if (updateError) {
       console.error('Error setting active league:', updateError);

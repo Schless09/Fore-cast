@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server';
+import { auth } from '@clerk/nextjs/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 
 export async function GET(
@@ -6,12 +7,10 @@ export async function GET(
   { params }: { params: Promise<{ code: string }> }
 ) {
   const { code } = await params;
-  const supabase = await createClient();
+  const { userId } = await auth();
+  const supabase = createServiceClient();
 
   try {
-    // Check user status
-    const { data: { user } } = await supabase.auth.getUser();
-
     // Fetch invite
     const { data: invite, error: inviteError } = await supabase
       .from('league_invites')
@@ -38,7 +37,7 @@ export async function GET(
     return NextResponse.json({
       debug: {
         inviteCode: code,
-        isAuthenticated: !!user,
+        isAuthenticated: !!userId,
         invite: invite,
         inviteError: inviteError?.message || null,
         league: league,

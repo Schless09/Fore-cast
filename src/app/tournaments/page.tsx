@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 // Force dynamic rendering to ensure fresh data
 export const dynamic = 'force-dynamic';
 
 export default async function TournamentsPage() {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data: tournaments } = await supabase
     .from('tournaments')
