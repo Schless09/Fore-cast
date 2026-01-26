@@ -56,7 +56,7 @@ In your Vercel project dashboard:
 For auto-sync to work:
 1. Go to `/admin/tournaments`
 2. Set tournament status to **"Active (Live)"**
-3. Ensure `livegolfapi_event_id` is set
+3. Ensure `rapidapi_tourn_id` is set
 
 ## How Auto-Sync Works
 
@@ -83,7 +83,7 @@ Check cron job execution in Vercel:
 
 1. **Check tournament status:**
    - Must be set to "active"
-   - Must have `livegolfapi_event_id`
+   - Must have `rapidapi_tourn_id`
 
 2. **Check environment variables:**
    - `CRON_SECRET` is set in Vercel

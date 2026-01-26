@@ -69,7 +69,7 @@ export default async function AdminPage() {
             </CardHeader>
             <CardContent>
               <p className="text-gray-600 text-sm mb-4">
-                Fetch tee times and live scores from LiveGolfAPI
+                Fetch tee times and live scores from RapidAPI
               </p>
               <Button variant="outline" className="w-full">
                 Sync Data
@@ -137,6 +137,22 @@ export default async function AdminPage() {
               </p>
               <Button variant="outline" className="w-full">
                 Import Historical Data
+              </Button>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/admin/sync-rankings">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle>Sync Rankings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 text-sm mb-4">
+                Update world rankings and FedEx Cup standings
+              </p>
+              <Button variant="outline" className="w-full">
+                Sync Rankings
               </Button>
             </CardContent>
           </Card>

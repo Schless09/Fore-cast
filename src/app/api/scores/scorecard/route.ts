@@ -14,33 +14,21 @@ interface CacheEntry {
 }
 const cache = new Map<string, CacheEntry>();
 
-// Tournament ID mapping for scorecards
-// RapidAPI uses different tournament IDs for scorecards vs leaderboards
-const TOURNAMENT_ID_MAP: Record<string, { year: string; tournId: string; orgId: string }> = {
-  '291e61c6-b1e4-49d6-a84e-99864e73a2be': { year: '2026', tournId: '002', orgId: '1' }, // The American Express
-};
+// No more mapping needed - use year/tournId directly
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const eventId = searchParams.get('eventId');
   const playerId = searchParams.get('playerId');
   
-  // Allow direct params for flexibility
-  let year = searchParams.get('year');
-  let tournId = searchParams.get('tournId');
-  let orgId = searchParams.get('orgId') || '1'; // Default to PGA Tour
-
-  // If eventId provided, try to map it
-  if (eventId && TOURNAMENT_ID_MAP[eventId]) {
-    year = TOURNAMENT_ID_MAP[eventId].year;
-    tournId = TOURNAMENT_ID_MAP[eventId].tournId;
-    orgId = TOURNAMENT_ID_MAP[eventId].orgId;
-  }
+  // Accept direct params
+  const year = searchParams.get('year');
+  const tournId = searchParams.get('tournId');
+  const orgId = searchParams.get('orgId') || '1'; // Default to PGA Tour
 
   if (!year || !tournId || !playerId) {
     return NextResponse.json({ 
       error: 'Missing required parameters',
-      hint: 'Use ?eventId=<id>&playerId=<id> or ?year=2026&tournId=002&playerId=<id>'
+      hint: 'Use ?year=2026&tournId=002&playerId=<id>'
     }, { status: 400 });
   }
 

@@ -54,13 +54,13 @@ export async function DELETE(request: NextRequest) {
 /**
  * Create a new tournament
  * POST /api/admin/tournaments
- * Body: { name, course?, start_date, end_date, status?, livegolfapi_event_id? }
+ * Body: { name, course?, start_date, end_date, status?, rapidapi_tourn_id? }
  */
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServiceClient();
     const body = await request.json();
-    const { name, course, start_date, end_date, status = 'upcoming', livegolfapi_event_id } = body;
+    const { name, course, start_date, end_date, status = 'upcoming', rapidapi_tourn_id } = body;
 
     if (!name || !start_date || !end_date) {
       return NextResponse.json(
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         end_date,
         status,
         current_round: 1,
-        livegolfapi_event_id: livegolfapi_event_id || null,
+        rapidapi_tourn_id: rapidapi_tourn_id || null,
       })
       .select()
       .single();
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
 /**
  * Bulk create tournaments
  * POST /api/admin/tournaments/bulk
- * Body: { tournaments: [{ name, course?, start_date, end_date, status?, livegolfapi_event_id? }] }
+ * Body: { tournaments: [{ name, course?, start_date, end_date, status?, rapidapi_tourn_id? }] }
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -146,11 +146,11 @@ export async function PUT(request: NextRequest) {
 
     // Process each tournament individually to handle duplicates properly
     for (const tournament of tournaments) {
-      // Check if tournament already exists by livegolfapi_event_id or name + start_date
+      // Check if tournament already exists by rapidapi_tourn_id or name + start_date
       let existingQuery = supabase.from('tournaments').select('id');
 
-      if (tournament.livegolfapi_event_id) {
-        existingQuery = existingQuery.eq('livegolfapi_event_id', tournament.livegolfapi_event_id);
+      if (tournament.rapidapi_tourn_id) {
+        existingQuery = existingQuery.eq('rapidapi_tourn_id', tournament.rapidapi_tourn_id);
       } else {
         existingQuery = existingQuery.eq('name', tournament.name).eq('start_date', tournament.start_date);
       }
@@ -173,7 +173,7 @@ export async function PUT(request: NextRequest) {
           end_date: tournament.end_date,
           status: tournament.status || 'upcoming',
           current_round: 1,
-          livegolfapi_event_id: tournament.livegolfapi_event_id || null,
+          rapidapi_tourn_id: tournament.rapidapi_tourn_id || null,
         })
         .select()
         .single();

@@ -31,7 +31,7 @@ export async function PUT(
 
     const { data: tournament, error } = await supabase
       .from('tournaments')
-      .update({ status, updated_at: new Date().toISOString() })
+      .update({ status, last_updated: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single();

@@ -25,7 +25,7 @@ export default function AdminTournamentsPage() {
     start_date: '',
     end_date: '',
     status: 'upcoming',
-    livegolfapi_event_id: '',
+    rapidapi_tourn_id: '',
   });
 
   useEffect(() => {
@@ -149,7 +149,7 @@ export default function AdminTournamentsPage() {
           start_date: formData.start_date,
           end_date: formData.end_date,
           status: formData.status,
-          livegolfapi_event_id: formData.livegolfapi_event_id || null,
+          rapidapi_tourn_id: formData.rapidapi_tourn_id || null,
         }),
       });
 
@@ -166,7 +166,7 @@ export default function AdminTournamentsPage() {
         start_date: '',
         end_date: '',
         status: 'upcoming',
-        livegolfapi_event_id: '',
+        rapidapi_tourn_id: '',
       });
       fetchTournaments();
     } catch (err: any) {
@@ -300,8 +300,8 @@ export default function AdminTournamentsPage() {
                         <p className="text-xs font-mono bg-casino-card px-2 py-1 rounded">
                           ID: {tournament.id}
                         </p>
-                        {tournament.livegolfapi_event_id && (
-                          <p className="text-casino-green">✓ LiveGolfAPI Connected ({tournament.livegolfapi_event_id})</p>
+                        {tournament.rapidapi_tourn_id && (
+                          <p className="text-casino-green">✓ RapidAPI tournId: {tournament.rapidapi_tourn_id}</p>
                         )}
                       </div>
                     </div>
@@ -494,23 +494,23 @@ export default function AdminTournamentsPage() {
 
             <div>
               <label
-                htmlFor="livegolfapi_event_id"
+                htmlFor="rapidapi_tourn_id"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                LiveGolfAPI Event ID (optional)
+                RapidAPI Tournament ID (optional)
               </label>
               <input
-                id="livegolfapi_event_id"
+                id="rapidapi_tourn_id"
                 type="text"
-                value={formData.livegolfapi_event_id}
+                value={formData.rapidapi_tourn_id}
                 onChange={(e) =>
-                  setFormData({ ...formData, livegolfapi_event_id: e.target.value })
+                  setFormData({ ...formData, rapidapi_tourn_id: e.target.value })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
                 placeholder="e.g., 291e61c6-b1e4-49d6-a84e-99864e73a2be"
               />
               <p className="mt-1 text-xs text-gray-500">
-                Used to pull leaderboards directly from LiveGolfAPI when available.
+                Used to pull leaderboards from RapidAPI (e.g., 002, 004, 006).
               </p>
             </div>
 

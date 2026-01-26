@@ -30,6 +30,7 @@ interface LiveLeaderboardProps {
   userRosterPlayerIds: string[];
   playerNameToIdMap: Map<string, string>;
   liveGolfAPITournamentId?: string;
+  tournamentStatus?: 'upcoming' | 'active' | 'completed';
 }
 
 // Helper to parse scores from API
@@ -50,21 +51,22 @@ export function LiveLeaderboard({
   userRosterPlayerIds,
   playerNameToIdMap,
   liveGolfAPITournamentId,
+  tournamentStatus: initialTournamentStatus,
 }: LiveLeaderboardProps) {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardRow[]>(initialData);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [tournamentStatus, setTournamentStatus] = useState<string>('In Progress');
+  const [apiTournamentStatus, setApiTournamentStatus] = useState<string>('In Progress');
   const [cacheAge, setCacheAge] = useState<number | null>(null); // How old the server cache is
   const hasInitialSynced = useRef(false);
   
   // Scorecard modal state
   const [selectedPlayer, setSelectedPlayer] = useState<{ id: string; name: string } | null>(null);
 
-  // Check if tournament is completed
-  const isCompleted = tournamentStatus === 'Official';
+  // Check if tournament is completed - use passed prop first, then API status
+  const isCompleted = initialTournamentStatus === 'completed' || apiTournamentStatus === 'Official';
 
   // Create prize distribution map (memoized)
   const prizeDistributionMap = useMemo(() => 
@@ -102,7 +104,7 @@ export function LiveLeaderboard({
 
       // Update tournament status and cache age
       if (result.tournamentStatus) {
-        setTournamentStatus(result.tournamentStatus);
+        setApiTournamentStatus(result.tournamentStatus);
       }
       if (result.cacheAge !== undefined) {
         setCacheAge(result.cacheAge);
@@ -186,14 +188,19 @@ export function LiveLeaderboard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveGolfAPITournamentId, prizeDistributionMap, isCompleted]);
 
-  // Trigger initial fetch on mount
+  // Trigger initial fetch on mount - but skip for completed tournaments
+  // Server already provides final data, no need to re-fetch
   useEffect(() => {
-    if (liveGolfAPITournamentId && !hasInitialSynced.current) {
+    if (liveGolfAPITournamentId && !hasInitialSynced.current && !isCompleted) {
       hasInitialSynced.current = true;
-      console.log('[LiveLeaderboard] Fetching initial data from API...');
-      fetchFromAPI();
+      // Small delay to prevent flash on initial render
+      const timer = setTimeout(() => {
+        console.log('[LiveLeaderboard] Fetching initial data from API...');
+        fetchFromAPI();
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [liveGolfAPITournamentId, fetchFromAPI]);
+  }, [liveGolfAPITournamentId, fetchFromAPI, isCompleted]);
 
   useEffect(() => {
     // Don't poll if tournament is completed

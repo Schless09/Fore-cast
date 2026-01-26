@@ -17,37 +17,45 @@ import { createServiceClient } from '@/lib/supabase/service';
  * - Off-hours: No polling
  */
 
-// Tournament ID mapping (same as auto-sync)
-const TOURNAMENT_ID_MAP: Record<string, { year: string; tournId: string }> = {
-  '291e61c6-b1e4-49d6-a84e-99864e73a2be': { year: '2026', tournId: '002' }, // The American Express
-};
+// rapidapi_tourn_id stores the RapidAPI tournId directly (e.g., "002", "004")
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const eventId = searchParams.get('eventId');
+  const supabase = createServiceClient();
   
-  // Allow direct year/tournId params for flexibility
+  // Accept either:
+  // - ?year=2026&tournId=002 (direct params)
+  // - ?eventId=004 (will look up year from tournament)
   let year = searchParams.get('year');
   let tournId = searchParams.get('tournId');
+  const eventId = searchParams.get('eventId');
 
-  // If eventId provided, try to map it
-  if (eventId && TOURNAMENT_ID_MAP[eventId]) {
-    year = TOURNAMENT_ID_MAP[eventId].year;
-    tournId = TOURNAMENT_ID_MAP[eventId].tournId;
+  // If eventId provided, look up the tournament to get year
+  if (eventId && (!year || !tournId)) {
+    tournId = eventId;
+    
+    // Look up tournament by rapidapi_tourn_id to get the year
+    const { data: tournament } = await supabase
+      .from('tournaments')
+      .select('start_date')
+      .eq('rapidapi_tourn_id', eventId)
+      .single();
+    
+    if (tournament?.start_date) {
+      year = new Date(tournament.start_date).getFullYear().toString();
+    }
   }
 
   if (!year || !tournId) {
     return NextResponse.json({ 
-      error: 'Missing year and tournId parameters (or unknown eventId)',
-      hint: 'Use ?year=2026&tournId=002 or ?eventId=<mapped-id>'
+      error: 'Missing year and tournId parameters',
+      hint: 'Use ?year=2026&tournId=002 or ?eventId=004'
     }, { status: 400 });
   }
 
   const cacheKey = `${year}-${tournId}`;
 
   try {
-    const supabase = createServiceClient();
-    
     // Read from cache
     const { data: cached, error: cacheError } = await supabase
       .from('live_scores_cache')

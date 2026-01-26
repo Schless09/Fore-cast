@@ -8,7 +8,7 @@ interface Tournament {
   id: string;
   name: string;
   status: string;
-  livegolfapi_event_id: string | null;
+  rapidapi_tourn_id: string | null;
   start_date: string;
 }
 
@@ -28,8 +28,8 @@ export function SyncTeeTimesForm({ tournaments }: SyncTeeTimesFormProps) {
     }
 
     const tournament = tournaments.find(t => t.id === selectedTournament);
-    if (!tournament?.livegolfapi_event_id) {
-      alert('This tournament does not have a LiveGolfAPI Event ID');
+    if (!tournament?.rapidapi_tourn_id) {
+      alert('This tournament does not have a RapidAPI Event ID');
       return;
     }
 
@@ -42,7 +42,7 @@ export function SyncTeeTimesForm({ tournaments }: SyncTeeTimesFormProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tournamentId: tournament.id,
-          liveGolfAPITournamentId: tournament.livegolfapi_event_id,
+          liveGolfAPITournamentId: tournament.rapidapi_tourn_id,
         }),
       });
 
@@ -80,7 +80,7 @@ export function SyncTeeTimesForm({ tournaments }: SyncTeeTimesFormProps) {
           >
             <option value="">Select a tournament...</option>
             {tournaments.map((tournament) => {
-              const hasApiId = !!tournament.livegolfapi_event_id;
+              const hasApiId = !!tournament.rapidapi_tourn_id;
               const statusEmoji = 
                 tournament.status === 'active' ? '⭐ ' :
                 tournament.status === 'upcoming' ? '📅 ' :
@@ -105,9 +105,9 @@ export function SyncTeeTimesForm({ tournaments }: SyncTeeTimesFormProps) {
             {tournaments.find(t => t.id === selectedTournament) && (
               <div className="text-sm space-y-1">
                 <p className="text-casino-gray">
-                  <span className="font-medium">LiveGolfAPI Event ID:</span>{' '}
+                  <span className="font-medium">RapidAPI Event ID:</span>{' '}
                   <code className="text-casino-gold">
-                    {tournaments.find(t => t.id === selectedTournament)?.livegolfapi_event_id}
+                    {tournaments.find(t => t.id === selectedTournament)?.rapidapi_tourn_id}
                   </code>
                 </p>
                 <p className="text-casino-gray">

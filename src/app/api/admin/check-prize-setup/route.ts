@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         name,
-        livegolfapi_event_id,
+        rapidapi_tourn_id,
         prize_money_distributions(id),
         tournament_players(id)
       `);
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const results = tournaments?.map(t => ({
       id: t.id,
       name: t.name,
-      livegolfapi_event_id: t.livegolfapi_event_id,
+      rapidapi_tourn_id: t.rapidapi_tourn_id,
       hasPrizeDistributions: (t.prize_money_distributions as any)?.length > 0,
       prizeDistributionCount: (t.prize_money_distributions as any)?.length || 0,
       hasPlayers: (t.tournament_players as any)?.length > 0,
@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
       success: true,
       tournaments: results,
       tournamentsWithPrizeMoney: results.filter(t => t.hasPrizeDistributions),
-      tournamentsWithLiveGolfAPI: results.filter(t => t.livegolfapi_event_id),
-      tournamentsWithBoth: results.filter(t => t.hasPrizeDistributions && t.livegolfapi_event_id),
+      tournamentsWithLiveGolfAPI: results.filter(t => t.rapidapi_tourn_id),
+      tournamentsWithBoth: results.filter(t => t.hasPrizeDistributions && t.rapidapi_tourn_id),
     });
   } catch (error: any) {
     console.error('Error checking prize setup:', error);

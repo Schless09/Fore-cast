@@ -6,10 +6,10 @@ export default async function SyncTeeTimesPage() {
   // Auth is handled by Clerk middleware
   const supabase = createServiceClient();
 
-  // Get all tournaments with their LiveGolfAPI IDs
+  // Get all tournaments with their RapidAPI IDs
   const { data: tournaments } = await supabase
     .from('tournaments')
-    .select('id, name, status, livegolfapi_event_id, start_date')
+    .select('id, name, status, rapidapi_tourn_id, start_date')
     .order('start_date', { ascending: false });
 
   return (
@@ -19,7 +19,7 @@ export default async function SyncTeeTimesPage() {
           Sync Tee Times & Scores
         </h1>
         <p className="text-casino-gray">
-          Fetch latest data from LiveGolfAPI including tee times, scores, and positions
+          Fetch latest data from RapidAPI including tee times, scores, and positions
         </p>
       </div>
 
@@ -29,7 +29,7 @@ export default async function SyncTeeTimesPage() {
             ℹ️ How it works
           </h3>
           <ul className="space-y-2 text-sm text-casino-gray">
-            <li>• Fetches current leaderboard data from LiveGolfAPI</li>
+            <li>• Fetches current leaderboard data from RapidAPI</li>
             <li>• Updates tee times for Round 1 (available ~1-2 days before tournament)</li>
             <li>• Updates scores, positions, and made cut status during tournament</li>
             <li>• Cached for 3 minutes to prevent excessive API calls</li>

@@ -11,7 +11,7 @@ interface Tournament {
   id: string;
   name: string;
   status: string;
-  livegolfapi_event_id: string | null;
+  rapidapi_tourn_id: string | null;
 }
 
 export default function AdminScoresPage() {
@@ -29,7 +29,7 @@ export default function AdminScoresPage() {
         const supabase = createClient();
         const { data, error: fetchError } = await supabase
           .from('tournaments')
-          .select('id, name, status, livegolfapi_event_id')
+          .select('id, name, status, rapidapi_tourn_id')
           .order('start_date', { ascending: false });
 
         if (fetchError) throw fetchError;
@@ -60,14 +60,14 @@ export default function AdminScoresPage() {
 
 
 
-  const handleSyncFromLiveGolfAPI = async () => {
+  const handleSyncFromRapidAPI = async () => {
     if (!selectedTournament) {
       setError('Please select a tournament');
       return;
     }
 
-    if (!selectedTournament.livegolfapi_event_id) {
-      setError(`No LiveGolfAPI Event ID found for ${selectedTournament.name}. Please update the tournament in the database.`);
+    if (!selectedTournament.rapidapi_tourn_id) {
+      setError(`No RapidAPI Event ID found for ${selectedTournament.name}. Please update the tournament in the database.`);
       return;
     }
 
@@ -81,19 +81,19 @@ export default function AdminScoresPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tournamentId: selectedTournament.id,
-          liveGolfAPITournamentId: selectedTournament.livegolfapi_event_id,
+          liveGolfAPITournamentId: selectedTournament.rapidapi_tourn_id,
         }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to sync scores from LiveGolfAPI');
+        throw new Error(result.error || 'Failed to sync scores from RapidAPI');
       }
 
-      setMessage(`✅ ${result.message || 'Scores synced successfully from LiveGolfAPI!'} Updated ${result.updatedCount || 0} players.`);
+      setMessage(`✅ ${result.message || 'Scores synced successfully from RapidAPI!'} Updated ${result.updatedCount || 0} players.`);
     } catch (err: any) {
-      setError(err.message || 'Failed to sync scores from LiveGolfAPI');
+      setError(err.message || 'Failed to sync scores from RapidAPI');
     } finally {
       setIsUpdating(false);
     }
@@ -152,7 +152,7 @@ export default function AdminScoresPage() {
           Sync Scores & Calculate Winnings
         </h1>
         <p className="text-gray-600">
-          Automatically sync tournament scores from LiveGolfAPI and calculate player winnings.
+          Automatically sync tournament scores from RapidAPI and calculate player winnings.
         </p>
       </div>
 
@@ -202,7 +202,7 @@ export default function AdminScoresPage() {
                   t.status === 'active' ? '🔴 ' :
                   t.status === 'upcoming' ? '📅 ' :
                   '✅ ';
-                const hasLiveGolfId = t.livegolfapi_event_id ? '✓' : '⚠️ Missing ID';
+                const hasLiveGolfId = t.rapidapi_tourn_id ? '✓' : '⚠️ Missing ID';
                 
                 return (
                   <option key={t.id} value={t.id}>
@@ -217,9 +217,9 @@ export default function AdminScoresPage() {
                   <strong>Status:</strong> {selectedTournament.status}
                 </p>
                 <p className="text-xs text-gray-600">
-                  <strong>LiveGolfAPI Event ID:</strong>{' '}
-                  {selectedTournament.livegolfapi_event_id ? (
-                    <span className="font-mono bg-gray-100 px-1 rounded">{selectedTournament.livegolfapi_event_id}</span>
+                  <strong>RapidAPI Event ID:</strong>{' '}
+                  {selectedTournament.rapidapi_tourn_id ? (
+                    <span className="font-mono bg-gray-100 px-1 rounded">{selectedTournament.rapidapi_tourn_id}</span>
                   ) : (
                     <span className="text-orange-600">⚠️ Not set - update tournament in database</span>
                   )}
@@ -242,12 +242,12 @@ export default function AdminScoresPage() {
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
             <Button
-              onClick={handleSyncFromLiveGolfAPI}
+              onClick={handleSyncFromRapidAPI}
               isLoading={isUpdating}
-              disabled={!selectedTournament || !selectedTournament.livegolfapi_event_id}
+              disabled={!selectedTournament || !selectedTournament.rapidapi_tourn_id}
               className="flex-1"
             >
-              🔄 Sync Scores from LiveGolfAPI
+              🔄 Sync Scores from RapidAPI
             </Button>
             <Button
               variant="outline"
@@ -268,7 +268,7 @@ export default function AdminScoresPage() {
           <h3 className="font-semibold text-gray-900 mb-3">ℹ️ How It Works:</h3>
           <ul className="list-disc list-inside space-y-2 text-sm text-gray-700">
             <li>
-              <strong>Sync Scores:</strong> Fetches leaderboard from LiveGolfAPI and updates player positions automatically
+              <strong>Sync Scores:</strong> Fetches leaderboard from RapidAPI and updates player positions automatically
             </li>
             <li>
               <strong>Calculate Winnings:</strong> Calculates prize money for each player based on their position and updates roster totals

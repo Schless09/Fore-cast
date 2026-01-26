@@ -18,12 +18,7 @@ import { shouldPollNow, getPollingDebugInfo } from '@/lib/polling-config';
 const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com';
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
 
-// Tournament ID mapping - update this for each tournament
-// Maps our internal livegolfapi_event_id to RapidAPI's year/tournId
-const TOURNAMENT_ID_MAP: Record<string, { year: string; tournId: string }> = {
-  '291e61c6-b1e4-49d6-a84e-99864e73a2be': { year: '2026', tournId: '002' }, // The American Express
-  // Add more mappings as tournaments are set up
-};
+// No more mapping needed - rapidapi_tourn_id now stores the RapidAPI tournId directly (e.g., "002", "004")
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
@@ -53,9 +48,9 @@ export async function GET(request: NextRequest) {
     // Get all active tournaments
     const { data: tournaments, error: tournamentsError } = await supabase
       .from('tournaments')
-      .select('id, name, livegolfapi_event_id, start_date, end_date')
+      .select('id, name, rapidapi_tourn_id, start_date, end_date')
       .eq('status', 'active')
-      .not('livegolfapi_event_id', 'is', null);
+      .not('rapidapi_tourn_id', 'is', null);
 
     if (tournamentsError) {
       console.error('[AUTO-SYNC] Error fetching tournaments:', tournamentsError);
@@ -90,22 +85,23 @@ export async function GET(request: NextRequest) {
     const results = [];
     
     for (const tournament of tournaments) {
-      const eventId = tournament.livegolfapi_event_id;
-      const mapping = TOURNAMENT_ID_MAP[eventId];
+      // rapidapi_tourn_id now stores the RapidAPI tournId directly (e.g., "002", "004")
+      const tournId = tournament.rapidapi_tourn_id;
       
-      if (!mapping) {
-        console.warn(`[AUTO-SYNC] No RapidAPI mapping for event: ${eventId}`);
+      if (!tournId) {
+        console.warn(`[AUTO-SYNC] No RapidAPI tournId for: ${tournament.name}`);
         results.push({
           tournamentId: tournament.id,
           tournamentName: tournament.name,
           success: false,
-          error: 'No RapidAPI mapping configured',
+          error: 'No RapidAPI tournId configured',
         });
         continue;
       }
 
       try {
-        const { year, tournId } = mapping;
+        // Derive year from tournament start date
+        const year = new Date(tournament.start_date).getFullYear().toString();
         const cacheKey = `${year}-${tournId}`;
         
         console.log(`[AUTO-SYNC] Fetching ${tournament.name} (${cacheKey})...`);

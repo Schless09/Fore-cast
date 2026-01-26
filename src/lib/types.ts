@@ -45,7 +45,7 @@ export interface Tournament {
   end_date: string;
   current_round: number;
   status: 'upcoming' | 'active' | 'completed';
-  livegolfapi_event_id?: string | null;
+  rapidapi_tourn_id?: string | null;
   last_updated: string;
   created_at: string;
 }

@@ -12,7 +12,8 @@ import { LiveRoundBadge } from '@/components/tournaments/LiveRoundBadge';
 import Link from 'next/link';
 import { formatDate, formatScore, getScoreColor, formatTimestampCST } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
-import { fetchScoresFromLiveGolfAPI } from '@/lib/livegolfapi';
+
+// No more mapping needed - rapidapi_tourn_id now stores the RapidAPI tournId directly (e.g., "002", "004")
 
 interface TournamentPageProps {
   params: Promise<{ id: string }>;
@@ -171,7 +172,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   let prizeDistributions: PrizeDistributionRow[] = [];
 
   let tournamentLeaderboard: LeaderboardRow[] = [];
-  let leaderboardSource: 'database' | 'livegolfapi' | 'cache' | 'none' = 'none';
+  let leaderboardSource: 'database' | 'rapidapi' | 'cache' | 'none' = 'none';
   let lastUpdated: number | null = null;
 
   // Helper to parse LiveGolfAPI scores
@@ -185,28 +186,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   };
 
   if (tournament.status === 'completed' || (tournament.status === 'active' && existingRoster)) {
-    // Try database first
-    const { data: leaderboardData, error: dbError } = await supabase
-      .from('tournament_players')
-      .select(
-        `
-        position,
-        is_tied,
-        tied_with_count,
-        total_score,
-        today_score,
-        thru,
-        prize_money,
-        pga_players ( name )
-      `
-      )
-      .eq('tournament_id', id)
-      .not('position', 'is', null)
-      .order('position', { ascending: true });
-
-    // Prize money calculation is now handled manually by admin via the prize money page
-    // This prevents glitching and ensures calculations happen when explicitly requested
-
+    // Get prize distributions first
     const { data: prizeDistributionsData } = await supabase
       .from('prize_money_distributions')
       .select('position, percentage, amount, total_purse')
@@ -229,131 +209,181 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       );
     }
 
-    if (!dbError && leaderboardData && leaderboardData.length > 0) {
-      leaderboardSource = 'database';
+    // Helper to calculate prize money with proper tie handling
+    const calculateTiePrizeMoney = (position: number | null, tieCount: number): number => {
+      if (!position || position < 1 || tieCount < 1) return 0;
+      let totalPrize = 0;
+      for (let i = 0; i < tieCount; i++) {
+        const pos = position + i;
+        const dist = prizeDistributionMap.get(pos);
+        totalPrize += dist?.amount || 0;
+      }
+      return Math.round(totalPrize / tieCount);
+    };
 
-      // Prize money calculation is now handled manually by admin via the prize money page
-      // This prevents glitching and ensures calculations happen when explicitly requested
+    // PRIORITY 1: Check live_scores_cache (where RapidAPI data is stored)
+    // Query by tournament_id directly - this is how auto-sync stores the data
+    const { data: cachedData } = await supabase
+      .from('live_scores_cache')
+      .select('data, updated_at, tournament_status, current_round, player_count')
+      .eq('tournament_id', id)
+      .single();
+    
+    if (cachedData?.data?.data && Array.isArray(cachedData.data.data) && cachedData.data.data.length > 0) {
+        leaderboardSource = 'cache';
+        lastUpdated = cachedData.data.timestamp || new Date(cachedData.updated_at).getTime();
+        
+        const scores = cachedData.data.data;
+        
+        // Count players at each position to detect ties
+        const positionCounts = new Map<number, number>();
+        scores.forEach((player: any) => {
+          const posNum = player.positionValue;
+          if (posNum && posNum > 0 && posNum < 900) {
+            positionCounts.set(posNum, (positionCounts.get(posNum) || 0) + 1);
+          }
+        });
 
-      tournamentLeaderboard =
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        leaderboardData.map((row: any) => ({
-          position: row.position ?? null,
-          is_tied: row.is_tied ?? false,
-          tied_with_count: row.tied_with_count ?? 1,
-          total_score: row.total_score ?? 0,
-          today_score: row.today_score ?? 0,
-          thru: row.thru ?? '-',
-          prize_money: row.prize_money ?? 0,
-          name: row.pga_players?.name || 'Unknown',
-          prize_distribution:
-            row.position && prizeDistributionMap.has(row.position)
-              ? prizeDistributionMap.get(row.position)
+        tournamentLeaderboard = scores.map((player: any) => {
+          const posNum = player.positionValue;
+          const actualPosition = (posNum && posNum < 900) ? posNum : null;
+          const tieCount = actualPosition ? (positionCounts.get(actualPosition) || 1) : 1;
+          const isTied = tieCount > 1;
+
+          return {
+            position: actualPosition,
+            is_tied: isTied,
+            tied_with_count: tieCount,
+            total_score: parseScore(player.total),
+            today_score: player.currentRoundScore ? parseScore(player.currentRoundScore) : 0,
+            thru: player.thru || 'F',
+            prize_money: calculateTiePrizeMoney(actualPosition, tieCount),
+            name: player.player || 'Unknown',
+            tee_time: player.teeTime || null,
+            starting_tee: null,
+            prize_distribution: actualPosition && prizeDistributionMap.has(actualPosition)
+              ? prizeDistributionMap.get(actualPosition)
               : undefined,
-        })) || [];
-    } else if (tournament.livegolfapi_event_id) {
-      // Fallback to LiveGolfAPI if no DB data
-      try {
-        const result = await fetchScoresFromLiveGolfAPI(
-          tournament.livegolfapi_event_id
-        );
-        const scores = result.data;
-        lastUpdated = result.timestamp || null;
-
-        if (!scores || !Array.isArray(scores) || scores.length === 0) {
-          // No data available from API or cache - show empty state
-          console.warn('LiveGolfAPI unavailable:', result.error || 'No data returned');
-          leaderboardSource = 'none';
-          tournamentLeaderboard = [];
-        } else {
-          leaderboardSource = result.source === 'cache' ? 'cache' : 'livegolfapi';
-
-          // First pass: count players at each position to detect ties
-          const positionCounts = new Map<number, number>();
-          scores.forEach((scorecard: any) => {
-            const position = scorecard.positionValue >= 980 ? null : scorecard.positionValue;
-            if (position && position > 0) {
-              positionCounts.set(position, (positionCounts.get(position) || 0) + 1);
-            }
-          });
-          
-          // Helper to calculate prize money with proper tie handling
-          const calculateTiePrizeMoney = (position: number | null, tieCount: number): number => {
-            if (!position || position < 1 || tieCount < 1) return 0;
-            
-            // Sum prize money for positions position through position + tieCount - 1
-            let totalPrize = 0;
-            for (let i = 0; i < tieCount; i++) {
-              const pos = position + i;
-              const dist = prizeDistributionMap.get(pos);
-              totalPrize += dist?.amount || 0;
-            }
-            
-            // Split evenly among tied players
-            return Math.round(totalPrize / tieCount);
           };
+        });
+        
+        // Sort by position
+        tournamentLeaderboard.sort((a, b) => {
+          if (a.position === null && b.position === null) return 0;
+          if (a.position === null) return 1;
+          if (b.position === null) return -1;
+          return a.position - b.position;
+        });
+    }
 
-          tournamentLeaderboard =
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            scores.map((scorecard: any) => {
-            const rounds = scorecard.rounds || [];
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const currentRound = rounds.reduce((acc: any, r: any) => {
-              if (!acc || (r.round || 0) > (acc.round || 0)) return r;
-              return acc;
-            }, null);
+    // PRIORITY 2: Try database tournament_players if no cache data
+    if (tournamentLeaderboard.length === 0) {
+      const { data: leaderboardData, error: dbError } = await supabase
+        .from('tournament_players')
+        .select(
+          `
+          position,
+          is_tied,
+          tied_with_count,
+          total_score,
+          today_score,
+          thru,
+          prize_money,
+          pga_players ( name )
+        `
+        )
+        .eq('tournament_id', id)
+        .not('position', 'is', null)
+        .order('position', { ascending: true });
 
-            const actualPosition =
-              scorecard.positionValue >= 980 ? null : scorecard.positionValue;
+      if (!dbError && leaderboardData && leaderboardData.length > 0) {
+        leaderboardSource = 'database';
+        tournamentLeaderboard =
+          leaderboardData.map((row: any) => ({
+            position: row.position ?? null,
+            is_tied: row.is_tied ?? false,
+            tied_with_count: row.tied_with_count ?? 1,
+            total_score: row.total_score ?? 0,
+            today_score: row.today_score ?? 0,
+            thru: row.thru ?? '-',
+            prize_money: row.prize_money ?? 0,
+            name: row.pga_players?.name || 'Unknown',
+            prize_distribution:
+              row.position && prizeDistributionMap.has(row.position)
+                ? prizeDistributionMap.get(row.position)
+                : undefined,
+          })) || [];
+      }
+    }
+
+    // PRIORITY 3: Fetch fresh from RapidAPI if still no data
+    // rapidapi_tourn_id now stores the RapidAPI tournId directly (e.g., "002", "004")
+    if (tournamentLeaderboard.length === 0 && tournament.rapidapi_tourn_id) {
+      try {
+        const tournId = tournament.rapidapi_tourn_id;
+        const year = new Date(tournament.start_date).getFullYear().toString();
+        const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com';
+        const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
+        
+        const response = await fetch(
+          `https://${RAPIDAPI_HOST}/leaderboard?year=${year}&tournId=${tournId}`,
+          {
+            headers: {
+              'X-RapidAPI-Host': RAPIDAPI_HOST,
+              'X-RapidAPI-Key': RAPIDAPI_KEY,
+            },
+            cache: 'no-store',
+          }
+        );
+
+        if (response.ok) {
+          const json = await response.json();
+          const leaderboard = json.leaderboardRows || [];
+          
+          if (leaderboard.length > 0) {
+            leaderboardSource = 'rapidapi';
+            lastUpdated = Date.now();
             
-            const tieCount = actualPosition ? (positionCounts.get(actualPosition) || 1) : 1;
-            const isTied = tieCount > 1;
-
-            // Handle thru field - could be hole number "9", "18", "F", or tee time
-            let thruValue = '-';
-            if (currentRound?.thru && currentRound.thru !== '-') {
-              const parsed = parseInt(currentRound.thru);
-              // If it's a number (hole), use it; if "F", show finished; otherwise it's likely a tee time
-              if (!isNaN(parsed)) {
-                thruValue = currentRound.thru;
-              } else if (currentRound.thru === 'F') {
-                thruValue = 'F';
-              } else {
-                // Likely a tee time like "6:09 PM" or "5:58 PM"
-                thruValue = currentRound.thru;
+            // Count positions for ties
+            const positionCounts = new Map<number, number>();
+            leaderboard.forEach((player: any) => {
+              const posNum = parseInt(player.position?.replace('T', '')) || null;
+              if (posNum && posNum > 0) {
+                positionCounts.set(posNum, (positionCounts.get(posNum) || 0) + 1);
               }
-            }
+            });
 
-            // Calculate prize money with proper tie handling
-            const calculatedPrizeMoney = calculateTiePrizeMoney(actualPosition, tieCount);
+            tournamentLeaderboard = leaderboard.map((player: any) => {
+              const posNum = parseInt(player.position?.replace('T', '')) || null;
+              const tieCount = posNum ? (positionCounts.get(posNum) || 1) : 1;
+              const isTied = tieCount > 1;
 
-            return {
-              position: actualPosition,
-              is_tied: isTied,
-              tied_with_count: tieCount,
-              total_score: parseScore(scorecard.total),
-              today_score: currentRound ? parseScore(currentRound.total) : 0,
-              thru: thruValue,
-              prize_money: calculatedPrizeMoney,
-              name: scorecard.player || 'Unknown',
-              tee_time: currentRound?.teeTime || null,
-              starting_tee: currentRound?.startingTee || null,
-              prize_distribution:
-                actualPosition && prizeDistributionMap.has(actualPosition)
-                  ? prizeDistributionMap.get(actualPosition)
+              return {
+                position: posNum,
+                is_tied: isTied,
+                tied_with_count: tieCount,
+                total_score: parseScore(player.total),
+                today_score: player.currentRoundScore ? parseScore(player.currentRoundScore) : 0,
+                thru: player.thru || 'F',
+                prize_money: calculateTiePrizeMoney(posNum, tieCount),
+                name: `${player.firstName} ${player.lastName}`,
+                tee_time: player.teeTime || null,
+                starting_tee: null,
+                prize_distribution: posNum && prizeDistributionMap.has(posNum)
+                  ? prizeDistributionMap.get(posNum)
                   : undefined,
-            };
-          }) || [];
+              };
+            });
+          }
         }
       } catch (error) {
-        // Log error but don't crash - gracefully fall back to empty state
-        console.error('Error fetching scores from LiveGolfAPI:', error);
-        leaderboardSource = 'none';
-        tournamentLeaderboard = [];
+        console.error('Error fetching from RapidAPI:', error);
       }
-    } else {
+    }
+
+    // If still no data, set source to none
+    if (tournamentLeaderboard.length === 0) {
       leaderboardSource = 'none';
-      tournamentLeaderboard = [];
     }
   }
 
@@ -428,9 +458,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         <Card>
           <CardContent className="py-8 text-center text-casino-gray">
             <p className="mb-2">No leaderboard data available for this tournament.</p>
-            {tournament.livegolfapi_event_id && leaderboardSource === 'none' && (
+            {tournament.rapidapi_tourn_id && leaderboardSource === 'none' && (
               <p className="text-sm text-casino-gray">
-                Unable to fetch data from LiveGolfAPI. Please try again later or contact support.
+                Unable to fetch data from RapidAPI. Please try again later or contact support.
               </p>
             )}
           </CardContent>
@@ -459,8 +489,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 ? 'Database'
                 : leaderboardSource === 'cache'
                 ? 'Cache'
-                : leaderboardSource === 'livegolfapi'
-                ? 'LiveGolfAPI'
+                : leaderboardSource === 'rapidapi'
+                ? 'RapidAPI'
                 : 'Unknown'} | Cache: {cacheBuster}
             </span>
             <span className="text-casino-gray">
@@ -480,7 +510,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             prizeDistributions={prizeDistributions}
             userRosterPlayerIds={userRosterPlayerIds}
             playerNameToIdMap={playerNameToIdMap}
-            liveGolfAPITournamentId={tournament.livegolfapi_event_id}
+            liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
+            tournamentStatus={tournament.status}
           />
         </CardContent>
       </Card>
@@ -549,9 +580,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                   {formatDate(tournament.end_date)}
                 </span>
                 {tournament.status === 'active' && (
-                  tournament.livegolfapi_event_id ? (
+                  tournament.rapidapi_tourn_id ? (
                     <LiveRoundBadge 
-                      liveGolfAPITournamentId={tournament.livegolfapi_event_id}
+                      liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
                       fallbackRound={tournament.current_round || 1}
                     />
                   ) : (
@@ -588,12 +619,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       {/* Show personal leaderboard for active tournaments */}
       {showPersonalLeaderboard && existingRosterData && (
         <div className="mb-6">
-          {tournament.status === 'active' && tournament.livegolfapi_event_id ? (
+          {tournament.status === 'active' && tournament.rapidapi_tourn_id ? (
             <LivePersonalLeaderboard
               rosterId={existingRosterData.id}
               rosterName={existingRosterData.roster_name}
               tournamentName={tournament.name}
-              liveGolfAPITournamentId={tournament.livegolfapi_event_id}
+              liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
               prizeDistributions={(prizeDistributions || []).map((p: any) => ({
                 position: p.position,
                 amount: p.amount || 0,

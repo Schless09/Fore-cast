@@ -66,7 +66,7 @@ export default async function WeeklyStandingsByTournamentPage({
     .order('position', { ascending: true });
 
   // Check if we should use live standings (active tournament with API ID)
-  const useLiveStandings = tournament.status === 'active' && tournament.livegolfapi_event_id;
+  const useLiveStandings = tournament.status === 'active' && tournament.rapidapi_tourn_id;
 
   // Get all rosters for this tournament, ranked by total_winnings
   // Filter by user's league to show only rosters from the same league
@@ -278,7 +278,7 @@ export default async function WeeklyStandingsByTournamentPage({
           {useLiveStandings ? (
             <LiveTeamStandings
               tournamentId={tournamentId}
-              liveGolfAPITournamentId={tournament.livegolfapi_event_id}
+              liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
               prizeDistributions={(prizeDistributions || []).map((p) => ({
                 position: p.position,
                 amount: p.amount || 0,

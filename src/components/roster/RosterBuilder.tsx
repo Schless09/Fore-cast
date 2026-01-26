@@ -131,6 +131,12 @@ export function RosterBuilder({
       return;
     }
 
+    if (!clerkUser) {
+      setError('Please sign in to create a roster.');
+      router.push('/auth');
+      return;
+    }
+
     const playerCosts = selectedPlayerIds.map((id) => {
       const tp = tournamentPlayers.find((t) => t.pga_player_id === id);
       return tp?.cost || 0.20;
@@ -152,12 +158,16 @@ export function RosterBuilder({
 
     try {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      
+      // Look up profile by Clerk ID
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('clerk_id', clerkUser.id)
+        .single();
 
-      if (!user) {
-        router.push('/auth');
+      if (profileError || !profile) {
+        setError('Profile not found. Please try signing out and back in.');
         return;
       }
 
@@ -171,7 +181,7 @@ export function RosterBuilder({
         rosterId = existingRoster.id;
       } else {
         // Create new roster
-        rosterId = await createRoster(budgetSpent);
+        rosterId = await createRoster(profile.id, budgetSpent);
       }
 
       // Show success modal
@@ -184,17 +194,14 @@ export function RosterBuilder({
     }
   }
 
-  async function createRoster(budgetSpent: number): Promise<string> {
+  async function createRoster(profileId: string, budgetSpent: number): Promise<string> {
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
 
     // Create roster with budget tracking (use username as roster name)
     const { data: roster, error: rosterError } = await supabase
       .from('user_rosters')
       .insert({
-        user_id: user!.id,
+        user_id: profileId,
         tournament_id: tournamentId,
         roster_name: username,
         budget_spent: budgetSpent,

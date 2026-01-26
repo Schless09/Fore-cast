@@ -431,7 +431,7 @@ export default function AdminPrizeMoneyPage() {
           </p>
           <ol className="list-decimal list-inside space-y-2 text-gray-600 mb-4">
             <li><strong>Import Prize Money:</strong> Upload the prize money distribution table for the tournament</li>
-            <li><strong>Update Scores:</strong> Sync player positions from LiveGolfAPI</li>
+            <li><strong>Update Scores:</strong> Sync player positions from RapidAPI</li>
             <li><strong>Calculate Winnings:</strong> System automatically calculates each player&apos;s prize money based on final position</li>
             <li><strong>Handle Ties:</strong> If players tie, they split the combined prize money of all tied positions</li>
             <li><strong>Roster Total:</strong> Each roster&apos;s total winnings = sum of all players&apos; prize money</li>
