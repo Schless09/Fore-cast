@@ -57,6 +57,7 @@ export function LiveLeaderboard({
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [tournamentStatus, setTournamentStatus] = useState<string>('In Progress');
+  const [cacheAge, setCacheAge] = useState<number | null>(null); // How old the server cache is
   const hasInitialSynced = useRef(false);
   
   // Scorecard modal state
@@ -99,9 +100,12 @@ export function LiveLeaderboard({
         return;
       }
 
-      // Update tournament status
+      // Update tournament status and cache age
       if (result.tournamentStatus) {
         setTournamentStatus(result.tournamentStatus);
+      }
+      if (result.cacheAge !== undefined) {
+        setCacheAge(result.cacheAge);
       }
 
       // Transform API data directly to display format
@@ -247,8 +251,14 @@ export function LiveLeaderboard({
                 <>
                   <span className="text-green-500">●</span>
                   <span>Live updates active</span>
+                  {cacheAge !== null && (
+                    <>
+                      <span className="text-casino-gray-dark">|</span>
+                      <span>Data {cacheAge < 60 ? `${cacheAge}s` : `${Math.floor(cacheAge / 60)}m`} old</span>
+                    </>
+                  )}
                   <span className="text-casino-gray-dark">|</span>
-                  <span>Next refresh in {formatCountdown(nextRefreshIn)}</span>
+                  <span>Next check in {formatCountdown(nextRefreshIn)}</span>
                 </>
               )}
             </div>

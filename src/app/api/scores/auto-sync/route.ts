@@ -1,30 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { shouldPollNow, getPollingDebugInfo } from '@/lib/polling-config';
 
 /**
- * Auto-sync endpoint for Vercel Cron
- * Automatically syncs scores for all active tournaments
- * Runs every 5 minutes via cron job
+ * Smart Auto-sync endpoint for Vercel Cron
+ * 
+ * Features:
+ * - Only polls during tournament hours (Thu-Sun)
+ * - Uses RapidAPI (Live Golf Data) instead of LiveGolfAPI
+ * - Stores results in Supabase cache for all users
+ * - Logs API calls for monitoring rate limits
+ * 
+ * Cron runs every 3 minutes, but we check shouldPollNow() to determine
+ * if we actually make an API call based on tournament schedule.
  */
+
+const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com';
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
+
+// Tournament ID mapping - update this for each tournament
+// Maps our internal livegolfapi_event_id to RapidAPI's year/tournId
+const TOURNAMENT_ID_MAP: Record<string, { year: string; tournId: string }> = {
+  '291e61c6-b1e4-49d6-a84e-99864e73a2be': { year: '2026', tournId: '002' }, // The American Express
+  // Add more mappings as tournaments are set up
+};
+
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
-    // Verify the request is from Vercel Cron
+    // Verify the request is from Vercel Cron (in production)
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const cronSecret = process.env.CRON_SECRET;
+    
+    // Allow bypass in development or if no secret configured
+    const isDev = process.env.NODE_ENV === 'development';
+    const isAuthorized = !cronSecret || authHeader === `Bearer ${cronSecret}` || isDev;
+    
+    if (!isAuthorized) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const supabase = createServiceClient();
+    const now = new Date();
     
-    // Get all active tournaments (status = 'active')
+    // Check if we should poll based on tournament schedule
+    const pollStatus = shouldPollNow(now);
+    
+    console.log(`[AUTO-SYNC] ${now.toISOString()}`);
+    console.log(`[AUTO-SYNC] Should poll: ${pollStatus.shouldPoll} - ${pollStatus.reason}`);
+
+    // Get all active tournaments
     const { data: tournaments, error: tournamentsError } = await supabase
       .from('tournaments')
-      .select('id, name, livegolfapi_event_id')
+      .select('id, name, livegolfapi_event_id, start_date, end_date')
       .eq('status', 'active')
       .not('livegolfapi_event_id', 'is', null);
 
     if (tournamentsError) {
-      console.error('Error fetching tournaments:', tournamentsError);
+      console.error('[AUTO-SYNC] Error fetching tournaments:', tournamentsError);
       return NextResponse.json(
         { error: 'Failed to fetch tournaments' },
         { status: 500 }
@@ -35,41 +69,172 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'No active tournaments to sync',
-        tournaments: [],
+        pollingStatus: pollStatus,
+        timestamp: now.toISOString(),
       });
     }
 
+    // If we shouldn't poll now, just return status
+    if (!pollStatus.shouldPoll) {
+      return NextResponse.json({
+        success: true,
+        message: `Skipping sync: ${pollStatus.reason}`,
+        pollingStatus: pollStatus,
+        activeTournaments: tournaments.length,
+        nextPollIn: `${pollStatus.nextPollMinutes} minutes`,
+        timestamp: now.toISOString(),
+      });
+    }
+
+    // Time to poll! Fetch and cache scores for each active tournament
     const results = [];
     
-    // Sync scores for each active tournament
     for (const tournament of tournaments) {
+      const eventId = tournament.livegolfapi_event_id;
+      const mapping = TOURNAMENT_ID_MAP[eventId];
+      
+      if (!mapping) {
+        console.warn(`[AUTO-SYNC] No RapidAPI mapping for event: ${eventId}`);
+        results.push({
+          tournamentId: tournament.id,
+          tournamentName: tournament.name,
+          success: false,
+          error: 'No RapidAPI mapping configured',
+        });
+        continue;
+      }
+
       try {
-        console.log(`Syncing scores for tournament: ${tournament.name}`);
+        const { year, tournId } = mapping;
+        const cacheKey = `${year}-${tournId}`;
         
-        const syncResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_APP_URL}/api/scores/sync`,
+        console.log(`[AUTO-SYNC] Fetching ${tournament.name} (${cacheKey})...`);
+        
+        const fetchStart = Date.now();
+        const response = await fetch(
+          `https://${RAPIDAPI_HOST}/leaderboard?year=${year}&tournId=${tournId}`,
           {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tournamentId: tournament.id,
-              liveGolfAPITournamentId: tournament.livegolfapi_event_id,
-            }),
+            headers: {
+              'X-RapidAPI-Host': RAPIDAPI_HOST,
+              'X-RapidAPI-Key': RAPIDAPI_KEY,
+            },
+            cache: 'no-store',
           }
         );
+        const fetchDuration = Date.now() - fetchStart;
 
-        const syncResult = await syncResponse.json();
+        // Log the API call
+        await supabase.from('api_call_log').insert({
+          api_name: 'rapidapi',
+          endpoint: '/leaderboard',
+          cache_key: cacheKey,
+          success: response.ok,
+          response_time_ms: fetchDuration,
+          error_message: response.ok ? null : `HTTP ${response.status}`,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => response.statusText);
+          console.error(`[AUTO-SYNC] RapidAPI error: ${response.status} - ${errorText}`);
+          results.push({
+            tournamentId: tournament.id,
+            tournamentName: tournament.name,
+            success: false,
+            error: `RapidAPI error (${response.status})`,
+          });
+          continue;
+        }
+
+        const json = await response.json();
+        
+        // Transform and prepare data
+        const leaderboard = json.leaderboardRows || [];
+        const roundId = json.roundId?.$numberInt || json.roundId || 1;
+        const status = json.status || 'Unknown';
+        
+        // Transform to our format
+        const transformedData = leaderboard.map((player: any) => {
+          const position = player.position;
+          const positionNum = parseInt(position?.replace('T', '')) || null;
+          
+          return {
+            player: `${player.firstName} ${player.lastName}`,
+            playerId: player.playerId,
+            position: position,
+            positionValue: positionNum,
+            total: player.total,
+            rounds: player.rounds?.map((r: any) => ({
+              round: r.roundId?.$numberInt || r.roundId,
+              score: r.strokes?.$numberInt || r.strokes,
+              total: r.scoreToPar,
+              thru: player.currentRound === (r.roundId?.$numberInt || r.roundId) ? player.thru : 'F',
+            })) || [],
+            thru: player.thru,
+            currentRound: player.currentRound?.$numberInt || player.currentRound,
+            currentRoundScore: player.currentRoundScore,
+            teeTime: player.teeTime,
+            roundComplete: player.roundComplete,
+          };
+        });
+
+        const cacheData = {
+          data: transformedData,
+          source: 'rapidapi',
+          timestamp: Date.now(),
+          tournamentStatus: status,
+          currentRound: roundId,
+          lastUpdated: json.lastUpdated,
+        };
+
+        // Upsert into cache table
+        const { error: cacheError } = await supabase
+          .from('live_scores_cache')
+          .upsert({
+            cache_key: cacheKey,
+            tournament_id: tournament.id,
+            data: cacheData,
+            tournament_status: status,
+            current_round: roundId,
+            player_count: transformedData.length,
+          }, {
+            onConflict: 'cache_key',
+          });
+
+        if (cacheError) {
+          console.error(`[AUTO-SYNC] Cache error for ${tournament.name}:`, cacheError);
+          results.push({
+            tournamentId: tournament.id,
+            tournamentName: tournament.name,
+            success: false,
+            error: 'Failed to cache data',
+          });
+          continue;
+        }
+
+        // Auto-update tournament status if completed
+        if (status === 'Official') {
+          await supabase
+            .from('tournaments')
+            .update({ status: 'completed' })
+            .eq('id', tournament.id)
+            .eq('status', 'active');
+          console.log(`[AUTO-SYNC] ✅ Marked ${tournament.name} as completed`);
+        }
+
+        console.log(`[AUTO-SYNC] ✅ Cached ${transformedData.length} players for ${tournament.name}`);
         
         results.push({
           tournamentId: tournament.id,
           tournamentName: tournament.name,
-          success: syncResponse.ok,
-          result: syncResult,
+          success: true,
+          playersCount: transformedData.length,
+          round: roundId,
+          status: status,
+          fetchDuration: `${fetchDuration}ms`,
         });
 
-        console.log(`Sync result for ${tournament.name}:`, syncResult);
       } catch (error) {
-        console.error(`Error syncing tournament ${tournament.name}:`, error);
+        console.error(`[AUTO-SYNC] Error processing ${tournament.name}:`, error);
         results.push({
           tournamentId: tournament.id,
           tournamentName: tournament.name,
@@ -79,14 +244,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const totalDuration = Date.now() - startTime;
+    const successCount = results.filter(r => r.success).length;
+
     return NextResponse.json({
       success: true,
-      message: `Auto-synced ${results.length} tournaments`,
-      timestamp: new Date().toISOString(),
+      message: `Auto-synced ${successCount}/${results.length} tournaments`,
+      pollingStatus: pollStatus,
+      timestamp: now.toISOString(),
+      duration: `${totalDuration}ms`,
       results,
     });
+
   } catch (error: any) {
-    console.error('Error in auto-sync:', error);
+    console.error('[AUTO-SYNC] Error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to auto-sync' },
       { status: 500 }
@@ -94,7 +265,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Also support POST for manual triggering
+// Support POST for manual triggering (useful for testing)
 export async function POST(request: NextRequest) {
   return GET(request);
 }

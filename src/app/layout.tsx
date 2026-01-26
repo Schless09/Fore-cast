@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -42,6 +43,7 @@ export default function RootLayout({
               </main>
             </div>
           </ErrorBoundary>
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>

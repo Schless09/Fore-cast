@@ -1,55 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { CACHE_TTL_MS } from '@/lib/config';
 
 /**
- * Fetch live scores from RapidAPI Live Golf Data
- * Much more reliable than LiveGolfAPI!
+ * Fetch live scores from server-side cache
  * 
- * Includes in-memory caching to reduce API calls when multiple
- * components request data within a short window.
+ * This endpoint reads from the Supabase cache that's populated by the
+ * auto-sync cron job. This means:
+ * - No API calls are made per user request
+ * - All users see the same cached data
+ * - Data freshness depends on the smart polling schedule
  * 
- * Auto-updates tournament status to "completed" when API returns "Official"
+ * The cron job polls RapidAPI based on tournament schedule:
+ * - Thu/Fri: Every 10 minutes
+ * - Saturday: Every 5 minutes  
+ * - Sunday: Every 3 minutes
+ * - Off-hours: No polling
  */
 
-const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com';
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '4786f7c55amshbe62b07d4f84965p1a07a0jsn6aef3153473b';
-
-// In-memory cache
-interface CacheEntry {
-  data: any;
-  timestamp: number;
-}
-const cache = new Map<string, CacheEntry>();
-
-// Tournament ID mapping (RapidAPI uses different IDs)
-// You can update this mapping as needed
+// Tournament ID mapping (same as auto-sync)
 const TOURNAMENT_ID_MAP: Record<string, { year: string; tournId: string }> = {
-  // LiveGolfAPI event ID -> RapidAPI tournId
   '291e61c6-b1e4-49d6-a84e-99864e73a2be': { year: '2026', tournId: '002' }, // The American Express
 };
-
-// Helper to update tournament status in database
-async function updateTournamentStatusIfCompleted(eventId: string, apiStatus: string) {
-  if (apiStatus !== 'Official') return;
-  
-  try {
-    const supabase = createServiceClient();
-    
-    // Find tournament by livegolfapi_event_id and update status if not already completed
-    const { error } = await supabase
-      .from('tournaments')
-      .update({ status: 'completed' })
-      .eq('livegolfapi_event_id', eventId)
-      .eq('status', 'active'); // Only update if currently active
-    
-    if (!error) {
-      console.log(`[LiveScores] ✅ Updated tournament status to 'completed' for event ${eventId}`);
-    }
-  } catch (error) {
-    console.error('[LiveScores] Error updating tournament status:', error);
-  }
-}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -73,104 +44,50 @@ export async function GET(request: NextRequest) {
   }
 
   const cacheKey = `${year}-${tournId}`;
-  
-  // Check cache first
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    const cacheAge = Math.round((Date.now() - cached.timestamp) / 1000);
-    console.log(`[LiveScores] ✅ Returning cached data (${cacheAge}s old)`);
-    return NextResponse.json({
-      ...cached.data,
-      source: 'cache',
-      cacheAge: cacheAge,
-    });
-  }
 
   try {
-    console.log(`[LiveScores] Fetching fresh data from RapidAPI: year=${year}, tournId=${tournId}`);
+    const supabase = createServiceClient();
     
-    const response = await fetch(
-      `https://${RAPIDAPI_HOST}/leaderboard?year=${year}&tournId=${tournId}`,
-      {
-        headers: {
-          'X-RapidAPI-Host': RAPIDAPI_HOST,
-          'X-RapidAPI-Key': RAPIDAPI_KEY,
-        },
-        cache: 'no-store',
-      }
-    );
+    // Read from cache
+    const { data: cached, error: cacheError } = await supabase
+      .from('live_scores_cache')
+      .select('data, updated_at, tournament_status, current_round, player_count')
+      .eq('cache_key', cacheKey)
+      .single();
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => response.statusText);
-      console.error(`[LiveScores] RapidAPI error: ${response.status} - ${errorText}`);
-      return NextResponse.json(
-        { error: `RapidAPI error (${response.status})`, data: null },
-        { status: response.status }
-      );
+    if (cacheError && cacheError.code !== 'PGRST116') { // PGRST116 = not found
+      console.error('[LiveScores] Cache read error:', cacheError);
     }
 
-    const json = await response.json();
-    
-    // Transform RapidAPI format to our expected format
-    const leaderboard = json.leaderboardRows || [];
-    const roundId = json.roundId?.$numberInt || json.roundId || 1;
-    const status = json.status || 'Unknown';
-    
-    console.log(`[LiveScores] ✅ Fetched ${leaderboard.length} players (Round ${roundId}, ${status})`);
-
-    // Auto-update tournament status if completed
-    if (eventId && status === 'Official') {
-      await updateTournamentStatusIfCompleted(eventId, status);
-    }
-
-    // Transform to match our expected format
-    const transformedData = leaderboard.map((player: any) => {
-      const position = player.position;
-      const isTied = position?.startsWith('T') || false;
-      const positionNum = parseInt(position?.replace('T', '')) || null;
+    if (cached) {
+      const cacheAge = Math.round((Date.now() - new Date(cached.updated_at).getTime()) / 1000);
       
-      return {
-        player: `${player.firstName} ${player.lastName}`,
-        playerId: player.playerId,
-        position: position,
-        positionValue: positionNum,
-        total: player.total, // e.g., "-29"
-        rounds: player.rounds?.map((r: any) => ({
-          round: r.roundId?.$numberInt || r.roundId,
-          score: r.strokes?.$numberInt || r.strokes,
-          total: r.scoreToPar,
-          thru: player.currentRound === (r.roundId?.$numberInt || r.roundId) ? player.thru : 'F',
-        })) || [],
-        thru: player.thru,
-        currentRound: player.currentRound?.$numberInt || player.currentRound,
-        currentRoundScore: player.currentRoundScore,
-        teeTime: player.teeTime,
-        roundComplete: player.roundComplete,
-      };
-    });
+      console.log(`[LiveScores] ✅ Returning cached data (${cacheAge}s old, ${cached.player_count} players)`);
+      
+      return NextResponse.json({
+        ...cached.data,
+        source: 'cache',
+        cacheAge: cacheAge,
+        cacheUpdatedAt: cached.updated_at,
+      });
+    }
 
-    const responseData = {
-      data: transformedData,
-      source: 'rapidapi',
-      timestamp: Date.now(),
-      tournamentStatus: status,
-      currentRound: roundId,
-      lastUpdated: json.lastUpdated,
-    };
-
-    // Store in cache
-    cache.set(cacheKey, {
-      data: responseData,
+    // No cache - return empty response with helpful message
+    // The cron job will populate this once it runs during tournament hours
+    console.log(`[LiveScores] ⚠️ No cached data for ${cacheKey}`);
+    
+    return NextResponse.json({
+      data: [],
+      source: 'cache',
+      message: 'No cached data available yet. Data will be available once the tournament begins and the auto-sync runs.',
+      tournamentStatus: 'pending',
       timestamp: Date.now(),
     });
-    console.log(`[LiveScores] 📦 Cached response for ${cacheKey}`);
-
-    return NextResponse.json(responseData);
 
   } catch (error: any) {
     console.error('[LiveScores] Error:', error.message);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch scores', data: null },
+      { error: error.message || 'Failed to fetch scores', data: [] },
       { status: 500 }
     );
   }
