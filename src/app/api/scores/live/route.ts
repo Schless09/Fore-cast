@@ -84,10 +84,11 @@ export async function GET(request: NextRequest) {
       timestamp: Date.now(),
     });
 
-  } catch (error: any) {
-    console.error('[LiveScores] Error:', error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch scores';
+    console.error('[LiveScores] Error:', errorMessage);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch scores', data: [] },
+      { error: errorMessage, data: [] },
       { status: 500 }
     );
   }
