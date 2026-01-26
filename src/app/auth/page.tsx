@@ -7,14 +7,23 @@ import { Suspense } from 'react';
 function AuthContent() {
   const searchParams = useSearchParams();
   const invite = searchParams.get('invite');
+  const leagueName = searchParams.get('league');
   const redirectUrl = invite ? `/invite/${invite}` : '/the-money-board';
 
   return (
-    <SignIn 
-      routing="hash"
-      afterSignInUrl={redirectUrl}
-      afterSignUpUrl={redirectUrl}
-      appearance={{
+    <>
+      {invite && leagueName && (
+        <div className="mb-6 p-4 bg-casino-elevated border border-casino-gold/30 rounded-lg text-center">
+          <p className="text-casino-gray text-sm">You&apos;ve been invited to join</p>
+          <p className="text-casino-gold font-semibold text-lg">{decodeURIComponent(leagueName)}</p>
+          <p className="text-casino-gray text-sm mt-1">Sign in or create an account to join the league</p>
+        </div>
+      )}
+      <SignIn 
+        routing="hash"
+        afterSignInUrl={redirectUrl}
+        afterSignUpUrl={redirectUrl}
+        appearance={{
         elements: {
           rootBox: 'w-full',
           card: 'bg-casino-card border border-casino-gold/20 shadow-xl',
@@ -36,7 +45,8 @@ function AuthContent() {
           borderRadius: '0.5rem',
         },
       }}
-    />
+      />
+    </>
   );
 }
 
