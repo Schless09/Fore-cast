@@ -19,19 +19,28 @@ export function oddsToProbability(odds: number): number {
 
 /**
  * Calculate player cost from winner odds
- * Uses a power-law scaling formula that:
- * - Top favorites (low odds like +290) get high costs (~$12-13)
- * - Good players (medium odds like +2000) get medium costs ($5-7)
- * - Decent players (higher odds like +10000) get lower costs ($2-5)
- * - Irrelevant players (very high odds like +50000) get minimum ($0.20)
  * 
- * Based on example odds:
- * - +290 → ~$12.50
- * - +2000 → ~$6.00
- * - +10000 → ~$3.00
- * - +50000 → $0.20
+ * COMPETITIVE BALANCE:
+ * Prize money is heavily skewed toward winners (1st = $1.6M, 10th = $250k, 50th = $23k)
+ * Top favorites cost ~$20 (67% of budget) creating real but playable tradeoffs.
+ * 
+ * With $30 budget, picking Scheffler ($20) leaves $10 for supporting cast.
+ * This forces meaningful strategic decisions:
+ * - Pick Scheffler ($20) → $10 left for ~5-6 solid supporting picks
+ * - Pick a co-favorite ($13) → $17 left for balanced roster
+ * - Fade the chalk → full budget for mid-tier/longshots
+ * 
+ * Cost mapping:
+ * - +290 (Scheffler-level) → ~$20.00 (67% of budget)
+ * - +500 (co-favorite) → ~$13.50
+ * - +1000 (top 5) → ~$8.00
+ * - +2000 (top 10) → ~$4.50
+ * - +5000 (solid) → ~$2.25
+ * - +10000 (mid-tier) → ~$1.50
+ * - +25000 (longshot) → ~$1.00
+ * - +50000+ (deep longshot) → ~$0.75
  */
-export function calculateCostFromOdds(odds: number, minCost: number = 0.20, maxCost: number = 13.00): number {
+export function calculateCostFromOdds(odds: number, minCost: number = 0.75, maxCost: number = 20.00): number {
   if (!odds || odds === 0 || odds > 500000) {
     return minCost;
   }
@@ -39,25 +48,19 @@ export function calculateCostFromOdds(odds: number, minCost: number = 0.20, maxC
   // Convert to implied probability
   const probability = oddsToProbability(odds);
 
-  // Use a power-law formula: cost = maxCost * (probability ^ alpha) + minCost
-  // We want to map probability to cost range
-  // For +290 (25.6% prob) → $12.50
-  // For +2000 (4.76% prob) → $6.00
-  // For +10000 (0.99% prob) → $3.00
-  // For +50000 (0.2% prob) → $0.20
-
-  // Calculate alpha based on desired mapping
-  // Using empirical values: alpha ≈ 0.5 works well for this range
-  const alpha = 0.5;
+  // Use LINEAR scaling - probability directly maps to cost
+  // This properly reflects that favorites have proportionally higher expected value
+  // A 25% win probability player should cost ~25x more than a 1% player
   
-  // Normalize probability to 0-1 range relative to max probability (~25% for top favorite)
-  const maxProbability = 0.256; // For +290 odds
+  // Reference: +290 odds = 25.6% probability = max cost
+  // Scale: cost = probability * scaleFactor + minCost
+  const maxProbability = 0.256; // +290 odds
   const normalizedProb = Math.min(probability / maxProbability, 1);
   
-  // Apply power law: higher probability → higher cost
-  const cost = (maxCost - minCost) * Math.pow(normalizedProb, alpha) + minCost;
+  // Linear scaling: favorites pay full price for their expected value advantage
+  const cost = (maxCost - minCost) * normalizedProb + minCost;
   
-  // Ensure minimum cost
+  // Ensure within bounds
   const finalCost = Math.max(minCost, Math.min(maxCost, cost));
   
   // Round to 2 decimal places
@@ -117,7 +120,7 @@ export function validateRoster(
  */
 export function generateCostFromOddsData(winnerOdds: string | number | null): number {
   if (!winnerOdds && winnerOdds !== 0) {
-    return 0.20; // Default minimum cost
+    return 0.75; // Default minimum cost
   }
   
   // If it's already a number, use it directly
@@ -129,7 +132,7 @@ export function generateCostFromOddsData(winnerOdds: string | number | null): nu
   const odds = parseOdds(winnerOdds);
   
   if (odds === null) {
-    return 0.20;
+    return 0.75;
   }
   
   return calculateCostFromOdds(odds);
