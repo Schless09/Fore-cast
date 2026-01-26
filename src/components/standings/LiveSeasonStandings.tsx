@@ -85,6 +85,35 @@ export function LiveSeasonStandings({
     return map;
   }, [liveScores]);
 
+  // Count players at each position to detect ties
+  const positionCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    liveScores.forEach((score) => {
+      const position = score.positionValue;
+      if (position && position > 0) {
+        counts.set(position, (counts.get(position) || 0) + 1);
+      }
+    });
+    return counts;
+  }, [liveScores]);
+
+  // Helper to calculate prize money with proper tie handling
+  const calculateTiePrizeMoney = useCallback((position: number | null): number => {
+    if (!position || position < 1) return 0;
+    
+    const tieCount = positionCounts.get(position) || 1;
+    
+    // Sum prize money for positions position through position + tieCount - 1
+    let totalPrize = 0;
+    for (let i = 0; i < tieCount; i++) {
+      const pos = position + i;
+      totalPrize += prizeMap.get(pos) || 0;
+    }
+    
+    // Split evenly among tied players
+    return Math.round(totalPrize / tieCount);
+  }, [positionCounts, prizeMap]);
+
   // Calculate live winnings for a roster
   const calculateLiveWinnings = useCallback((playerNames: string[]): number => {
     let total = 0;
@@ -93,14 +122,12 @@ export function LiveSeasonStandings({
       const liveScore = playerScoreMap.get(normalizedName);
       const position = liveScore?.positionValue;
       if (position && position > 0) {
-        const prize = prizeMap.get(position);
-        if (prize) {
-          total += prize;
-        }
+        // Use tie-aware prize calculation
+        total += calculateTiePrizeMoney(position);
       }
     });
     return total;
-  }, [playerScoreMap, prizeMap]);
+  }, [playerScoreMap, calculateTiePrizeMoney]);
 
   // Combined standings with live data
   const combinedStandings = useMemo(() => {

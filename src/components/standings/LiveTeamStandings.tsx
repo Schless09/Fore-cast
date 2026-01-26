@@ -116,6 +116,35 @@ export function LiveTeamStandings({
     return map;
   }, [liveScores]);
 
+  // Count players at each position to detect ties
+  const positionCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    liveScores.forEach((score) => {
+      const position = score.positionValue;
+      if (position && position > 0) {
+        counts.set(position, (counts.get(position) || 0) + 1);
+      }
+    });
+    return counts;
+  }, [liveScores]);
+
+  // Helper to calculate prize money with proper tie handling
+  const calculateTiePrizeMoney = useCallback((position: number | null): number => {
+    if (!position || position < 1) return 0;
+    
+    const tieCount = positionCounts.get(position) || 1;
+    
+    // Sum prize money for positions position through position + tieCount - 1
+    let totalPrize = 0;
+    for (let i = 0; i < tieCount; i++) {
+      const pos = position + i;
+      totalPrize += prizeMap.get(pos) || 0;
+    }
+    
+    // Split evenly among tied players
+    return Math.round(totalPrize / tieCount);
+  }, [positionCounts, prizeMap]);
+
   // Calculate winnings for each roster based on live scores
   const rostersWithLiveWinnings = useMemo(() => {
     return rosters.map((roster) => {
@@ -124,16 +153,10 @@ export function LiveTeamStandings({
         const normalizedName = normalizeName(player.playerName);
         const liveScore = playerScoreMap.get(normalizedName);
         
-        let winnings = 0;
         const position = liveScore?.positionValue;
         
-        // Calculate winnings based on position
-        if (position && position > 0) {
-          const prize = prizeMap.get(position);
-          if (prize) {
-            winnings = prize;
-          }
-        }
+        // Calculate winnings with proper tie handling
+        const winnings = calculateTiePrizeMoney(position || null);
         
         totalWinnings += winnings;
 
@@ -153,7 +176,7 @@ export function LiveTeamStandings({
         totalWinnings,
       };
     }).sort((a, b) => b.totalWinnings - a.totalWinnings);
-  }, [rosters, playerScoreMap, prizeMap]);
+  }, [rosters, playerScoreMap, calculateTiePrizeMoney]);
 
   // Fetch rosters from database
   const fetchRosters = useCallback(async () => {

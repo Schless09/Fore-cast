@@ -106,26 +106,51 @@ export function LiveLeaderboard({
 
       // Transform API data directly to display format
       const scores = result.data;
+      
+      // First pass: count players at each position to detect ties
+      const positionCounts = new Map<number, number>();
+      scores.forEach((scorecard: any) => {
+        const position = scorecard.positionValue || 
+          (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null);
+        if (position && position > 0) {
+          positionCounts.set(position, (positionCounts.get(position) || 0) + 1);
+        }
+      });
+      
+      // Helper to calculate prize money with proper tie handling
+      const calculateTiePrizeMoney = (position: number | null, tieCount: number): number => {
+        if (!position || position < 1 || tieCount < 1) return 0;
+        
+        // Sum prize money for positions position through position + tieCount - 1
+        let totalPrize = 0;
+        for (let i = 0; i < tieCount; i++) {
+          const pos = position + i;
+          totalPrize += prizeDistributionMap.get(pos) || 0;
+        }
+        
+        // Split evenly among tied players
+        return Math.round(totalPrize / tieCount);
+      };
+      
       const transformed: LeaderboardRow[] = scores.map((scorecard: any) => {
         // Handle both RapidAPI and LiveGolfAPI formats
         const position = scorecard.positionValue || 
           (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null);
-        const isTied = scorecard.position?.startsWith('T') || false;
+        const tieCount = position ? (positionCounts.get(position) || 1) : 1;
+        const isTied = tieCount > 1;
         
         // Get today's score - RapidAPI provides currentRoundScore directly
         const todayScore = scorecard.currentRoundScore 
           ? parseScore(scorecard.currentRoundScore)
           : parseScore(scorecard.total);
         
-        // Calculate prize money based on position
-        const prizeMoney = position && prizeDistributionMap.has(position) 
-          ? prizeDistributionMap.get(position) || 0 
-          : 0;
+        // Calculate prize money with proper tie handling
+        const prizeMoney = calculateTiePrizeMoney(position, tieCount);
 
         return {
           position,
           is_tied: isTied,
-          tied_with_count: 1,
+          tied_with_count: tieCount,
           total_score: parseScore(scorecard.total),
           today_score: todayScore,
           thru: scorecard.thru || '-',

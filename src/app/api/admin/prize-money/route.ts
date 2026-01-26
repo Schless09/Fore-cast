@@ -25,13 +25,23 @@ export async function POST(request: NextRequest) {
       .delete()
       .eq('tournament_id', tournamentId);
 
-    // Insert new distributions
+    // Insert new distributions including pre-calculated tie amounts
     const distributionsToInsert = distributions.map((dist: any) => ({
       tournament_id: tournamentId,
       total_purse: totalPurse,
       position: dist.position,
       percentage: dist.percentage || null,
       amount: dist.amount,
+      // Pre-calculated tie amounts from official PGA Tour data
+      tied_2: dist.tied_2 || null,
+      tied_3: dist.tied_3 || null,
+      tied_4: dist.tied_4 || null,
+      tied_5: dist.tied_5 || null,
+      tied_6: dist.tied_6 || null,
+      tied_7: dist.tied_7 || null,
+      tied_8: dist.tied_8 || null,
+      tied_9: dist.tied_9 || null,
+      tied_10: dist.tied_10 || null,
     }));
 
     const { error: insertError } = await supabase

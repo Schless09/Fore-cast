@@ -47,6 +47,16 @@ export async function POST(request: NextRequest) {
         position: d.position,
         percentage: d.percentage,
         amount: parseFloat(d.amount),
+        // Include pre-calculated tie amounts if available
+        tied_2: d.tied_2 ? parseFloat(d.tied_2) : undefined,
+        tied_3: d.tied_3 ? parseFloat(d.tied_3) : undefined,
+        tied_4: d.tied_4 ? parseFloat(d.tied_4) : undefined,
+        tied_5: d.tied_5 ? parseFloat(d.tied_5) : undefined,
+        tied_6: d.tied_6 ? parseFloat(d.tied_6) : undefined,
+        tied_7: d.tied_7 ? parseFloat(d.tied_7) : undefined,
+        tied_8: d.tied_8 ? parseFloat(d.tied_8) : undefined,
+        tied_9: d.tied_9 ? parseFloat(d.tied_9) : undefined,
+        tied_10: d.tied_10 ? parseFloat(d.tied_10) : undefined,
       }))
     );
 

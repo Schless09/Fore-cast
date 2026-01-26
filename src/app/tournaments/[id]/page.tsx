@@ -268,8 +268,30 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         } else {
           leaderboardSource = result.source === 'cache' ? 'cache' : 'livegolfapi';
 
-          // Prize money calculation is now handled manually by admin via the prize money page
-          // This prevents glitching and ensures calculations happen when explicitly requested
+          // First pass: count players at each position to detect ties
+          const positionCounts = new Map<number, number>();
+          scores.forEach((scorecard: any) => {
+            const position = scorecard.positionValue >= 980 ? null : scorecard.positionValue;
+            if (position && position > 0) {
+              positionCounts.set(position, (positionCounts.get(position) || 0) + 1);
+            }
+          });
+          
+          // Helper to calculate prize money with proper tie handling
+          const calculateTiePrizeMoney = (position: number | null, tieCount: number): number => {
+            if (!position || position < 1 || tieCount < 1) return 0;
+            
+            // Sum prize money for positions position through position + tieCount - 1
+            let totalPrize = 0;
+            for (let i = 0; i < tieCount; i++) {
+              const pos = position + i;
+              const dist = prizeDistributionMap.get(pos);
+              totalPrize += dist?.amount || 0;
+            }
+            
+            // Split evenly among tied players
+            return Math.round(totalPrize / tieCount);
+          };
 
           tournamentLeaderboard =
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -283,6 +305,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
             const actualPosition =
               scorecard.positionValue >= 980 ? null : scorecard.positionValue;
+            
+            const tieCount = actualPosition ? (positionCounts.get(actualPosition) || 1) : 1;
+            const isTied = tieCount > 1;
 
             // Handle thru field - could be hole number "9", "18", "F", or tee time
             let thruValue = '-';
@@ -299,19 +324,13 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               }
             }
 
-            // Calculate prize money for LiveGolfAPI data if we have prize distribution
-            let calculatedPrizeMoney = 0;
-            if (actualPosition && prizeDistributionMap.has(actualPosition)) {
-              const dist = prizeDistributionMap.get(actualPosition);
-              calculatedPrizeMoney = dist?.amount || 0;
-            }
+            // Calculate prize money with proper tie handling
+            const calculatedPrizeMoney = calculateTiePrizeMoney(actualPosition, tieCount);
 
             return {
               position: actualPosition,
-              is_tied:
-                typeof scorecard.position === 'string' &&
-                scorecard.position.startsWith('T'),
-              tied_with_count: 1,
+              is_tied: isTied,
+              tied_with_count: tieCount,
               total_score: parseScore(scorecard.total),
               today_score: currentRound ? parseScore(currentRound.total) : 0,
               thru: thruValue,
