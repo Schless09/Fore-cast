@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { formatScore, getScoreColor } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
+import { ScorecardModal } from './ScorecardModal';
 
 interface LeaderboardRow {
   position: number | null;
@@ -13,6 +14,7 @@ interface LeaderboardRow {
   thru: string | number;
   prize_money: number;
   name: string;
+  apiPlayerId?: string; // Player ID from RapidAPI for scorecard lookup
 }
 
 interface LiveLeaderboardProps {
@@ -58,6 +60,9 @@ export function LiveLeaderboard({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [tournamentStatus, setTournamentStatus] = useState<string>('In Progress');
   const hasInitialSynced = useRef(false);
+  
+  // Scorecard modal state
+  const [selectedPlayer, setSelectedPlayer] = useState<{ id: string; name: string } | null>(null);
 
   // Check if tournament is completed
   const isCompleted = tournamentStatus === 'Official';
@@ -128,6 +133,7 @@ export function LiveLeaderboard({
           thru: scorecard.thru || '-',
           prize_money: prizeMoney,
           name: scorecard.player || 'Unknown',
+          apiPlayerId: scorecard.playerId, // Store API player ID for scorecard lookup
         };
       });
 
@@ -248,7 +254,7 @@ export function LiveLeaderboard({
             <th className="px-2 sm:px-4 py-2">Pos</th>
             <th className="px-2 sm:px-4 py-2">Golfer</th>
             <th className="px-2 sm:px-4 py-2">Total</th>
-            <th className="px-2 sm:px-4 py-2">Today</th>
+            <th className="px-2 sm:px-4 py-2" title="Click score to view scorecard">Today</th>
             <th className="px-2 sm:px-4 py-2 hidden sm:table-cell" title="Holes completed or tee time">Thru</th>
             <th className="px-2 sm:px-4 py-2 text-right">Prize</th>
           </tr>
@@ -295,7 +301,17 @@ export function LiveLeaderboard({
                   {formatScore(row.total_score)}
                 </td>
                 <td className={`px-2 sm:px-4 py-2 text-xs sm:text-sm ${todayClass}`}>
-                  {formatScore(row.today_score)}
+                  {row.apiPlayerId ? (
+                    <button
+                      onClick={() => setSelectedPlayer({ id: row.apiPlayerId!, name: row.name })}
+                      className="hover:underline hover:text-casino-gold transition-colors cursor-pointer"
+                      title="Click to view scorecard"
+                    >
+                      {formatScore(row.today_score)}
+                    </button>
+                  ) : (
+                    formatScore(row.today_score)
+                  )}
                 </td>
                 <td className="px-2 sm:px-4 py-2 text-casino-gray text-xs sm:text-sm hidden sm:table-cell">
                   {row.thru && row.thru !== '-' && row.thru !== '0' ? row.thru : '-'}
@@ -309,6 +325,17 @@ export function LiveLeaderboard({
         </tbody>
       </table>
       </div>
+
+      {/* Scorecard Modal */}
+      {liveGolfAPITournamentId && (
+        <ScorecardModal
+          isOpen={selectedPlayer !== null}
+          onClose={() => setSelectedPlayer(null)}
+          playerId={selectedPlayer?.id || ''}
+          playerName={selectedPlayer?.name || ''}
+          eventId={liveGolfAPITournamentId}
+        />
+      )}
     </div>
   );
 }

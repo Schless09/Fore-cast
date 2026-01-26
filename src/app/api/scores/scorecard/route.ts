@@ -1,0 +1,180 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+/**
+ * Fetch player scorecard from RapidAPI Live Golf Data
+ */
+
+const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com';
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '4786f7c55amshbe62b07d4f84965p1a07a0jsn6aef3153473b';
+
+// Cache configuration (5 minutes for scorecards)
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+const cache = new Map<string, CacheEntry>();
+
+// Tournament ID mapping for scorecards
+// RapidAPI uses different tournament IDs for scorecards vs leaderboards
+const TOURNAMENT_ID_MAP: Record<string, { year: string; tournId: string; orgId: string }> = {
+  '291e61c6-b1e4-49d6-a84e-99864e73a2be': { year: '2026', tournId: '002', orgId: '1' }, // The American Express
+};
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const eventId = searchParams.get('eventId');
+  const playerId = searchParams.get('playerId');
+  
+  // Allow direct params for flexibility
+  let year = searchParams.get('year');
+  let tournId = searchParams.get('tournId');
+  let orgId = searchParams.get('orgId') || '1'; // Default to PGA Tour
+
+  // If eventId provided, try to map it
+  if (eventId && TOURNAMENT_ID_MAP[eventId]) {
+    year = TOURNAMENT_ID_MAP[eventId].year;
+    tournId = TOURNAMENT_ID_MAP[eventId].tournId;
+    orgId = TOURNAMENT_ID_MAP[eventId].orgId;
+  }
+
+  if (!year || !tournId || !playerId) {
+    return NextResponse.json({ 
+      error: 'Missing required parameters',
+      hint: 'Use ?eventId=<id>&playerId=<id> or ?year=2026&tournId=002&playerId=<id>'
+    }, { status: 400 });
+  }
+
+  const cacheKey = `${year}-${tournId}-${playerId}`;
+  
+  // Check cache first
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    const cacheAge = Math.round((Date.now() - cached.timestamp) / 1000);
+    console.log(`[Scorecard] ✅ Returning cached data (${cacheAge}s old)`);
+    return NextResponse.json({
+      ...cached.data,
+      source: 'cache',
+      cacheAge,
+    });
+  }
+
+  try {
+    console.log(`[Scorecard] Fetching scorecard: year=${year}, tournId=${tournId}, playerId=${playerId}`);
+    
+    const response = await fetch(
+      `https://${RAPIDAPI_HOST}/scorecard?orgId=${orgId}&tournId=${tournId}&year=${year}&playerId=${playerId}`,
+      {
+        headers: {
+          'X-RapidAPI-Host': RAPIDAPI_HOST,
+          'X-RapidAPI-Key': RAPIDAPI_KEY,
+        },
+        cache: 'no-store',
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => response.statusText);
+      console.error(`[Scorecard] RapidAPI error: ${response.status} - ${errorText}`);
+      return NextResponse.json(
+        { error: `RapidAPI error (${response.status})`, data: null },
+        { status: response.status }
+      );
+    }
+
+    const json = await response.json();
+    
+    // API returns an array of round objects (one per round)
+    const roundsArray = Array.isArray(json) ? json : [json];
+    
+    if (roundsArray.length === 0) {
+      return NextResponse.json({ 
+        data: null, 
+        error: 'No scorecard data found',
+        source: 'rapidapi' 
+      });
+    }
+    
+    // Get player info from first round
+    const firstRound = roundsArray[0];
+    
+    // Transform to a cleaner format
+    const scorecard = {
+      player: {
+        id: firstRound.playerId,
+        firstName: firstRound.firstName,
+        lastName: firstRound.lastName,
+        country: firstRound.country || '',
+      },
+      tournament: {
+        name: '', // Not provided in this endpoint
+        courseName: '',
+      },
+      rounds: roundsArray.map((round: any) => {
+        // holes is an object keyed by hole number, convert to sorted array
+        const holesObj = round.holes || {};
+        const holesArray = Object.keys(holesObj)
+          .map(key => {
+            const hole = holesObj[key];
+            const holeNum = hole.holeId?.$numberInt || hole.holeId || parseInt(key);
+            const par = hole.par?.$numberInt || hole.par;
+            const strokes = hole.holeScore?.$numberInt || hole.holeScore;
+            return {
+              holeNumber: holeNum,
+              par: par,
+              strokes: strokes,
+              scoreToPar: strokes - par,
+            };
+          })
+          .sort((a, b) => a.holeNumber - b.holeNumber);
+        
+        return {
+          roundNumber: round.roundId?.$numberInt || round.roundId,
+          courseName: `Course ${round.courseId || ''}`,
+          scoreToPar: round.currentRoundScore || '0',
+          strokes: round.totalShots?.$numberInt || round.totalShots,
+          holes: holesArray,
+          roundComplete: round.roundComplete,
+        };
+      }).sort((a: any, b: any) => a.roundNumber - b.roundNumber),
+      currentRound: roundsArray.length,
+      totalScore: roundsArray.reduce((sum: number, r: any) => {
+        const score = r.currentRoundScore;
+        if (!score) return sum;
+        if (score === 'E') return sum;
+        return sum + parseInt(score);
+      }, 0).toString(),
+    };
+    
+    // Format total score
+    if (parseInt(scorecard.totalScore) > 0) {
+      scorecard.totalScore = `+${scorecard.totalScore}`;
+    } else if (parseInt(scorecard.totalScore) === 0) {
+      scorecard.totalScore = 'E';
+    }
+
+    console.log(`[Scorecard] ✅ Fetched ${scorecard.rounds.length} rounds for ${scorecard.player.firstName} ${scorecard.player.lastName}`);
+
+    const responseData = {
+      data: scorecard,
+      source: 'rapidapi',
+      timestamp: Date.now(),
+    };
+
+    // Store in cache
+    cache.set(cacheKey, {
+      data: responseData,
+      timestamp: Date.now(),
+    });
+
+    return NextResponse.json(responseData);
+
+  } catch (error: any) {
+    console.error('[Scorecard] Error:', error.message);
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch scorecard', data: null },
+      { status: 500 }
+    );
+  }
+}
