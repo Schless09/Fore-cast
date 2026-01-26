@@ -22,25 +22,24 @@ export function oddsToProbability(odds: number): number {
  * 
  * COMPETITIVE BALANCE:
  * Prize money is heavily skewed toward winners (1st = $1.6M, 10th = $250k, 50th = $23k)
- * Top favorites cost ~$20 (67% of budget) creating real but playable tradeoffs.
+ * Costs should create meaningful roster decisions with a $30 budget.
  * 
- * With $30 budget, picking Scheffler ($20) leaves $10 for supporting cast.
- * This forces meaningful strategic decisions:
- * - Pick Scheffler ($20) → $10 left for ~5-6 solid supporting picks
- * - Pick a co-favorite ($13) → $17 left for balanced roster
- * - Fade the chalk → full budget for mid-tier/longshots
+ * Cost mapping (logarithmic scaling for better distribution):
+ * - +290 (Scottie-level dominant) → ~$15-18 (with super-favorite multiplier)
+ * - +500 (co-favorite) → ~$12-14 (with multiplier)
+ * - +1500 (field favorite) → ~$7.50
+ * - +3000 (solid contender) → ~$6.00
+ * - +5000 (mid-tier) → ~$5.00
+ * - +10000 (longshot) → ~$3.80
+ * - +25000 (deep longshot) → ~$2.00
+ * - +50000+ (extreme longshot) → ~$0.50
+ * - +150000+ (ultra longshot) → ~$0.20
  * 
- * Cost mapping:
- * - +290 (Scheffler-level) → ~$20.00 (67% of budget)
- * - +500 (co-favorite) → ~$13.50
- * - +1000 (top 5) → ~$8.00
- * - +2000 (top 10) → ~$4.50
- * - +5000 (solid) → ~$2.25
- * - +10000 (mid-tier) → ~$1.50
- * - +25000 (longshot) → ~$1.00
- * - +50000+ (deep longshot) → ~$0.75
+ * SUPER-FAVORITE MULTIPLIER:
+ * When a player has odds of +600 or shorter, they get an additional cost multiplier.
+ * This ensures dominant favorites like Scottie Scheffler are priced appropriately.
  */
-export function calculateCostFromOdds(odds: number, minCost: number = 0.75, maxCost: number = 20.00): number {
+export function calculateCostFromOdds(odds: number, minCost: number = 0.20, maxCost: number = 10.00): number {
   if (!odds || odds === 0 || odds > 500000) {
     return minCost;
   }
@@ -48,20 +47,43 @@ export function calculateCostFromOdds(odds: number, minCost: number = 0.75, maxC
   // Convert to implied probability
   const probability = oddsToProbability(odds);
 
-  // Use LINEAR scaling - probability directly maps to cost
-  // This properly reflects that favorites have proportionally higher expected value
-  // A 25% win probability player should cost ~25x more than a 1% player
+  // Use logarithmic scaling for better distribution across the field
+  // This prevents costs from compressing too much for mid-tier players
   
-  // Reference: +290 odds = 25.6% probability = max cost
-  // Scale: cost = probability * scaleFactor + minCost
+  // Reference points for scaling:
+  // +290 odds = 25.6% probability → max cost ($10, before multiplier)
+  // +50000 odds = 0.2% probability → min cost ($0.20)
+  
   const maxProbability = 0.256; // +290 odds
-  const normalizedProb = Math.min(probability / maxProbability, 1);
+  const minProbability = 0.002; // +50000 odds
   
-  // Linear scaling: favorites pay full price for their expected value advantage
-  const cost = (maxCost - minCost) * normalizedProb + minCost;
+  // Use log scaling to spread costs more evenly
+  const logMax = Math.log(maxProbability);
+  const logMin = Math.log(minProbability);
+  const logProb = Math.log(Math.max(probability, minProbability));
   
-  // Ensure within bounds
-  const finalCost = Math.max(minCost, Math.min(maxCost, cost));
+  // Normalize to 0-1 range using log scale
+  const normalizedProb = Math.min((logProb - logMin) / (logMax - logMin), 1);
+  
+  // Linear curve (1.0) for balanced cost distribution
+  const curvedProb = Math.pow(normalizedProb, 1.0);
+  
+  // Calculate base cost
+  let cost = (maxCost - minCost) * curvedProb + minCost;
+  
+  // SUPER-FAVORITE MULTIPLIER
+  // Apply extra cost for dominant favorites (odds +600 or shorter)
+  // This ensures players like Scottie are priced at a premium
+  const superFavoriteThreshold = 600; // +600 odds
+  if (odds <= superFavoriteThreshold) {
+    // Scale multiplier: +290 gets ~1.8x, +500 gets ~1.4x, +600 gets ~1.2x
+    const multiplier = 1.2 + (0.6 * (superFavoriteThreshold - odds) / superFavoriteThreshold);
+    cost = cost * multiplier;
+  }
+  
+  // Ensure within bounds (allow up to $20 for super-favorites)
+  const absoluteMax = 20.00;
+  const finalCost = Math.max(minCost, Math.min(absoluteMax, cost));
   
   // Round to 2 decimal places
   return Math.round(finalCost * 100) / 100;
