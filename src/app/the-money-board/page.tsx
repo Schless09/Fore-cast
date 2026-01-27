@@ -50,86 +50,41 @@ export default async function TheMoneyBoardPage() {
         </CardContent>
       </Card>
 
-      {/* Rules Section */}
+      {/* Rules Section - Compact */}
       <Card className="mb-6">
         <CardContent className="pt-6">
           <h2 className="text-xl font-bold text-casino-gold mb-4">📋 League Rules</h2>
           
-          {/* Weekly Rules */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-white mb-2">Weekly Rules</h3>
-            <p className="text-casino-gray">
-              Using your budget of <span className="text-casino-green font-semibold">$30</span>, select up to <span className="text-casino-green font-semibold">10 golfers</span> each week. 
-              The person whose team of golfers earns the most money for that tournament wins the week.
-            </p>
-          </div>
-
-          {/* Weekly Payouts */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-white mb-2">Weekly Payouts</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3 text-center">
-                <div className="text-casino-gold font-bold">1st</div>
-                <div className="text-white text-lg">45%</div>
-              </div>
-              <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3 text-center">
-                <div className="text-casino-gold font-bold">2nd</div>
-                <div className="text-white text-lg">30%</div>
-              </div>
-              <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3 text-center">
-                <div className="text-casino-gold font-bold">3rd</div>
-                <div className="text-white text-lg">15%</div>
-              </div>
-              <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3 text-center">
-                <div className="text-casino-gold font-bold">4th</div>
-                <div className="text-white text-lg">10%</div>
-              </div>
+          <div className="space-y-3 text-sm">
+            {/* Weekly */}
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-white font-medium">Weekly:</span>
+              <span className="text-casino-gray">$30 budget, up to 10 golfers. Most prize money wins.</span>
+              <span className="text-casino-gray">Payouts:</span>
+              <span className="text-casino-gold">1st 45%</span>
+              <span className="text-casino-gray">•</span>
+              <span className="text-casino-gold">2nd 30%</span>
+              <span className="text-casino-gray">•</span>
+              <span className="text-casino-gold">3rd 15%</span>
+              <span className="text-casino-gray">•</span>
+              <span className="text-casino-gold">4th 10%</span>
+              <span className="text-casino-gray text-xs ml-1">(Top 5 if 50+ members)</span>
             </div>
-          </div>
 
-          {/* FedEx Cup */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-white mb-2">🏆 FedEx Cup Playoffs</h3>
-            <div className="bg-casino-dark/30 border border-casino-gold/10 rounded-lg p-4 mb-3">
-              <p className="text-casino-gray text-sm">
-                <span className="text-casino-gold">⚠️ Important:</span> All players (qualified & eliminated) should set a lineup during FedEx Cup weeks 
-                as you&apos;re still eligible to win the weekly contest & season prize. This is essentially our playoff where you &quot;do well & advance&quot;. 
-                Top half of the field advances each week. Top 4 from Tour Championship get paid out.
-              </p>
+            {/* FedEx */}
+            <div>
+              <span className="text-white font-medium">FedEx Cup:</span>
+              <span className="text-casino-gray ml-2">All members → Top 24 → Top 12. Everyone sets lineups (weekly + season prizes still in play).</span>
             </div>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3">
-                <div className="text-casino-gold font-bold text-sm">FedEx St Jude</div>
-                <div className="text-casino-gray text-xs mt-1">All members</div>
-              </div>
-              <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3">
-                <div className="text-casino-gold font-bold text-sm">BMW Championship</div>
-                <div className="text-casino-gray text-xs mt-1">Top 24</div>
-              </div>
-              <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3">
-                <div className="text-casino-gold font-bold text-sm">Tour Championship</div>
-                <div className="text-casino-gray text-xs mt-1">Top 12</div>
-              </div>
-            </div>
-          </div>
 
-          {/* Season Payouts */}
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-2">💵 Season Payouts</h3>
-            <p className="text-casino-gray text-sm mb-3">Based on total combined prize money</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Link href="/standings/season?period=first" className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3 hover:border-casino-gold/50 hover:bg-casino-dark/70 transition-colors">
-                <div className="text-casino-gold font-bold">1st Half</div>
-                <div className="text-casino-gray text-sm">AT&T Pro-Am → Byron Nelson</div>
-              </Link>
-              <Link href="/standings/season?period=second" className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3 hover:border-casino-gold/50 hover:bg-casino-dark/70 transition-colors">
-                <div className="text-casino-gold font-bold">2nd Half</div>
-                <div className="text-casino-gray text-sm">Charles Schwab → Tour Championship</div>
-              </Link>
-              <Link href="/standings/season?period=full" className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3 hover:border-casino-gold/50 hover:bg-casino-dark/70 transition-colors">
-                <div className="text-casino-gold font-bold">Full Season</div>
-                <div className="text-casino-gray text-sm">Total $$ accumulated</div>
-              </Link>
+            {/* Season */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-casino-gold/10">
+              <span className="text-white font-medium">Season Standings:</span>
+              <Link href="/standings/season?period=first" className="text-casino-gold hover:underline">1st Half</Link>
+              <span className="text-casino-gray">•</span>
+              <Link href="/standings/season?period=second" className="text-casino-gold hover:underline">2nd Half</Link>
+              <span className="text-casino-gray">•</span>
+              <Link href="/standings/season?period=full" className="text-casino-gold hover:underline">Full Season</Link>
             </div>
           </div>
         </CardContent>
