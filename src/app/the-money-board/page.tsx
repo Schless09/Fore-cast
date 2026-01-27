@@ -118,18 +118,18 @@ export default async function TheMoneyBoardPage() {
             <h3 className="text-lg font-semibold text-white mb-2">💵 Season Payouts</h3>
             <p className="text-casino-gray text-sm mb-3">Based on total combined prize money</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3">
+              <Link href="/standings/season?period=first" className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3 hover:border-casino-gold/50 hover:bg-casino-dark/70 transition-colors">
                 <div className="text-casino-gold font-bold">1st Half</div>
                 <div className="text-casino-gray text-sm">AT&T Pro-Am → Byron Nelson</div>
-              </div>
-              <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3">
+              </Link>
+              <Link href="/standings/season?period=second" className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3 hover:border-casino-gold/50 hover:bg-casino-dark/70 transition-colors">
                 <div className="text-casino-gold font-bold">2nd Half</div>
                 <div className="text-casino-gray text-sm">Charles Schwab → Tour Championship</div>
-              </div>
-              <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3">
+              </Link>
+              <Link href="/standings/season?period=full" className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3 hover:border-casino-gold/50 hover:bg-casino-dark/70 transition-colors">
                 <div className="text-casino-gold font-bold">Full Season</div>
                 <div className="text-casino-gray text-sm">Total $$ accumulated</div>
-              </div>
+              </Link>
             </div>
           </div>
         </CardContent>

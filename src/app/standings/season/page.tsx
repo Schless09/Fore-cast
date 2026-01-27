@@ -29,7 +29,13 @@ interface SupabaseError extends Error {
 // Revalidate page every 3 minutes
 export const revalidate = 180;
 
-export default async function SeasonStandingsPage() {
+interface SeasonStandingsPageProps {
+  searchParams: Promise<{ period?: string }>;
+}
+
+export default async function SeasonStandingsPage({ searchParams }: SeasonStandingsPageProps) {
+  const resolvedParams = await searchParams;
+  const initialPeriod = resolvedParams.period as 'full' | 'first' | 'second' | undefined;
   // Auth is handled by middleware
   const profile = await getProfile();
   if (!profile) {
@@ -219,6 +225,7 @@ export default async function SeasonStandingsPage() {
         activeTournament={activeTournament}
         prizeDistributions={prizeDistributions}
         userLeagueId={userLeagueId || undefined}
+        initialPeriod={initialPeriod}
       />
     </div>
   );

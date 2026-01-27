@@ -47,6 +47,7 @@ interface LiveSeasonStandingsProps {
     amount: number;
   }>;
   userLeagueId?: string;
+  initialPeriod?: SeasonPeriod;
 }
 
 // Normalize name for matching
@@ -65,12 +66,13 @@ export function LiveSeasonStandings({
   activeTournament,
   prizeDistributions,
   userLeagueId,
+  initialPeriod,
 }: LiveSeasonStandingsProps) {
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
   const [activeRosters, setActiveRosters] = useState<Map<string, { rosterId: string; rosterName: string; playerNames: string[] }>>(new Map());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
-  const [selectedPeriod, setSelectedPeriod] = useState<SeasonPeriod>('full');
+  const [selectedPeriod, setSelectedPeriod] = useState<SeasonPeriod>(initialPeriod || 'full');
   const hasInitialLoaded = useRef(false);
 
   // Prize distribution map
