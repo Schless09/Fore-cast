@@ -4,6 +4,11 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { createServiceClient } from '@/lib/supabase/service';
 
+// Force fresh data on every request
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 export default async function WeeklyStandingsPage() {
   // Auth is handled by middleware
   const supabase = createServiceClient();
