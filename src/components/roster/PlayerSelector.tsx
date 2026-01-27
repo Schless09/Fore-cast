@@ -40,6 +40,7 @@ interface PlayerSelectorProps {
   isLoading?: boolean;
   tournamentId?: string;
   venueId?: string;
+  tournamentName?: string;
 }
 
 export function PlayerSelector({
@@ -52,6 +53,7 @@ export function PlayerSelector({
   isLoading = false,
   tournamentId,
   venueId,
+  tournamentName,
 }: PlayerSelectorProps) {
   const [selectedPlayerForDetails, setSelectedPlayerForDetails] = useState<{
     player: PGAPlayer;
@@ -206,7 +208,8 @@ export function PlayerSelector({
           cost={selectedPlayerForDetails.cost}
           isOpen={!!selectedPlayerForDetails}
           onClose={() => setSelectedPlayerForDetails(null)}
-          tournamentName="This Tournament"
+          tournamentName={tournamentName}
+          venueId={venueId}
         />
       )}
     </div>

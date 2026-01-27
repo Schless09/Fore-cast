@@ -38,6 +38,7 @@ export function RosterBuilder({
     existingRoster?.playerIds || []
   );
   const [username, setUsername] = useState<string>('');
+  const [tournamentName, setTournamentName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +59,17 @@ export function RosterBuilder({
   const loadTournamentPlayers = useCallback(async () => {
     try {
       const supabase = createClient();
+
+      // Get tournament info for name
+      const { data: tournamentData } = await supabase
+        .from('tournaments')
+        .select('name')
+        .eq('id', tournamentId)
+        .single();
+
+      if (tournamentData) {
+        setTournamentName(tournamentData.name);
+      }
 
       // Get tournament players with costs and player info
       const { data: tournamentPlayersData, error: tpError } = await supabase
@@ -464,6 +476,7 @@ export function RosterBuilder({
             isLoading={isLoading}
             tournamentId={tournamentId}
             venueId={undefined} // TODO: Add venue_id to tournaments table if needed
+            tournamentName={tournamentName}
           />
 
           <div className="flex items-center justify-end gap-4 pt-4 border-t">
