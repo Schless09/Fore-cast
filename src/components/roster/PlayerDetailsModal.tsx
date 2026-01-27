@@ -55,9 +55,12 @@ export function PlayerDetailsModal({
   cost,
   isOpen,
   onClose,
-  tournamentName = 'This Tournament',
+  tournamentName: rawTournamentName,
   venueId,
 }: PlayerDetailsModalProps) {
+  // Normalize tournament name - treat empty string as undefined
+  const tournamentName = rawTournamentName?.trim() || 'This Tournament';
+  
   const [tournamentHistory, setTournamentHistory] = useState<TournamentHistory[]>([]);
   const [last25Starts, setLast25Starts] = useState<RecentStart[]>([]);
   const [stats, setStats] = useState<PlayerStats | null>(null);
