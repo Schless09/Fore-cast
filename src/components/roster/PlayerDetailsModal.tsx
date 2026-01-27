@@ -19,6 +19,7 @@ interface RecentStart {
   score: string;
   made_cut: boolean;
   sg_total: number | null;
+  earnings: number;
 }
 
 interface PlayerStats {
@@ -80,14 +81,23 @@ export function PlayerDetailsModal({
 
         if (historyData && historyData.length > 0) {
           setHasData(true);
-          setTournamentHistory(historyData.map(h => ({
-            year: new Date(h.tournament_date).getFullYear(),
-            position: h.is_made_cut === false ? 'MC' : 
-                     h.finish_position ? (h.finish_position <= 10 ? `T${h.finish_position}` : `${h.finish_position}`) : '-',
-            score: h.total_score ? (h.total_score > 0 ? `+${h.total_score}` : h.total_score === 0 ? 'E' : `${h.total_score}`) : '-',
-            earnings: h.prize_money || 0,
-            sg_total: h.strokes_gained_total,
-          })));
+          setTournamentHistory(historyData.map(h => {
+            // Calculate score relative to par (assume par 72 per round, 4 rounds = 288 for full tournament)
+            // For missed cuts (2 rounds), par would be 144
+            const parTotal = h.is_made_cut === false ? 144 : 288;
+            const relativeScore = h.total_score ? h.total_score - parTotal : null;
+            
+            return {
+              year: new Date(h.tournament_date).getFullYear(),
+              position: h.is_made_cut === false ? 'MC' : 
+                       h.finish_position ? (h.finish_position <= 10 ? `T${h.finish_position}` : `${h.finish_position}`) : '-',
+              score: relativeScore !== null 
+                ? (relativeScore > 0 ? `+${relativeScore}` : relativeScore === 0 ? 'E' : `${relativeScore}`)
+                : '-',
+              earnings: h.prize_money || 0,
+              sg_total: h.strokes_gained_total,
+            };
+          }));
         }
 
         // Fetch last 25 starts (any tournament)
@@ -100,15 +110,25 @@ export function PlayerDetailsModal({
 
         if (recentData && recentData.length > 0) {
           setHasData(true);
-          const starts = recentData.map(r => ({
-            tournament: r.tournament_name,
-            date: new Date(r.tournament_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-            position: r.is_made_cut === false ? 'MC' :
-                     r.finish_position ? (r.finish_position <= 10 ? `T${r.finish_position}` : `${r.finish_position}`) : '-',
-            score: r.total_score ? (r.total_score > 0 ? `+${r.total_score}` : r.total_score === 0 ? 'E' : `${r.total_score}`) : '-',
-            made_cut: r.is_made_cut !== false,
-            sg_total: r.strokes_gained_total,
-          }));
+          const starts = recentData.map(r => {
+            // Calculate score relative to par (assume par 72 per round, 4 rounds = 288 for full tournament)
+            // For missed cuts (2 rounds), par would be 144
+            const parTotal = r.is_made_cut === false ? 144 : 288;
+            const relativeScore = r.total_score ? r.total_score - parTotal : null;
+            
+            return {
+              tournament: r.tournament_name,
+              date: new Date(r.tournament_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+              position: r.is_made_cut === false ? 'MC' :
+                       r.finish_position ? (r.finish_position <= 10 ? `T${r.finish_position}` : `${r.finish_position}`) : '-',
+              score: relativeScore !== null 
+                ? (relativeScore > 0 ? `+${relativeScore}` : relativeScore === 0 ? 'E' : `${relativeScore}`)
+                : '-',
+              made_cut: r.is_made_cut !== false,
+              sg_total: r.strokes_gained_total,
+              earnings: r.prize_money || 0,
+            };
+          });
 
           setLast25Starts(starts);
 
@@ -315,47 +335,13 @@ export function PlayerDetailsModal({
                 </div>
               )}
 
-              {/* Recent Form - Last 10 */}
+              {/* Last 25 Starts Table */}
               {last25Starts.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-casino-gold mb-3 flex items-center gap-2">
-                    <span>📈</span> Recent Form (Last {Math.min(10, last25Starts.length)} Starts)
+                    <span>📋</span> Last {last25Starts.length} Starts
                   </h3>
-                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-                    {last25Starts.slice(0, 10).map((start, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-casino-dark/30 rounded-lg p-2 text-center border border-casino-gold/10"
-                        title={`${start.tournament}: ${start.position}`}
-                      >
-                        <div className={`text-sm font-bold ${
-                          start.position === 'MC' ? 'text-red-400' :
-                          start.position === '-' ? 'text-casino-gray' :
-                          parseInt(start.position.replace('T', '')) <= 10 ? 'text-casino-green' :
-                          parseInt(start.position.replace('T', '')) <= 25 ? 'text-casino-gold' :
-                          'text-casino-text'
-                        }`}>
-                          {start.position}
-                        </div>
-                        <div className="text-xs text-casino-gray truncate" title={start.tournament}>
-                          {start.tournament.split(' ')[0]}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Full Last 25 Starts Table (Collapsible) */}
-              {last25Starts.length > 10 && (
-                <details className="group">
-                  <summary className="text-sm font-semibold text-casino-gold mb-3 flex items-center gap-2 cursor-pointer hover:text-casino-gold/80">
-                    <span>📋</span> All Last {last25Starts.length} Starts
-                    <svg className="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </summary>
-                  <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                  <div className="overflow-x-auto max-h-72 overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 bg-casino-card">
                         <tr className="border-b border-casino-gold/20">
@@ -363,6 +349,7 @@ export function PlayerDetailsModal({
                           <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Date</th>
                           <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Finish</th>
                           <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Score</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-casino-gray uppercase">Earnings</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -381,12 +368,15 @@ export function PlayerDetailsModal({
                               </span>
                             </td>
                             <td className="px-3 py-2 text-center text-casino-gray text-xs">{start.score}</td>
+                            <td className="px-3 py-2 text-right text-casino-green text-xs">
+                              {start.earnings > 0 ? `$${start.earnings.toLocaleString()}` : '-'}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </details>
+                </div>
               )}
             </>
           )}
