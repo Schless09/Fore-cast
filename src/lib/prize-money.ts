@@ -1,6 +1,7 @@
 /**
  * Prize Money Calculation System
  * Calculates tournament winnings based on final position and handles ties
+ * Also handles amateur players who cannot collect prize money (money moves down)
  */
 
 export interface PrizeMoneyDistribution {
@@ -25,28 +26,81 @@ export interface TournamentPrizeStructure {
   distributions: PrizeMoneyDistribution[];
 }
 
+export interface PlayerForPrizeCalc {
+  position: number | null;
+  is_amateur?: boolean;
+  is_tied?: boolean;
+  tied_with_count?: number;
+}
+
+/**
+ * Calculate adjusted prize positions accounting for amateurs.
+ * Amateurs can't collect prize money, so pros below them move up in the payout.
+ * Returns a map of original position -> adjusted payout position
+ */
+export function calculateAdjustedPrizePositions(
+  players: PlayerForPrizeCalc[]
+): Map<number, number> {
+  const adjustedPositions = new Map<number, number>();
+  
+  // Sort players by position
+  const sortedPlayers = [...players]
+    .filter(p => p.position && p.position > 0)
+    .sort((a, b) => (a.position || 0) - (b.position || 0));
+  
+  // Count amateurs ahead of each position
+  let amateurCount = 0;
+  
+  for (const player of sortedPlayers) {
+    if (!player.position) continue;
+    
+    if (player.is_amateur) {
+      // Amateurs don't get prize money, increment count for those below
+      amateurCount++;
+      adjustedPositions.set(player.position, 0); // 0 means no prize
+    } else {
+      // Pros move up by the number of amateurs ahead of them
+      const adjustedPosition = player.position - amateurCount;
+      adjustedPositions.set(player.position, adjustedPosition);
+    }
+  }
+  
+  return adjustedPositions;
+}
+
 /**
  * Calculate prize money for a player based on their position
  * Handles ties by splitting the combined prize money of tied positions
+ * @param adjustedPosition - Position after accounting for amateurs (use calculateAdjustedPrizePositions)
  */
 export function calculatePlayerPrizeMoney(
   position: number | null,
   isTied: boolean,
   tiedCount: number,
-  prizeStructure: TournamentPrizeStructure
+  prizeStructure: TournamentPrizeStructure,
+  isAmateur: boolean = false,
+  adjustedPosition?: number
 ): number {
-  if (!position || position < 1) {
+  // Amateurs cannot collect prize money
+  if (isAmateur) {
+    return 0;
+  }
+  
+  // Use adjusted position if provided (accounts for amateurs above)
+  const effectivePosition = adjustedPosition ?? position;
+  
+  if (!effectivePosition || effectivePosition < 1) {
     return 0; // No prize money for CUT, WD, or invalid positions
   }
 
   const distribution = prizeStructure.distributions.find(
-    (d) => d.position === position
+    (d) => d.position === effectivePosition
   );
 
   if (!distribution) {
     // If no exact match, find the closest lower position
     const closest = prizeStructure.distributions
-      .filter((d) => d.position <= position)
+      .filter((d) => d.position <= effectivePosition)
       .sort((a, b) => b.position - a.position)[0];
 
     if (!closest) {
@@ -57,7 +111,7 @@ export function calculatePlayerPrizeMoney(
     return closest.amount;
   }
 
-  // Handle ties
+  // Handle ties (note: tie amounts may need recalculation if amateurs are in the tie)
   if (isTied && tiedCount > 1) {
     // Use pre-calculated tie amounts from the distribution table
     const tieField = `tied_${tiedCount}` as keyof PrizeMoneyDistribution;
@@ -74,15 +128,13 @@ export function calculatePlayerPrizeMoney(
 
     // Fallback: Calculate total prize money for all tied positions and split evenly
     let totalTiedMoney = 0;
-    const positionsToSplit: number[] = [];
 
     // Collect positions that need to be split
     for (let i = 0; i < tiedCount; i++) {
-      const pos = position + i;
+      const pos = effectivePosition + i;
       const dist = prizeStructure.distributions.find((d) => d.position === pos);
       if (dist) {
         totalTiedMoney += dist.amount;
-        positionsToSplit.push(pos);
       }
     }
 
@@ -92,6 +144,48 @@ export function calculatePlayerPrizeMoney(
 
   // No tie, return the base amount
   return distribution.amount;
+}
+
+/**
+ * Calculate prize money for all players in a tournament, handling amateurs correctly.
+ * Money from amateur positions moves down to pros below them.
+ */
+export function calculateAllPlayerPrizeMoney(
+  players: Array<{
+    id: string;
+    position: number | null;
+    is_amateur?: boolean;
+    is_tied?: boolean;
+    tied_with_count?: number;
+  }>,
+  prizeStructure: TournamentPrizeStructure
+): Map<string, number> {
+  const results = new Map<string, number>();
+  
+  // Calculate adjusted positions accounting for amateurs
+  const adjustedPositions = calculateAdjustedPrizePositions(players);
+  
+  for (const player of players) {
+    if (!player.position || player.position < 1) {
+      results.set(player.id, 0);
+      continue;
+    }
+    
+    const adjustedPos = adjustedPositions.get(player.position) || 0;
+    
+    const prizeMoney = calculatePlayerPrizeMoney(
+      player.position,
+      player.is_tied || false,
+      player.tied_with_count || 1,
+      prizeStructure,
+      player.is_amateur || false,
+      adjustedPos
+    );
+    
+    results.set(player.id, prizeMoney);
+  }
+  
+  return results;
 }
 
 /**

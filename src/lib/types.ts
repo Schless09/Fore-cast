@@ -34,6 +34,7 @@ export interface PGAPlayer {
   fedex_cup_ranking: number | null;
   image_url: string | null;
   is_active: boolean;
+  is_amateur: boolean;
   created_at: string;
 }
 
