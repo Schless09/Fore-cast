@@ -43,30 +43,24 @@ export default async function WeeklyStandingsPage() {
     .limit(1)
     .maybeSingle();
 
-  // Check if the completed tournament ended today or yesterday
-  // If so, keep showing it to let users review final results
+  // Check if we should show the completed tournament
+  // Show completed tournament until Monday noon CST, then switch to upcoming
+  const isBeforeMondayNoonCST = () => {
+    const now = new Date();
+    // Convert to CST
+    const cstTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+    const dayOfWeek = cstTime.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const hour = cstTime.getHours();
+    
+    // Before Monday noon: Sunday (day 0) or Monday before noon (day 1, hour < 12)
+    return dayOfWeek === 0 || (dayOfWeek === 1 && hour < 12);
+  };
+  
   const shouldShowCompletedTournament = () => {
     if (!completedTournament?.end_date) return false;
     
-    // Get today's date in CST using Intl.DateTimeFormat for accurate timezone handling
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat('en-CA', { 
-      timeZone: 'America/Chicago',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-    const today = formatter.format(now); // YYYY-MM-DD format
-    
-    // Get yesterday's date in CST
-    const yesterdayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const yesterday = formatter.format(yesterdayDate);
-    
-    // Extract just the date part from end_date
-    const endDate = completedTournament.end_date.split('T')[0];
-    
-    // Show completed if it ended today or yesterday
-    return endDate === today || endDate === yesterday;
+    // Only show completed tournament if we're before Monday noon CST
+    return isBeforeMondayNoonCST();
   };
 
   let tournament;

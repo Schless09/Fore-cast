@@ -23,35 +23,24 @@ export default async function TournamentsPage() {
     b.end_date.localeCompare(a.end_date) // Most recent completed first
   );
 
-  // Check if the most recent completed tournament ended today or yesterday
-  // If so, keep showing it instead of jumping to the next upcoming
+  // Check if we should show the completed tournament
+  // Show completed tournament until Monday noon CST, then switch to upcoming
+  const isBeforeMondayNoonCST = () => {
+    const now = new Date();
+    // Convert to CST
+    const cstTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+    const dayOfWeek = cstTime.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const hour = cstTime.getHours();
+    
+    // Before Monday noon: Sunday (day 0) or Monday before noon (day 1, hour < 12)
+    return dayOfWeek === 0 || (dayOfWeek === 1 && hour < 12);
+  };
+  
   const shouldShowCompletedTournament = () => {
     if (completed.length === 0) return false;
     
-    const mostRecentCompleted = completed[0];
-    if (!mostRecentCompleted.end_date) return false;
-    
-    // Get today's date in CST using Intl.DateTimeFormat for accurate timezone handling
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat('en-CA', { 
-      timeZone: 'America/Chicago',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-    const today = formatter.format(now); // YYYY-MM-DD format
-    
-    // Get yesterday's date in CST
-    const yesterdayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const yesterday = formatter.format(yesterdayDate);
-    
-    // Extract just the date part from end_date (handle both YYYY-MM-DD and ISO formats)
-    const endDate = mostRecentCompleted.end_date.split('T')[0];
-    
-    console.log('[Tournaments] Date check:', { endDate, today, yesterday });
-    
-    // Show completed if it ended today or yesterday
-    return endDate === today || endDate === yesterday;
+    // Only show completed tournament if we're before Monday noon CST
+    return isBeforeMondayNoonCST();
   };
 
   // Priority:
@@ -62,26 +51,15 @@ export default async function TournamentsPage() {
   let currentTournament;
   
   const showCompleted = shouldShowCompletedTournament();
-  console.log('[Tournaments] Selection:', { 
-    hasActive: !!active[0], 
-    showCompleted, 
-    hasUpcoming: !!upcoming[0],
-    completedName: completed[0]?.name,
-    upcomingName: upcoming[0]?.name
-  });
   
   if (active[0]) {
     currentTournament = active[0];
-    console.log('[Tournaments] Showing active:', active[0].name);
   } else if (showCompleted) {
     currentTournament = completed[0];
-    console.log('[Tournaments] Showing completed:', completed[0].name);
   } else if (upcoming[0]) {
     currentTournament = upcoming[0];
-    console.log('[Tournaments] Showing upcoming:', upcoming[0].name);
   } else {
     currentTournament = completed[0];
-    console.log('[Tournaments] Fallback to completed:', completed[0]?.name);
   }
 
   // Redirect to the current tournament
