@@ -94,7 +94,7 @@ export default async function TheMoneyBoardPage() {
               <p className="text-casino-gray text-sm">
                 <span className="text-casino-gold">⚠️ Important:</span> All players (qualified & eliminated) should set a lineup during FedEx Cup weeks 
                 as you&apos;re still eligible to win the weekly contest & season prize. This is essentially our playoff where you &quot;do well & advance&quot;. 
-                Top half of the field advances each week.
+                Top half of the field advances each week. Top 4 from Tour Championship get paid out.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3 text-center">
@@ -120,11 +120,11 @@ export default async function TheMoneyBoardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3">
                 <div className="text-casino-gold font-bold">1st Half</div>
-                <div className="text-casino-gray text-sm">Genesis → PGA Championship</div>
+                <div className="text-casino-gray text-sm">AT&T Pro-Am → Byron Nelson</div>
               </div>
               <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3">
                 <div className="text-casino-gold font-bold">2nd Half</div>
-                <div className="text-casino-gray text-sm">Charles Schwab → BMW Championship</div>
+                <div className="text-casino-gray text-sm">Charles Schwab → Tour Championship</div>
               </div>
               <div className="bg-casino-dark/50 border border-casino-gold/20 rounded-lg p-3">
                 <div className="text-casino-gold font-bold">Full Season</div>

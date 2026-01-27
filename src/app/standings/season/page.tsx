@@ -118,6 +118,7 @@ export default async function SeasonStandingsPage() {
       tournament_name: string;
       winnings: number;
       is_active: boolean;
+      is_first_half: boolean;
     }>;
   }
   
@@ -130,11 +131,41 @@ export default async function SeasonStandingsPage() {
     return bDate.localeCompare(aDate); // Most recent first
   });
 
+  // Define first half tournaments (AT&T Pro-Am through Byron Nelson)
+  // These are the tournament names that constitute the first half
+  const firstHalfTournaments = [
+    'AT&T Pebble Beach Pro-Am',
+    'AT&T Pro-Am',
+    'Genesis Invitational',
+    'Mexico Open',
+    'Cognizant Classic',
+    'Arnold Palmer Invitational',
+    'THE PLAYERS Championship',
+    'Valspar Championship',
+    'Texas Children\'s Houston Open',
+    'Houston Open',
+    'Valero Texas Open',
+    'Masters Tournament',
+    'The Masters',
+    'RBC Heritage',
+    'Zurich Classic',
+    'THE CJ CUP Byron Nelson',
+    'Byron Nelson',
+  ];
+
+  const isFirstHalfTournament = (name: string): boolean => {
+    const normalizedName = name.toLowerCase();
+    return firstHalfTournaments.some(t => normalizedName.includes(t.toLowerCase()));
+  };
+
   sortedRosters.forEach((roster: RosterData) => {
     const userId = roster.user_id;
     const username = roster.profiles?.username || 'Unknown';
     const tournamentName = roster.tournament?.name || 'Unknown Tournament';
     const isActive = roster.tournament?.status === 'active';
+    
+    // Determine which half this tournament belongs to
+    const isFirstHalf = isFirstHalfTournament(tournamentName);
     
     // Only count completed tournament winnings in base (live will be added client-side)
     const winnings = isActive ? 0 : (roster.total_winnings || 0);
@@ -157,6 +188,7 @@ export default async function SeasonStandingsPage() {
       tournament_name: tournamentName,
       winnings: isActive ? 0 : (roster.total_winnings || 0), // Will be updated live for active
       is_active: isActive,
+      is_first_half: isFirstHalf,
     });
   });
 
