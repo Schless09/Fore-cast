@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { PGAPlayer } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 
@@ -19,6 +20,10 @@ interface RecentStart {
   score: string;
   made_cut: boolean;
   sg_total: number | null;
+  sg_off_tee: number | null;
+  sg_approach: number | null;
+  sg_around_green: number | null;
+  sg_putting: number | null;
   earnings: number;
 }
 
@@ -30,6 +35,10 @@ interface PlayerStats {
   top25s: number;
   avgFinish: string;
   avgSgTotal: string | null;
+  avgSgOffTee: string | null;
+  avgSgApproach: string | null;
+  avgSgAroundGreen: string | null;
+  avgSgPutting: string | null;
 }
 
 interface PlayerDetailsModalProps {
@@ -54,6 +63,21 @@ export function PlayerDetailsModal({
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasData, setHasData] = useState(false);
+
+  // Close on escape key and lock body scroll
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -126,6 +150,10 @@ export function PlayerDetailsModal({
                 : '-',
               made_cut: r.is_made_cut !== false,
               sg_total: r.strokes_gained_total,
+              sg_off_tee: r.strokes_gained_off_tee,
+              sg_approach: r.strokes_gained_approach,
+              sg_around_green: r.strokes_gained_around_green,
+              sg_putting: r.strokes_gained_putting,
               earnings: r.prize_money || 0,
             };
           });
@@ -159,6 +187,12 @@ export function PlayerDetailsModal({
             ? (sgValues.reduce((a, b) => a + b, 0) / sgValues.length).toFixed(2)
             : null;
 
+          // Calculate SG breakdown averages
+          const calcAvg = (values: (number | null)[]) => {
+            const valid = values.filter((v): v is number => v !== null);
+            return valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(2) : null;
+          };
+
           setStats({
             starts: starts.length,
             madeCuts,
@@ -167,6 +201,10 @@ export function PlayerDetailsModal({
             top25s,
             avgFinish,
             avgSgTotal,
+            avgSgOffTee: calcAvg(starts.map(s => s.sg_off_tee)),
+            avgSgApproach: calcAvg(starts.map(s => s.sg_approach)),
+            avgSgAroundGreen: calcAvg(starts.map(s => s.sg_around_green)),
+            avgSgPutting: calcAvg(starts.map(s => s.sg_putting)),
           });
         }
       } catch (error) {
@@ -185,9 +223,44 @@ export function PlayerDetailsModal({
   const worldRanking = player.world_ranking;
   const fedexRanking = player.fedex_cup_ranking;
 
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-casino-card rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden border border-casino-gold/20">
+  // Use portal to render at document body level (escapes any parent transforms)
+  if (typeof document === 'undefined') return null;
+  
+  return createPortal(
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 }}>
+      {/* Backdrop */}
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          zIndex: 9999,
+        }}
+        onClick={onClose}
+      />
+      
+      {/* Modal - centered */}
+      <div 
+        style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 10000,
+          width: '90vw',
+          maxWidth: '672px',
+          maxHeight: '85vh',
+          overflow: 'hidden',
+          borderRadius: '12px',
+          border: '1px solid rgba(212, 175, 55, 0.3)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+        }}
+        className="bg-casino-card"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="bg-gradient-to-r from-casino-dark to-casino-elevated px-5 py-4 border-b border-casino-gold/20">
           <div className="flex items-center justify-between">
@@ -211,7 +284,7 @@ export function PlayerDetailsModal({
           </div>
         </div>
 
-        <div className="p-5 overflow-y-auto max-h-[calc(90vh-80px)] space-y-6">
+        <div className="p-5 overflow-y-auto max-h-[calc(85vh-140px)] space-y-6">
           {/* Rankings */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-casino-dark/50 rounded-lg p-4 border border-casino-gold/10">
@@ -272,12 +345,42 @@ export function PlayerDetailsModal({
                       <div className="text-xs text-casino-gray">Avg Finish</div>
                     </div>
                   </div>
-                  {stats.avgSgTotal && (
-                    <div className="mt-2 text-center">
-                      <span className="text-xs text-casino-gray">Avg Strokes Gained: </span>
-                      <span className={`text-sm font-bold ${parseFloat(stats.avgSgTotal) >= 0 ? 'text-casino-green' : 'text-red-400'}`}>
-                        {parseFloat(stats.avgSgTotal) >= 0 ? '+' : ''}{stats.avgSgTotal}
-                      </span>
+                  {/* SG Breakdown */}
+                  {(stats.avgSgOffTee || stats.avgSgApproach || stats.avgSgAroundGreen || stats.avgSgPutting) && (
+                    <div className="mt-3 p-3 bg-casino-dark/40 rounded-lg border border-casino-gold/20">
+                      <div className="text-xs text-casino-gray text-center mb-2">SG Breakdown (Avg)</div>
+                      <div className="grid grid-cols-5 gap-1 text-center">
+                        <div>
+                          <div className="text-[10px] text-casino-gray uppercase">OT</div>
+                          <div className={`text-sm font-bold ${stats.avgSgOffTee && parseFloat(stats.avgSgOffTee) >= 0 ? 'text-casino-green' : 'text-red-400'}`}>
+                            {stats.avgSgOffTee ? (parseFloat(stats.avgSgOffTee) >= 0 ? '+' : '') + stats.avgSgOffTee : '-'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-casino-gray uppercase">APP</div>
+                          <div className={`text-sm font-bold ${stats.avgSgApproach && parseFloat(stats.avgSgApproach) >= 0 ? 'text-casino-green' : 'text-red-400'}`}>
+                            {stats.avgSgApproach ? (parseFloat(stats.avgSgApproach) >= 0 ? '+' : '') + stats.avgSgApproach : '-'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-casino-gray uppercase">ARG</div>
+                          <div className={`text-sm font-bold ${stats.avgSgAroundGreen && parseFloat(stats.avgSgAroundGreen) >= 0 ? 'text-casino-green' : 'text-red-400'}`}>
+                            {stats.avgSgAroundGreen ? (parseFloat(stats.avgSgAroundGreen) >= 0 ? '+' : '') + stats.avgSgAroundGreen : '-'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-casino-gray uppercase">PUT</div>
+                          <div className={`text-sm font-bold ${stats.avgSgPutting && parseFloat(stats.avgSgPutting) >= 0 ? 'text-casino-green' : 'text-red-400'}`}>
+                            {stats.avgSgPutting ? (parseFloat(stats.avgSgPutting) >= 0 ? '+' : '') + stats.avgSgPutting : '-'}
+                          </div>
+                        </div>
+                        <div className="border-l border-casino-gold/20">
+                          <div className="text-[10px] text-casino-gray uppercase">Total</div>
+                          <div className={`text-sm font-bold ${stats.avgSgTotal && parseFloat(stats.avgSgTotal) >= 0 ? 'text-casino-green' : 'text-red-400'}`}>
+                            {stats.avgSgTotal ? (parseFloat(stats.avgSgTotal) >= 0 ? '+' : '') + stats.avgSgTotal : '-'}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -331,40 +434,60 @@ export function PlayerDetailsModal({
                 </div>
               )}
 
-              {/* Last 25 Starts Table */}
+              {/* Last 25 Starts Table - Compact with scroll */}
               {last25Starts.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-casino-gold mb-3 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-casino-gold mb-2 flex items-center gap-2">
                     <span>📋</span> Last {last25Starts.length} Starts
                   </h3>
-                  <div className="overflow-x-auto max-h-72 overflow-y-auto">
-                    <table className="w-full text-sm">
-                      <thead className="sticky top-0 bg-casino-card">
+                  <div className="max-h-[200px] overflow-auto border border-casino-gold/20 rounded-lg">
+                    <table className="w-full text-sm md:min-w-[600px]">
+                      <thead className="sticky top-0 bg-casino-elevated">
                         <tr className="border-b border-casino-gold/20">
-                          <th className="px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase">Tournament</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Date</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Finish</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Score</th>
+                          <th className="px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase whitespace-nowrap">Tournament</th>
+                          <th className="px-2 py-1.5 text-center text-xs font-medium text-casino-gray uppercase">Date</th>
+                          <th className="px-2 py-1.5 text-center text-xs font-medium text-casino-gray uppercase">Fin</th>
+                          <th className="px-2 py-1.5 text-center text-xs font-medium text-casino-gray uppercase">Score</th>
+                          <th className="hidden md:table-cell px-1.5 py-1.5 text-center text-xs font-medium text-casino-gray uppercase" title="Off the Tee">OT</th>
+                          <th className="hidden md:table-cell px-1.5 py-1.5 text-center text-xs font-medium text-casino-gray uppercase" title="Approach">APP</th>
+                          <th className="hidden md:table-cell px-1.5 py-1.5 text-center text-xs font-medium text-casino-gray uppercase" title="Around Green">AG</th>
+                          <th className="hidden md:table-cell px-1.5 py-1.5 text-center text-xs font-medium text-casino-gray uppercase" title="Putting">PUT</th>
+                          <th className="px-1.5 py-1.5 text-center text-xs font-medium text-casino-gray uppercase" title="Total SG">SG</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {last25Starts.map((start, idx) => (
-                          <tr key={idx} className="border-b border-casino-gold/10 hover:bg-casino-dark/30">
-                            <td className="px-3 py-2 text-casino-text text-xs">{start.tournament}</td>
-                            <td className="px-3 py-2 text-center text-casino-gray text-xs">{start.date}</td>
-                            <td className="px-3 py-2 text-center">
-                              <span className={`font-semibold text-xs ${
-                                start.position === 'MC' ? 'text-red-400' :
-                                start.position === '-' ? 'text-casino-gray' :
-                                parseInt(start.position.replace('T', '')) <= 10 ? 'text-casino-green' :
-                                'text-casino-text'
-                              }`}>
-                                {start.position}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-center text-casino-gray text-xs">{start.score}</td>
-                          </tr>
-                        ))}
+                        {last25Starts.map((start, idx) => {
+                          const formatSG = (val: number | null) => {
+                            if (val === null) return '-';
+                            return val >= 0 ? `+${val.toFixed(1)}` : val.toFixed(1);
+                          };
+                          const sgColor = (val: number | null) => {
+                            if (val === null) return 'text-casino-gray';
+                            return val >= 0 ? 'text-casino-green' : 'text-red-400';
+                          };
+                          return (
+                            <tr key={idx} className="border-b border-casino-gold/10 hover:bg-casino-dark/30">
+                              <td className="px-2 py-1 text-casino-text text-xs truncate max-w-[140px]">{start.tournament}</td>
+                              <td className="px-2 py-1 text-center text-casino-gray text-xs whitespace-nowrap">{start.date}</td>
+                              <td className="px-2 py-1 text-center">
+                                <span className={`font-semibold text-xs ${
+                                  start.position === 'MC' ? 'text-red-400' :
+                                  start.position === '-' ? 'text-casino-gray' :
+                                  parseInt(start.position.replace('T', '')) <= 10 ? 'text-casino-green' :
+                                  'text-casino-text'
+                                }`}>
+                                  {start.position}
+                                </span>
+                              </td>
+                              <td className="px-2 py-1 text-center text-casino-gray text-xs">{start.score}</td>
+                              <td className={`hidden md:table-cell px-1.5 py-1 text-center text-xs ${sgColor(start.sg_off_tee)}`}>{formatSG(start.sg_off_tee)}</td>
+                              <td className={`hidden md:table-cell px-1.5 py-1 text-center text-xs ${sgColor(start.sg_approach)}`}>{formatSG(start.sg_approach)}</td>
+                              <td className={`hidden md:table-cell px-1.5 py-1 text-center text-xs ${sgColor(start.sg_around_green)}`}>{formatSG(start.sg_around_green)}</td>
+                              <td className={`hidden md:table-cell px-1.5 py-1 text-center text-xs ${sgColor(start.sg_putting)}`}>{formatSG(start.sg_putting)}</td>
+                              <td className={`px-1.5 py-1 text-center text-xs font-medium ${sgColor(start.sg_total)}`}>{formatSG(start.sg_total)}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -384,6 +507,7 @@ export function PlayerDetailsModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
