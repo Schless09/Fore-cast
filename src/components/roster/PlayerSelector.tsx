@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { TournamentPlayer, PGAPlayer } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { useParams } from 'next/navigation';
+import { PlayerDetailsModal } from './PlayerDetailsModal';
 
 // Convert country code to flag emoji
 function getCountryFlag(countryCode: string | null): string {
@@ -51,6 +53,11 @@ export function PlayerSelector({
   tournamentId,
   venueId,
 }: PlayerSelectorProps) {
+  const [selectedPlayerForDetails, setSelectedPlayerForDetails] = useState<{
+    player: PGAPlayer;
+    cost: number;
+  } | null>(null);
+
   const canAddMore = selectedPlayerIds.length < maxPlayers;
   const remainingBudget = budgetLimit - budgetSpent;
 
@@ -126,39 +133,60 @@ export function PlayerSelector({
                         return (
                           <div
                             key={tp.id}
-                            className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-all cursor-pointer text-sm ${
+                            className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-all text-sm ${
                               isSelected
                                 ? 'border-green-600 bg-green-50 ring-1 ring-green-600'
                                 : isDisabled
-                                ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                                ? 'border-gray-200 bg-gray-50 opacity-50'
                                 : 'border-gray-200 hover:border-green-400 hover:bg-gray-50'
                             }`}
-                            onClick={() => !isDisabled && onTogglePlayer(playerId)}
                           >
-                            <div className="text-xs text-gray-400 w-5 text-right flex-shrink-0">
-                              {rank}
-                            </div>
-                            <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                              <span className="truncate font-medium text-gray-900">
-                                {pgaPlayer.name}
-                              </span>
-                              {pgaPlayer.country && (
-                                <span className="text-xs flex-shrink-0" title={pgaPlayer.country}>
-                                  {getCountryFlag(pgaPlayer.country)}
+                            {/* Info button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPlayerForDetails({ player: pgaPlayer, cost });
+                              }}
+                              className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0"
+                              title="View player details"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+                            
+                            {/* Clickable area for selection */}
+                            <div
+                              className={`flex-1 flex items-center gap-2 min-w-0 ${
+                                isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'
+                              }`}
+                              onClick={() => !isDisabled && onTogglePlayer(playerId)}
+                            >
+                              <div className="text-xs text-gray-400 w-5 text-right flex-shrink-0">
+                                {rank}
+                              </div>
+                              <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                                <span className="truncate font-medium text-gray-900">
+                                  {pgaPlayer.name}
                                 </span>
+                                {pgaPlayer.country && (
+                                  <span className="text-xs flex-shrink-0" title={pgaPlayer.country}>
+                                    {getCountryFlag(pgaPlayer.country)}
+                                  </span>
+                                )}
+                              </div>
+                              <div className={`text-xs font-bold flex-shrink-0 ${
+                                cost >= 10 ? 'text-red-600' : 
+                                cost >= 5 ? 'text-orange-600' : 
+                                cost >= 2 ? 'text-yellow-600' : 
+                                'text-gray-600'
+                              }`}>
+                                ${cost.toFixed(2)}
+                              </div>
+                              {isSelected && (
+                                <div className="text-green-600 font-bold flex-shrink-0">✓</div>
                               )}
                             </div>
-                            <div className={`text-xs font-bold flex-shrink-0 ${
-                              cost >= 10 ? 'text-red-600' : 
-                              cost >= 5 ? 'text-orange-600' : 
-                              cost >= 2 ? 'text-yellow-600' : 
-                              'text-gray-600'
-                            }`}>
-                              ${cost.toFixed(2)}
-                            </div>
-                            {isSelected && (
-                              <div className="text-green-600 font-bold flex-shrink-0">✓</div>
-                            )}
                           </div>
                         );
                       })}
@@ -169,6 +197,17 @@ export function PlayerSelector({
             );
           })}
         </div>
+      )}
+
+      {/* Player Details Modal */}
+      {selectedPlayerForDetails && (
+        <PlayerDetailsModal
+          player={selectedPlayerForDetails.player}
+          cost={selectedPlayerForDetails.cost}
+          isOpen={!!selectedPlayerForDetails}
+          onClose={() => setSelectedPlayerForDetails(null)}
+          tournamentName="This Tournament"
+        />
       )}
     </div>
   );
