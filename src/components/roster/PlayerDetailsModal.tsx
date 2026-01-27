@@ -296,7 +296,6 @@ export function PlayerDetailsModal({
                           <th className="px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase">Year</th>
                           <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Finish</th>
                           <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Score</th>
-                          <th className="px-3 py-2 text-right text-xs font-medium text-casino-gray uppercase">Earnings</th>
                           {tournamentHistory.some(h => h.sg_total !== null) && (
                             <th className="px-3 py-2 text-right text-xs font-medium text-casino-gray uppercase">SG</th>
                           )}
@@ -317,9 +316,6 @@ export function PlayerDetailsModal({
                               </span>
                             </td>
                             <td className="px-3 py-2 text-center text-casino-gray">{history.score}</td>
-                            <td className="px-3 py-2 text-right text-casino-green">
-                              {history.earnings > 0 ? `$${history.earnings.toLocaleString()}` : '-'}
-                            </td>
                             {tournamentHistory.some(h => h.sg_total !== null) && (
                               <td className="px-3 py-2 text-right">
                                 <span className={history.sg_total && history.sg_total >= 0 ? 'text-casino-green' : 'text-red-400'}>
@@ -349,7 +345,6 @@ export function PlayerDetailsModal({
                           <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Date</th>
                           <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Finish</th>
                           <th className="px-3 py-2 text-center text-xs font-medium text-casino-gray uppercase">Score</th>
-                          <th className="px-3 py-2 text-right text-xs font-medium text-casino-gray uppercase">Earnings</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -368,9 +363,6 @@ export function PlayerDetailsModal({
                               </span>
                             </td>
                             <td className="px-3 py-2 text-center text-casino-gray text-xs">{start.score}</td>
-                            <td className="px-3 py-2 text-right text-casino-green text-xs">
-                              {start.earnings > 0 ? `$${start.earnings.toLocaleString()}` : '-'}
-                            </td>
                           </tr>
                         ))}
                       </tbody>
