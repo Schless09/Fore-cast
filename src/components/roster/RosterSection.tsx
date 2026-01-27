@@ -87,12 +87,14 @@ export function RosterSection({
             </span>
           </div>
 
-          {/* Player List */}
+          {/* Player List - sorted by cost (most expensive first) */}
           <div className="space-y-2">
             <div className="text-sm font-medium text-casino-gray mb-2">
               {existingRoster.roster_players?.length || 0} Players Selected
             </div>
-            {existingRoster.roster_players?.map((rp, index) => {
+            {[...(existingRoster.roster_players || [])]
+              .sort((a, b) => (b.tournament_player?.cost || 0) - (a.tournament_player?.cost || 0))
+              .map((rp, index) => {
               const player = rp.tournament_player?.pga_player;
               const cost = rp.tournament_player?.cost || 0;
               return (
