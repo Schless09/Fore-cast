@@ -62,13 +62,30 @@ export default async function RosterPage({ params }: RosterPageProps) {
     ),
   } as RosterWithDetails;
 
+  // Check if tournament allows roster editing (upcoming status only)
+  const canEditRoster = roster.tournament?.status === 'upcoming';
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <Link href={`/tournaments/${tournamentId}`}>
           <Button variant="ghost" size="sm">← Back to Tournament</Button>
         </Link>
+        
+        {canEditRoster && (
+          <Link href={`/tournaments/${tournamentId}`}>
+            <Button variant="outline" size="sm">
+              ✏️ Edit Roster
+            </Button>
+          </Link>
+        )}
       </div>
+
+      {canEditRoster && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+          💡 You can edit your roster until the tournament starts
+        </div>
+      )}
 
       <PersonalLeaderboard
         rosterId={rosterId}

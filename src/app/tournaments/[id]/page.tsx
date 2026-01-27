@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
-import { RosterBuilder } from '@/components/roster/RosterBuilder';
+import { RosterSection } from '@/components/roster/RosterSection';
 import { PersonalLeaderboard } from '@/components/leaderboard/PersonalLeaderboard';
 import { LivePersonalLeaderboard } from '@/components/leaderboard/LivePersonalLeaderboard';
 import { LiveLeaderboard } from '@/components/leaderboard/LiveLeaderboard';
@@ -608,11 +608,19 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         </CardHeader>
       </Card>
 
-      {/* Roster Builder or Leaderboard */}
+      {/* Roster Section - shows summary with edit option, or builder for new rosters */}
       {showRosterBuilder && (
-        <RosterBuilder
+        <RosterSection
           tournamentId={id}
-          existingRoster={existingRosterData || undefined}
+          tournamentStatus={tournament.status}
+          existingRoster={existingRosterData ? {
+            id: existingRosterData.id,
+            roster_name: existingRosterData.roster_name,
+            budget_spent: existingRosterData.budget_spent,
+            budget_limit: existingRosterData.budget_limit,
+            roster_players: existingRosterData.roster_players,
+            playerIds: existingRosterData.playerIds,
+          } : undefined}
         />
       )}
 

@@ -18,6 +18,7 @@ interface RosterBuilderProps {
     rosterName: string;
     playerIds: string[];
   };
+  onSave?: () => void;
 }
 
 const MAX_PLAYERS = 10;
@@ -26,6 +27,7 @@ const BUDGET_LIMIT = 30.00;
 export function RosterBuilder({
   tournamentId,
   existingRoster,
+  onSave,
 }: RosterBuilderProps) {
   const router = useRouter();
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
@@ -420,11 +422,16 @@ export function RosterBuilder({
               <Button
                 variant="outline"
                 onClick={() => {
-                  router.push(`/tournaments/${tournamentId}`);
+                  if (onSave) {
+                    onSave();
+                    setShowSuccessModal(false);
+                  } else {
+                    router.push(`/tournaments/${tournamentId}`);
+                  }
                 }}
                 className="flex-1 border-2 border-gray-300 hover:border-gray-400 text-gray-700 text-sm font-semibold py-2 rounded-lg hover:bg-gray-50 transition-all duration-200"
               >
-                Back to Tournament
+                {onSave ? 'Done' : 'Back to Tournament'}
               </Button>
             </div>
           </div>
