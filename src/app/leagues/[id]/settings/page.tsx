@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
@@ -26,8 +25,15 @@ interface LeagueData {
   name: string;
 }
 
+interface Member {
+  user_id: string;
+  username: string;
+  email: string;
+  joined_at: string;
+  is_commissioner: boolean;
+}
+
 export default function LeagueSettingsPage({ params }: { params: Promise<{ id: string }> }) {
-  const router = useRouter();
   const [leagueId, setLeagueId] = useState<string | null>(null);
   const [league, setLeague] = useState<LeagueData | null>(null);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -39,6 +45,8 @@ export default function LeagueSettingsPage({ params }: { params: Promise<{ id: s
   const [newSegmentName, setNewSegmentName] = useState('');
   const [editingSegment, setEditingSegment] = useState<number | null>(null);
   const [editSegmentName, setEditSegmentName] = useState('');
+  const [members, setMembers] = useState<Member[]>([]);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
 
   // Resolve params
   useEffect(() => {
@@ -50,20 +58,30 @@ export default function LeagueSettingsPage({ params }: { params: Promise<{ id: s
     if (!leagueId) return;
     
     try {
-      const response = await fetch(`/api/leagues/${leagueId}/tournaments`);
-      const data = await response.json();
+      // Fetch tournaments and members in parallel
+      const [tournamentsRes, membersRes] = await Promise.all([
+        fetch(`/api/leagues/${leagueId}/tournaments`),
+        fetch(`/api/leagues/${leagueId}/members`),
+      ]);
+      
+      const tournamentsData = await tournamentsRes.json();
+      const membersData = await membersRes.json();
 
-      if (!data.success) {
-        setError(data.error || 'Failed to load data');
+      if (!tournamentsData.success) {
+        setError(tournamentsData.error || 'Failed to load data');
         return;
       }
 
-      setLeague(data.league);
-      setTournaments(data.tournaments);
-      setSegments(data.segments);
-      setIsCommissioner(data.isCommissioner);
+      setLeague(tournamentsData.league);
+      setTournaments(tournamentsData.tournaments);
+      setSegments(tournamentsData.segments);
+      setIsCommissioner(tournamentsData.isCommissioner);
 
-      if (!data.isCommissioner) {
+      if (membersData.success) {
+        setMembers(membersData.members);
+      }
+
+      if (!tournamentsData.isCommissioner) {
         setError('Only the league commissioner can access this page');
       }
     } catch (err) {
@@ -163,6 +181,44 @@ export default function LeagueSettingsPage({ params }: { params: Promise<{ id: s
     });
   };
 
+  const formatJoinDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  // Remove a member from the league
+  const removeMember = async (userId: string, username: string) => {
+    if (!confirm(`Are you sure you want to remove "${username}" from the league? This cannot be undone.`)) {
+      return;
+    }
+
+    setRemovingMember(userId);
+    try {
+      const response = await fetch(`/api/leagues/${leagueId}/members`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        alert(data.error || 'Failed to remove member');
+        return;
+      }
+
+      // Update local state
+      setMembers(prev => prev.filter(m => m.user_id !== userId));
+    } catch (err) {
+      console.error('Error removing member:', err);
+      alert('Failed to remove member');
+    } finally {
+      setRemovingMember(null);
+    }
+  };
+
   // Get max segment number for adding new segments
   const maxSegmentNumber = Math.max(0, ...segments.map(s => s.number));
   const nextSegmentNumber = maxSegmentNumber + 1;
@@ -201,12 +257,90 @@ export default function LeagueSettingsPage({ params }: { params: Promise<{ id: s
           ← Back to Leagues
         </Link>
         <h1 className="text-2xl font-bold text-white">
-          {league?.name} - Tournament Settings
+          {league?.name} - League Settings
         </h1>
         <p className="text-casino-gray mt-1">
-          Configure which tournaments are included and assign them to segments for season standings.
+          Manage league members and configure tournament settings.
         </p>
       </div>
+
+      {/* League Members */}
+      <Card className="bg-casino-card border-casino-gold/20 mb-6">
+        <CardHeader>
+          <CardTitle className="text-casino-gold">League Roster ({members.length} members)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
+                  <th className="px-2 sm:px-4 py-3">Username</th>
+                  <th className="px-2 sm:px-4 py-3 hidden sm:table-cell">Email</th>
+                  <th className="px-2 sm:px-4 py-3 hidden md:table-cell">Joined</th>
+                  <th className="px-2 sm:px-4 py-3 text-center">Role</th>
+                  <th className="px-2 sm:px-4 py-3 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((member) => (
+                  <tr 
+                    key={member.user_id}
+                    className={`border-b border-casino-gold/10 transition-colors hover:bg-casino-elevated ${
+                      member.is_commissioner ? 'bg-casino-gold/5' : ''
+                    }`}
+                  >
+                    <td className="px-2 sm:px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-casino-text">
+                          {member.username}
+                        </span>
+                        <span className="text-xs text-casino-gray sm:hidden">
+                          {member.email}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 text-casino-gray hidden sm:table-cell">
+                      {member.email}
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 text-casino-gray hidden md:table-cell">
+                      {formatJoinDate(member.joined_at)}
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 text-center">
+                      {member.is_commissioner ? (
+                        <span className="px-2 py-1 bg-casino-gold/20 text-casino-gold rounded text-xs font-medium">
+                          Commissioner
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 bg-casino-elevated text-casino-gray rounded text-xs">
+                          Member
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 text-center">
+                      {member.is_commissioner ? (
+                        <span className="text-xs text-casino-gray">-</span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removeMember(member.user_id, member.username)}
+                          disabled={removingMember === member.user_id}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                        >
+                          {removingMember === member.user_id ? 'Removing...' : 'Remove'}
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {members.length === 0 && (
+            <p className="text-center text-casino-gray py-4">No members found</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Segment Management */}
       <Card className="bg-casino-card border-casino-gold/20 mb-6">
