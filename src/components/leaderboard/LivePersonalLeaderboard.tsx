@@ -271,24 +271,24 @@ export function LivePersonalLeaderboard({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-casino-gold/30">
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">#</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Pos</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Total</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Today</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Thru</th>
-                <th className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Prize</th>
+                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-6 sm:w-8">#</th>
+                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
+                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-10 sm:w-12">Pos</th>
+                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-10 sm:w-14">Total</th>
+                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase hidden sm:table-cell w-12 sm:w-14">Today</th>
+                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-14 sm:w-16">Thru</th>
+                <th className="px-1 sm:px-3 py-2 text-right text-xs font-medium text-casino-gray uppercase w-14 sm:w-20">Prize</th>
               </tr>
             </thead>
             <tbody>
               {playersWithLiveData.length > 0 ? (
                 playersWithLiveData.map((player, index) => (
                   <tr key={index} className="border-b border-casino-gold/10 hover:bg-casino-elevated transition-colors">
-                    <td className="px-2 sm:px-4 py-2 text-casino-gray">{index + 1}</td>
-                    <td className="px-2 sm:px-4 py-2 text-casino-text">
+                    <td className="px-1 sm:px-3 py-2 text-casino-gray">{index + 1}</td>
+                    <td className="px-1 sm:px-3 py-2 text-casino-text">
                       {player.playerName}
                     </td>
-                    <td className="px-2 sm:px-4 py-2">
+                    <td className="px-1 sm:px-3 py-2">
                       {player.liveScore?.position ? (
                         <span className={`font-medium ${
                           player.liveScore.positionValue === 1 ? 'text-casino-gold' :
@@ -301,7 +301,7 @@ export function LivePersonalLeaderboard({
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-2 sm:px-4 py-2">
+                    <td className="px-1 sm:px-3 py-2">
                       {player.liveScore ? (
                         <span className={
                           parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
@@ -314,7 +314,7 @@ export function LivePersonalLeaderboard({
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-2 sm:px-4 py-2 hidden sm:table-cell">
+                    <td className="px-1 sm:px-3 py-2 hidden sm:table-cell">
                       {player.liveScore ? (
                         <span className={
                           parseScore(player.liveScore.currentRoundScore) < 0 ? 'text-casino-green' :
@@ -327,7 +327,7 @@ export function LivePersonalLeaderboard({
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-2 sm:px-4 py-2">
+                    <td className="px-1 sm:px-3 py-2">
                       {player.liveScore?.thru === 'F' ? (
                         <span className="text-casino-green font-medium">F</span>
                       ) : player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0' ? (
@@ -338,7 +338,7 @@ export function LivePersonalLeaderboard({
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-2 sm:px-4 py-2 text-right">
+                    <td className="px-1 sm:px-3 py-2 text-right">
                       <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
                         {formatCurrency(player.winnings)}
                       </span>

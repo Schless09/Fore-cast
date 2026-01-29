@@ -307,12 +307,12 @@ export function LiveLeaderboard({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
-            <th className="px-2 sm:px-4 py-2">Pos</th>
-            <th className="px-2 sm:px-4 py-2">Golfer</th>
-            <th className="px-2 sm:px-4 py-2">Total</th>
-            <th className="px-2 sm:px-4 py-2" title="Click score to view scorecard">Today</th>
-            <th className="px-2 sm:px-4 py-2" title="Holes completed or tee time">Thru</th>
-            <th className="px-2 sm:px-4 py-2 text-right">Prize</th>
+            <th className="px-1 sm:px-3 py-2 w-10 sm:w-14">Pos</th>
+            <th className="px-1 sm:px-3 py-2">Golfer</th>
+            <th className="px-1 sm:px-3 py-2 w-12 sm:w-16">Total</th>
+            <th className="px-1 sm:px-3 py-2 w-12 sm:w-16" title="Click score to view scorecard">Today</th>
+            <th className="px-1 sm:px-3 py-2 w-14 sm:w-16" title="Holes completed or tee time">Thru</th>
+            <th className="px-1 sm:px-3 py-2 text-right w-14 sm:w-20">Prize</th>
           </tr>
         </thead>
         <tbody>
@@ -346,17 +346,17 @@ export function LiveLeaderboard({
                     : 'border-casino-gold/10 hover:bg-casino-elevated'
                 }`}
               >
-                <td className="px-2 sm:px-4 py-2 font-medium text-casino-text text-xs sm:text-sm">
+                <td className="px-1 sm:px-3 py-2 font-medium text-casino-text text-xs sm:text-sm">
                   {isUserPlayer && <span className="mr-1">⭐</span>}
                   {pos}
                 </td>
-                <td className={`px-2 sm:px-4 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>
+                <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>
                   {name}
                 </td>
-                <td className={`px-2 sm:px-4 py-2 font-semibold text-xs sm:text-sm ${totalClass}`}>
+                <td className={`px-1 sm:px-3 py-2 font-semibold text-xs sm:text-sm ${totalClass}`}>
                   {formatScore(row.total_score)}
                 </td>
-                <td className={`px-2 sm:px-4 py-2 text-xs sm:text-sm ${todayClass}`}>
+                <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${todayClass}`}>
                   {row.apiPlayerId ? (
                     <button
                       onClick={() => setSelectedPlayer({ id: row.apiPlayerId!, name: row.name })}
@@ -369,7 +369,7 @@ export function LiveLeaderboard({
                     formatScore(row.today_score)
                   )}
                 </td>
-                <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm">
+                <td className="px-1 sm:px-3 py-2 text-xs sm:text-sm">
                   {row.thru === 'F' || row.thru === 18 || row.thru === '18' ? (
                     <span className="text-casino-green font-medium">F</span>
                   ) : row.thru && row.thru !== '-' && row.thru !== '0' && row.thru !== 0 ? (
@@ -380,7 +380,7 @@ export function LiveLeaderboard({
                     <span className="text-casino-gray-dark">-</span>
                   )}
                 </td>
-                <td className="px-2 sm:px-4 py-2 text-right text-xs sm:text-sm text-casino-gold">
+                <td className="px-1 sm:px-3 py-2 text-right text-xs sm:text-sm text-casino-gold">
                   {formatCurrency(prizeAmount || 0)}
                 </td>
               </tr>
