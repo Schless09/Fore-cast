@@ -11,13 +11,59 @@ import { TournamentSelector } from '@/components/tournaments/TournamentSelector'
 import { LiveRoundBadge } from '@/components/tournaments/LiveRoundBadge';
 import { LineupCountdown } from '@/components/ui/LineupCountdown';
 import Link from 'next/link';
-import { formatDate, formatScore, getScoreColor, formatTimestampCST } from '@/lib/utils';
+import { formatDate, formatTimestampCST } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
 
 // No more mapping needed - rapidapi_tourn_id now stores the RapidAPI tournId directly (e.g., "002", "004")
 
 interface TournamentPageProps {
   params: Promise<{ id: string }>;
+}
+
+// Types for data from various sources
+interface RosterPlayerData {
+  tournament_player?: {
+    pga_player_id?: string;
+    pga_player?: { name: string };
+    [key: string]: unknown;
+  };
+  player_winnings?: number;
+  fantasy_points?: number;
+  [key: string]: unknown;
+}
+
+interface CachedLeaderboardPlayer {
+  positionValue?: number;
+  playerId?: string;
+  firstName?: string;
+  lastName?: string;
+  total?: string | number;
+  toPar?: number;
+  holesPlayed?: number;
+  currentRoundScore?: string | number;
+  thru?: string;
+  player?: string;
+  teeTime?: string;
+  earnings?: number;
+}
+
+interface RapidAPILeaderboardPlayer {
+  position?: string;
+  playerId?: string;
+  firstName?: string;
+  lastName?: string;
+  total?: string | number;
+  thru?: string;
+  round?: number;
+  money?: number;
+  currentRoundScore?: string | number;
+  teeTime?: string;
+}
+
+interface PrizeDistribution {
+  position: number | string;
+  amount: number;
+  total_purse?: number;
 }
 
 
@@ -39,9 +85,10 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
   // Add timestamp for debugging revalidation and cache busting
   const pageGeneratedAt = new Date().getTime();
-  const cacheBuster = Math.random().toString(36).substring(7);
+  // Use last 6 digits of timestamp as cache identifier (deterministic, avoids impure Math.random)
+  const cacheBuster = pageGeneratedAt.toString(36).slice(-6);
 
-  // Get tournament
+  // Get tournament first (need it for early bail)
   const { data: tournament, error: tournamentError } = await supabase
     .from('tournaments')
     .select('*')
@@ -63,11 +110,43 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     );
   }
 
-  // Get all tournaments for selector
-  const { data: allTournaments } = await supabase
-    .from('tournaments')
-    .select('id, name, status, start_date')
-    .order('start_date', { ascending: false });
+  // Run remaining queries in parallel for faster page load
+  const [allTournamentsResult, existingRosterResult, teeTimeResult] = await Promise.all([
+    // Get all tournaments for selector
+    supabase
+      .from('tournaments')
+      .select('id, name, status, start_date')
+      .order('start_date', { ascending: false }),
+    
+    // Check if user has an existing roster for this tournament
+    supabase
+      .from('user_rosters')
+      .select(`
+        *,
+        roster_players(
+          *,
+          tournament_player:tournament_players(
+            *,
+            pga_player:pga_players(*)
+          )
+        )
+      `)
+      .eq('user_id', profile.id)
+      .eq('tournament_id', id)
+      .maybeSingle(),
+    
+    // Get earliest tee time for countdown
+    supabase
+      .from('tournament_players')
+      .select('tee_time_r1')
+      .eq('tournament_id', id)
+      .not('tee_time_r1', 'is', null)
+      .limit(200),
+  ]);
+
+  const allTournaments = allTournamentsResult.data;
+  const existingRoster = existingRosterResult.data;
+  const teeTimeData = teeTimeResult.data;
 
   // Sort tournaments: active first, then upcoming (by date), then completed (recent first)
   const sortedTournaments = allTournaments
@@ -90,35 +169,16 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   // Find current week tournament (active tournament)
   const currentWeekTournament = sortedTournaments.find((t) => t.status === 'active');
 
-  // Check if user has an existing roster for this tournament
-  const { data: existingRoster } = await supabase
-    .from('user_rosters')
-    .select(
-      `
-      *,
-      roster_players(
-        *,
-        tournament_player:tournament_players(
-          *,
-          pga_player:pga_players(*)
-        )
-      )
-    `
-    )
-    .eq('user_id', profile.id)
-    .eq('tournament_id', id)
-    .maybeSingle();
-
   // Get roster players if roster exists
   let existingRosterData = null;
   if (existingRoster) {
     // Sort roster players by winnings (descending), then by fantasy points as tiebreaker
     const sortedRosterPlayers = (existingRoster.roster_players || [])
-      .map((rp: any) => ({
+      .map((rp: RosterPlayerData) => ({
         ...rp,
         tournament_player: rp.tournament_player || {},
       }))
-      .sort((a: any, b: any) => {
+      .sort((a: RosterPlayerData, b: RosterPlayerData) => {
         const aWinnings = a.player_winnings || 0;
         const bWinnings = b.player_winnings || 0;
         if (aWinnings !== bWinnings) {
@@ -131,18 +191,10 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       ...existingRoster,
       roster_players: sortedRosterPlayers,
       playerIds: sortedRosterPlayers
-        .map((rp: any) => rp.tournament_player?.pga_player_id)
+        .map((rp: RosterPlayerData) => rp.tournament_player?.pga_player_id)
         .filter(Boolean),
     };
   }
-
-  // Get earliest tee time for countdown
-  const { data: teeTimeData } = await supabase
-    .from('tournament_players')
-    .select('tee_time_r1')
-    .eq('tournament_id', id)
-    .not('tee_time_r1', 'is', null)
-    .limit(200);
   
   // Parse and find earliest tee time
   let earliestTeeTime: string | undefined;
@@ -269,14 +321,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         
         // Count players at each position to detect ties
         const positionCounts = new Map<number, number>();
-        scores.forEach((player: any) => {
+        scores.forEach((player: CachedLeaderboardPlayer) => {
           const posNum = player.positionValue;
           if (posNum && posNum > 0 && posNum < 900) {
             positionCounts.set(posNum, (positionCounts.get(posNum) || 0) + 1);
           }
         });
 
-        tournamentLeaderboard = scores.map((player: any) => {
+        tournamentLeaderboard = scores.map((player: CachedLeaderboardPlayer) => {
           const posNum = player.positionValue;
           const actualPosition = (posNum && posNum < 900) ? posNum : null;
           const tieCount = actualPosition ? (positionCounts.get(actualPosition) || 1) : 1;
@@ -286,7 +338,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             position: actualPosition,
             is_tied: isTied,
             tied_with_count: tieCount,
-            total_score: parseScore(player.total),
+            total_score: parseScore(player.total ?? 0),
             today_score: player.currentRoundScore ? parseScore(player.currentRoundScore) : 0,
             thru: player.thru || 'F',
             prize_money: calculateTiePrizeMoney(actualPosition, tieCount),
@@ -331,20 +383,23 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       if (!dbError && leaderboardData && leaderboardData.length > 0) {
         leaderboardSource = 'database';
         tournamentLeaderboard =
-          leaderboardData.map((row: any) => ({
-            position: row.position ?? null,
-            is_tied: row.is_tied ?? false,
-            tied_with_count: row.tied_with_count ?? 1,
-            total_score: row.total_score ?? 0,
-            today_score: row.today_score ?? 0,
-            thru: row.thru ?? '-',
-            prize_money: row.prize_money ?? 0,
-            name: row.pga_players?.name || 'Unknown',
-            prize_distribution:
-              row.position && prizeDistributionMap.has(row.position)
-                ? prizeDistributionMap.get(row.position)
-                : undefined,
-          })) || [];
+          leaderboardData.map((row) => {
+            const pga = row.pga_players as unknown as { name: string } | null;
+            return {
+              position: row.position ?? null,
+              is_tied: row.is_tied ?? false,
+              tied_with_count: row.tied_with_count ?? 1,
+              total_score: row.total_score ?? 0,
+              today_score: row.today_score ?? 0,
+              thru: row.thru ?? '-',
+              prize_money: row.prize_money ?? 0,
+              name: pga?.name || 'Unknown',
+              prize_distribution:
+                row.position && prizeDistributionMap.has(row.position)
+                  ? prizeDistributionMap.get(row.position)
+                  : undefined,
+            };
+          }) || [];
       }
     }
 
@@ -374,19 +429,19 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           
           if (leaderboard.length > 0) {
             leaderboardSource = 'rapidapi';
-            lastUpdated = Date.now();
+            lastUpdated = pageGeneratedAt;
             
             // Count positions for ties
             const positionCounts = new Map<number, number>();
-            leaderboard.forEach((player: any) => {
-              const posNum = parseInt(player.position?.replace('T', '')) || null;
+            leaderboard.forEach((player: RapidAPILeaderboardPlayer) => {
+              const posNum = parseInt(player.position?.replace('T', '') || '') || null;
               if (posNum && posNum > 0) {
                 positionCounts.set(posNum, (positionCounts.get(posNum) || 0) + 1);
               }
             });
 
-            tournamentLeaderboard = leaderboard.map((player: any) => {
-              const posNum = parseInt(player.position?.replace('T', '')) || null;
+            tournamentLeaderboard = leaderboard.map((player: RapidAPILeaderboardPlayer) => {
+              const posNum = parseInt(player.position?.replace('T', '') || '') || null;
               const tieCount = posNum ? (positionCounts.get(posNum) || 1) : 1;
               const isTied = tieCount > 1;
 
@@ -394,7 +449,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 position: posNum,
                 is_tied: isTied,
                 tied_with_count: tieCount,
-                total_score: parseScore(player.total),
+                total_score: parseScore(player.total ?? 0),
                 today_score: player.currentRoundScore ? parseScore(player.currentRoundScore) : 0,
                 thru: player.thru || 'F',
                 prize_money: calculateTiePrizeMoney(posNum, tieCount),
@@ -430,9 +485,10 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       .select('pga_player_id, pga_players(name)')
       .eq('tournament_id', id);
     
-    allPlayers?.forEach((tp: any) => {
-      if (tp.pga_players?.name) {
-        const name = tp.pga_players.name;
+    allPlayers?.forEach((tp) => {
+      const pga = tp.pga_players as unknown as { name: string } | null;
+      if (pga?.name) {
+        const name = pga.name;
         playerNameToIdMap.set(name.toLowerCase().trim(), tp.pga_player_id);
         // Also add normalized version
         const normalized = name.toLowerCase().trim()
@@ -469,7 +525,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {prizeDistributions.slice(0, 20).map((dist: any, idx: number) => (
+                  {prizeDistributions.slice(0, 20).map((dist: PrizeDistribution, idx: number) => (
                     <tr key={idx} className="border-b border-casino-gold/10">
                       <td className="px-2 sm:px-4 py-2 font-medium text-casino-text text-xs sm:text-sm">
                         {dist.position}
@@ -530,7 +586,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             </span>
             {lastUpdated && (
               <span className="text-casino-gray">
-                Data updated: {formatTimestampCST(lastUpdated)} ({Math.round((Date.now() - lastUpdated) / 1000 / 60)} minutes ago)
+                Data updated: {formatTimestampCST(lastUpdated)} ({Math.round((pageGeneratedAt - lastUpdated) / 1000 / 60)} minutes ago)
               </span>
             )}
           </div>
@@ -676,8 +732,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               rosterName={existingRosterData.roster_name}
               tournamentName={tournament.name}
               liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
-              prizeDistributions={(prizeDistributions || []).map((p: any) => ({
-                position: p.position,
+              prizeDistributions={(prizeDistributions || []).map((p: PrizeDistribution) => ({
+                position: typeof p.position === 'string' ? parseInt(p.position, 10) : p.position,
                 amount: p.amount || 0,
               }))}
             />

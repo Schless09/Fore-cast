@@ -32,11 +32,11 @@ export default async function WeeklyStandingsByTournamentPage({
   
   const supabase = createServiceClient();
   const pageGeneratedAt = new Date().getTime();
-  const cacheBuster = Math.random().toString(36).substring(7);
+  const cacheBuster = pageGeneratedAt.toString(36);
 
   const userLeagueId = profile.active_league_id;
 
-  // Get tournament
+  // Get tournament first (need it for early bail)
   const { data: tournament, error: tournamentError } = await supabase
     .from('tournaments')
     .select('*')
@@ -58,50 +58,54 @@ export default async function WeeklyStandingsByTournamentPage({
     );
   }
 
-  // Get prize distributions for live calculations
-  const { data: prizeDistributions } = await supabase
-    .from('prize_money_distributions')
-    .select('position, percentage, amount')
-    .eq('tournament_id', tournamentId)
-    .order('position', { ascending: true });
+  // Run remaining queries in parallel for faster page load
+  const [prizeDistributionsResult, rostersResult, allTournamentsResult] = await Promise.all([
+    // Get prize distributions for live calculations
+    supabase
+      .from('prize_money_distributions')
+      .select('position, percentage, amount')
+      .eq('tournament_id', tournamentId)
+      .order('position', { ascending: true }),
+    
+    // Get all rosters for this tournament, ranked by total_winnings
+    // Filter by user's league to show only rosters from the same league
+    supabase
+      .from('user_rosters')
+      .select(`
+        id,
+        roster_name,
+        total_winnings,
+        user_id,
+        profiles!inner(username, active_league_id),
+        tournament:tournaments(name, status)
+      `)
+      .eq('tournament_id', tournamentId)
+      .eq('profiles.active_league_id', userLeagueId)
+      .order('total_winnings', { ascending: false }),
+    
+    // Get all tournaments for selector
+    supabase
+      .from('tournaments')
+      .select('id, name, status, start_date')
+      .order('status', { ascending: true })
+      .order('start_date', { ascending: false }),
+  ]);
+
+  const prizeDistributions = prizeDistributionsResult.data;
+  const rosters = rostersResult.data;
+  const allTournaments = allTournamentsResult.data;
+
+  if (rostersResult.error) {
+    console.error('Error loading rosters:', rostersResult.error);
+  }
 
   // Check if we should use live standings (active tournament with API ID)
   const useLiveStandings = tournament.status === 'active' && tournament.rapidapi_tourn_id;
-
-  // Get all rosters for this tournament, ranked by total_winnings
-  // Filter by user's league to show only rosters from the same league
-  const { data: rosters, error: rostersError } = await supabase
-    .from('user_rosters')
-    .select(
-      `
-      id,
-      roster_name,
-      total_winnings,
-      user_id,
-      profiles!inner(username, active_league_id),
-      tournament:tournaments(name, status)
-    `
-    )
-    .eq('tournament_id', tournamentId)
-    .eq('profiles.active_league_id', userLeagueId)
-    .order('total_winnings', { ascending: false });
-
-  if (rostersError) {
-    console.error('Error loading rosters:', rostersError);
-  }
 
   // Get user's roster rank
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userRosterIndex = rosters?.findIndex((r: any) => r.user_id === profile.id);
   const userRank = userRosterIndex !== undefined && userRosterIndex !== -1 ? userRosterIndex + 1 : null;
-
-  // Get all tournaments for selector, prioritizing active tournaments
-  // Sort: active first, then by start_date
-  const { data: allTournaments } = await supabase
-    .from('tournaments')
-    .select('id, name, status, start_date')
-    .order('status', { ascending: true }) // This will sort: active, completed, upcoming (alphabetically)
-    .order('start_date', { ascending: false });
 
   // Re-sort to prioritize: active > completed (recent) > upcoming (next)
   const sortedTournaments = allTournaments
@@ -131,18 +135,12 @@ export default async function WeeklyStandingsByTournamentPage({
       })
     : [];
 
-  // Determine current week's tournament
+  // Determine current week's tournament from sortedTournaments (no extra query needed)
   // 1. If there's an active tournament, show that
   // 2. After Monday noon CST, show the next upcoming tournament
   // 3. Otherwise, show the most recent completed tournament
-  
-  const { data: currentActive } = await supabase
-    .from('tournaments')
-    .select('id')
-    .eq('status', 'active')
-    .order('start_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currentActive = sortedTournaments.find((t: any) => t.status === 'active');
 
   // Check if it's after Monday noon CST
   const isAfterMondayNoonCST = () => {
@@ -356,8 +354,8 @@ export default async function WeeklyStandingsByTournamentPage({
               <div className="text-right">
                 <p className="text-xs sm:text-sm text-casino-gray mb-1">Your Winnings</p>
                 <p className="text-xl sm:text-2xl font-bold text-casino-green font-orbitron">
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {formatCurrency(
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     rosters?.find((r: any) => r.user_id === profile.id)?.total_winnings || 0
                   )}
                 </p>
