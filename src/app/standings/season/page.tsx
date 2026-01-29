@@ -46,7 +46,14 @@ interface SeasonStandingsPageProps {
 
 export default async function SeasonStandingsPage({ searchParams }: SeasonStandingsPageProps) {
   const resolvedParams = await searchParams;
-  const initialPeriod = resolvedParams.period as 'full' | 'first' | 'second' | undefined;
+  // Convert period string to SeasonPeriod type ('full' or segment number)
+  const periodParam = resolvedParams.period;
+  const initialPeriod: 'full' | number | undefined = 
+    periodParam === 'full' ? 'full' :
+    periodParam === 'first' ? 1 :
+    periodParam === 'second' ? 2 :
+    periodParam ? parseInt(periodParam, 10) || undefined :
+    undefined;
   // Auth is handled by middleware
   const profile = await getProfile();
   if (!profile) {
