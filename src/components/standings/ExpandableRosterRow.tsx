@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
+import { convertESTtoLocal } from '@/lib/timezone';
 
 interface ExpandableRosterRowProps {
   roster: any;
@@ -93,6 +94,8 @@ export function ExpandableRosterRow({
             thru,
             made_cut,
             tee_time,
+            tee_time_r1,
+            tee_time_r2,
             starting_tee,
             pga_players(name, country, image_url)
           )
@@ -282,16 +285,11 @@ export function ExpandableRosterRow({
                             <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center hidden md:table-cell">
                               {tp?.thru === 'F' ? (
                                 <span className="text-casino-green font-medium">F</span>
-                              ) : (tp?.thru && parseInt(tp.thru) > 0) ? (
+                              ) : (tp?.thru && tp.thru !== '-' && parseInt(tp.thru) > 0) ? (
                                 <span className="text-casino-blue">{tp.thru}</span>
-                              ) : tp?.tee_time ? (
+                              ) : tp?.tee_time_r1 ? (
                                 <span className="text-casino-gray">
-                                  {new Date(tp.tee_time).toLocaleTimeString('en-US', {
-                                    hour: 'numeric',
-                                    minute: '2-digit',
-                                    hour12: true
-                                    // Uses user's local timezone automatically
-                                  })}
+                                  {convertESTtoLocal(tp.tee_time_r1)}
                                 </span>
                               ) : (
                                 <span className="text-casino-gray-dark">-</span>

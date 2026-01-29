@@ -1,14 +1,40 @@
 import { TournamentPlayer, PGAPlayer } from '@/lib/types';
 import { formatScore, getScoreColor } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
+import { convertESTtoLocal } from '@/lib/timezone';
 
 interface PlayerRowProps {
   player: TournamentPlayer & { pga_player?: PGAPlayer };
   playerWinnings: number;
   rank: number;
+  currentRound?: number;
 }
 
-export function PlayerRow({ player, playerWinnings, rank }: PlayerRowProps) {
+/**
+ * Get the tee time to display based on the current round
+ * Converts from EST to user's local timezone
+ */
+function getTeeTimeForRound(player: TournamentPlayer, currentRound?: number): string | null {
+  let estTime: string | null = null;
+  
+  // For round 1 or before tournament starts, show R1 tee time
+  if (!currentRound || currentRound === 1) {
+    estTime = player.tee_time_r1 || player.tee_time;
+  }
+  // For round 2, show R2 tee time
+  else if (currentRound === 2) {
+    estTime = player.tee_time_r2 || player.tee_time;
+  }
+  // For rounds 3-4 (after cut), no scheduled tee times in our system
+  else {
+    estTime = player.tee_time;
+  }
+  
+  // Convert EST to local timezone
+  return estTime ? convertESTtoLocal(estTime) : null;
+}
+
+export function PlayerRow({ player, playerWinnings, rank, currentRound }: PlayerRowProps) {
   const pgaPlayer = player.pga_player;
   const displayName = pgaPlayer?.name || 'Unknown Player';
 
@@ -53,8 +79,7 @@ export function PlayerRow({ player, playerWinnings, rank }: PlayerRowProps) {
       </td>
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-casino-text hidden md:table-cell">
         {player.thru && player.thru !== 0 ? player.thru :
-         player.tee_time ? player.tee_time :
-         '-'}
+         getTeeTimeForRound(player, currentRound) || '-'}
       </td>
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-right">
         <span className={`font-semibold ${playerWinnings > 0 ? 'text-casino-green' : 'text-casino-gray'}`}>

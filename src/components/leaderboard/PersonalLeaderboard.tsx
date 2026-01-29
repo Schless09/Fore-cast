@@ -199,6 +199,7 @@ export function PersonalLeaderboard({
                       player={rp.tournament_player}
                       playerWinnings={rp.player_winnings || 0}
                       rank={index + 1}
+                      currentRound={roster.tournament?.current_round}
                     />
                   );
                 })

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'rea
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
+import { convertESTtoLocal } from '@/lib/timezone';
 
 interface RosterData {
   id: string;
@@ -15,6 +16,8 @@ interface RosterData {
     playerName: string;
     imageUrl?: string;
     country?: string;
+    teeTimeR1?: string | null;
+    teeTimeR2?: string | null;
   }>;
 }
 
@@ -193,6 +196,8 @@ export function LiveTeamStandings({
         roster_players(
           tournament_player:tournament_players(
             pga_player_id,
+            tee_time_r1,
+            tee_time_r2,
             pga_players(name, image_url, country)
           )
         )
@@ -221,6 +226,8 @@ export function LiveTeamStandings({
         playerName: rp.tournament_player?.pga_players?.name || 'Unknown',
         imageUrl: rp.tournament_player?.pga_players?.image_url,
         country: rp.tournament_player?.pga_players?.country,
+        teeTimeR1: rp.tournament_player?.tee_time_r1,
+        teeTimeR2: rp.tournament_player?.tee_time_r2,
       })),
     }));
 
@@ -467,8 +474,10 @@ export function LiveTeamStandings({
                                     <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center hidden md:table-cell">
                                       {player.liveScore?.thru === 'F' ? (
                                         <span className="text-casino-green font-medium">F</span>
-                                      ) : player.liveScore?.thru ? (
+                                      ) : player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0' ? (
                                         <span className="text-casino-blue">{player.liveScore.thru}</span>
+                                      ) : player.teeTimeR1 ? (
+                                        <span className="text-casino-gray">{convertESTtoLocal(player.teeTimeR1)}</span>
                                       ) : (
                                         <span className="text-casino-gray-dark">-</span>
                                       )}

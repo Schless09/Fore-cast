@@ -45,6 +45,78 @@ export async function GET(request: NextRequest) {
     console.log(`[AUTO-SYNC] ${now.toISOString()}`);
     console.log(`[AUTO-SYNC] Should poll: ${pollStatus.shouldPoll} - ${pollStatus.reason}`);
 
+    // Auto-activate upcoming tournaments that have started
+    // Check for tournaments where first tee time has passed
+    const { data: upcomingTournaments } = await supabase
+      .from('tournaments')
+      .select('id, name, start_date')
+      .eq('status', 'upcoming');
+
+    if (upcomingTournaments && upcomingTournaments.length > 0) {
+      for (const tournament of upcomingTournaments) {
+        // Get earliest tee time for this tournament
+        const { data: teeTimeData } = await supabase
+          .from('tournament_players')
+          .select('tee_time_r1')
+          .eq('tournament_id', tournament.id)
+          .not('tee_time_r1', 'is', null)
+          .limit(200);
+
+        // Parse and find earliest tee time (default to 7:00 AM if none set)
+        let earliestHour = 7;
+        let earliestMinute = 0;
+
+        if (teeTimeData && teeTimeData.length > 0) {
+          const parseTime = (timeStr: string): number => {
+            const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (!match) return 9999;
+            let hours = parseInt(match[1], 10);
+            const minutes = parseInt(match[2], 10);
+            const period = match[3].toUpperCase();
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+            return hours * 60 + minutes;
+          };
+
+          const teeTimes = teeTimeData
+            .map((t: { tee_time_r1: string | null }) => t.tee_time_r1)
+            .filter((t): t is string => t !== null);
+
+          if (teeTimes.length > 0) {
+            const sorted = teeTimes.sort((a, b) => parseTime(a) - parseTime(b));
+            const earliest = sorted[0];
+            const match = earliest.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (match) {
+              earliestHour = parseInt(match[1], 10);
+              earliestMinute = parseInt(match[2], 10);
+              const period = match[3].toUpperCase();
+              if (period === 'PM' && earliestHour !== 12) earliestHour += 12;
+              if (period === 'AM' && earliestHour === 12) earliestHour = 0;
+            }
+          }
+        }
+
+        // Create target datetime in EST
+        const [year, month, day] = tournament.start_date.split('-').map(Number);
+        const estTimeString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(earliestHour).padStart(2, '0')}:${String(earliestMinute).padStart(2, '0')}:00-05:00`;
+        const tournamentStartTime = new Date(estTimeString);
+
+        // If current time is past the start time, activate the tournament
+        if (now >= tournamentStartTime) {
+          const { error: updateError } = await supabase
+            .from('tournaments')
+            .update({ status: 'active' })
+            .eq('id', tournament.id);
+
+          if (!updateError) {
+            console.log(`[AUTO-SYNC] 🟢 Activated tournament: ${tournament.name}`);
+          } else {
+            console.error(`[AUTO-SYNC] Failed to activate ${tournament.name}:`, updateError);
+          }
+        }
+      }
+    }
+
     // Get all active tournaments
     const { data: tournaments, error: tournamentsError } = await supabase
       .from('tournaments')

@@ -5,6 +5,7 @@ import { formatScore, getScoreColor } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import { ScorecardModal } from './ScorecardModal';
+import { convertESTtoLocal } from '@/lib/timezone';
 
 interface LeaderboardRow {
   position: number | null;
@@ -16,6 +17,13 @@ interface LeaderboardRow {
   prize_money: number;
   name: string;
   apiPlayerId?: string; // Player ID from RapidAPI for scorecard lookup
+}
+
+interface TeeTimeData {
+  tee_time_r1: string | null;
+  tee_time_r2: string | null;
+  starting_tee_r1: number | null;
+  starting_tee_r2: number | null;
 }
 
 interface LiveLeaderboardProps {
@@ -31,6 +39,8 @@ interface LiveLeaderboardProps {
   playerNameToIdMap: Map<string, string>;
   liveGolfAPITournamentId?: string;
   tournamentStatus?: 'upcoming' | 'active' | 'completed';
+  currentRound?: number;
+  teeTimeMap?: Map<string, TeeTimeData>; // Map of player name to tee time data
 }
 
 // Helper to parse scores from API
@@ -44,6 +54,28 @@ const parseScore = (score: string | number | null): number => {
   return parseInt(s, 10) || 0;
 };
 
+/**
+ * Get the tee time to display based on the current round
+ * Converts from EST to user's local timezone
+ */
+function getTeeTimeForRound(teeTime: TeeTimeData | undefined, currentRound?: number): string | null {
+  if (!teeTime) return null;
+  
+  let estTime: string | null = null;
+  
+  // For round 1 or before tournament starts, show R1 tee time
+  if (!currentRound || currentRound === 1) {
+    estTime = teeTime.tee_time_r1;
+  }
+  // For round 2, show R2 tee time
+  else if (currentRound === 2) {
+    estTime = teeTime.tee_time_r2;
+  }
+  
+  // Convert EST to local timezone
+  return estTime ? convertESTtoLocal(estTime) : null;
+}
+
 export function LiveLeaderboard({
   initialData,
   tournamentId,
@@ -52,6 +84,8 @@ export function LiveLeaderboard({
   playerNameToIdMap,
   liveGolfAPITournamentId,
   tournamentStatus: initialTournamentStatus,
+  currentRound,
+  teeTimeMap,
 }: LiveLeaderboardProps) {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardRow[]>(initialData);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -354,7 +388,9 @@ export function LiveLeaderboard({
                   )}
                 </td>
                 <td className="px-2 sm:px-4 py-2 text-casino-gray text-xs sm:text-sm hidden sm:table-cell">
-                  {row.thru && row.thru !== '-' && row.thru !== '0' ? row.thru : '-'}
+                  {row.thru && row.thru !== '-' && row.thru !== '0' 
+                    ? row.thru 
+                    : getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound) || '-'}
                 </td>
                 <td className="px-2 sm:px-4 py-2 text-right text-xs sm:text-sm text-casino-gold">
                   {formatCurrency(prizeAmount || 0)}

@@ -78,6 +78,22 @@ export default async function AdminPage() {
           </Card>
         </Link>
 
+        <Link href="/admin/tee-times">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle>Manually Set Tee Times</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 text-sm mb-4">
+                Upload R1/R2 tee times from CSV (every Wednesday)
+              </p>
+              <Button variant="outline" className="w-full">
+                Upload
+              </Button>
+            </CardContent>
+          </Card>
+        </Link>
+
         <Link href="/admin/odds">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader>

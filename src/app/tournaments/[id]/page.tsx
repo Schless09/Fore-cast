@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { TournamentSelector } from '@/components/tournaments/TournamentSelector';
 import { LiveRoundBadge } from '@/components/tournaments/LiveRoundBadge';
+import { LineupCountdown } from '@/components/ui/LineupCountdown';
 import Link from 'next/link';
 import { formatDate, formatScore, getScoreColor, formatTimestampCST } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
@@ -133,6 +134,37 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         .map((rp: any) => rp.tournament_player?.pga_player_id)
         .filter(Boolean),
     };
+  }
+
+  // Get earliest tee time for countdown
+  const { data: teeTimeData } = await supabase
+    .from('tournament_players')
+    .select('tee_time_r1')
+    .eq('tournament_id', id)
+    .not('tee_time_r1', 'is', null)
+    .limit(200);
+  
+  // Parse and find earliest tee time
+  let earliestTeeTime: string | undefined;
+  if (teeTimeData && teeTimeData.length > 0) {
+    const parseTime = (timeStr: string): number => {
+      const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!match) return 9999;
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const period = match[3].toUpperCase();
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    };
+    
+    const teeTimes = teeTimeData
+      .map((t: { tee_time_r1: string | null }) => t.tee_time_r1)
+      .filter((t): t is string => t !== null);
+    
+    if (teeTimes.length > 0) {
+      earliestTeeTime = teeTimes.sort((a, b) => parseTime(a) - parseTime(b))[0];
+    }
   }
 
   // Determine what to show
@@ -607,6 +639,17 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           </div>
         </CardHeader>
       </Card>
+
+      {/* Lineup Countdown - shows for upcoming tournaments */}
+      {tournament.status === 'upcoming' && (
+        <div className="mb-6 flex justify-center">
+          <LineupCountdown
+            startDate={tournament.start_date}
+            earliestTeeTime={earliestTeeTime}
+            status={tournament.status}
+          />
+        </div>
+      )}
 
       {/* Roster Section - shows summary with edit option, or builder for new rosters */}
       {showRosterBuilder && (
