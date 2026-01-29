@@ -41,6 +41,7 @@ interface LiveLeaderboardProps {
   tournamentStatus?: 'upcoming' | 'active' | 'completed';
   currentRound?: number;
   teeTimeMap?: Map<string, TeeTimeData>; // Map of player name to tee time data
+  playerCostMap?: Map<string, number>; // Map of player name to salary cost
 }
 
 // Helper to parse scores from API
@@ -86,6 +87,7 @@ export function LiveLeaderboard({
   tournamentStatus: initialTournamentStatus,
   currentRound,
   teeTimeMap,
+  playerCostMap,
 }: LiveLeaderboardProps) {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardRow[]>(initialData);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -352,6 +354,9 @@ export function LiveLeaderboard({
                 </td>
                 <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>
                   {name}
+                  {playerCostMap?.has(name) && (
+                    <span className="text-casino-gray font-normal ml-1">(${playerCostMap.get(name)})</span>
+                  )}
                 </td>
                 <td className={`px-1 sm:px-3 py-2 font-semibold text-xs sm:text-sm ${totalClass}`}>
                   {formatScore(row.total_score)}

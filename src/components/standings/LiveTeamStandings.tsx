@@ -14,10 +14,9 @@ interface RosterData {
   players: Array<{
     playerId: string;
     playerName: string;
-    imageUrl?: string;
-    country?: string;
     teeTimeR1?: string | null;
     teeTimeR2?: string | null;
+    cost?: number;
   }>;
 }
 
@@ -198,7 +197,8 @@ export function LiveTeamStandings({
             pga_player_id,
             tee_time_r1,
             tee_time_r2,
-            pga_players(name, image_url, country)
+            cost,
+            pga_players(name)
           )
         )
       `)
@@ -224,10 +224,9 @@ export function LiveTeamStandings({
       players: (r.roster_players || []).map((rp: any) => ({
         playerId: rp.tournament_player?.pga_player_id,
         playerName: rp.tournament_player?.pga_players?.name || 'Unknown',
-        imageUrl: rp.tournament_player?.pga_players?.image_url,
-        country: rp.tournament_player?.pga_players?.country,
         teeTimeR1: rp.tournament_player?.tee_time_r1,
         teeTimeR2: rp.tournament_player?.tee_time_r2,
+        cost: rp.tournament_player?.cost,
       })),
     }));
 
@@ -430,20 +429,12 @@ export function LiveTeamStandings({
                                 {roster.playersWithScores.map((player, idx) => (
                                   <tr key={idx} className="hover:bg-casino-card/50 transition-colors">
                                     <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-casino-text">
-                                      <div className="flex items-center gap-1 sm:gap-2">
-                                        {player.imageUrl ? (
-                                          <img
-                                            src={player.imageUrl}
-                                            alt={player.playerName}
-                                            className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0 border border-casino-gold/20"
-                                          />
-                                        ) : (
-                                          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-casino-card border border-casino-gold/20 flex items-center justify-center text-xs shrink-0">
-                                            <span className="text-casino-gray">{player.playerName.charAt(0)}</span>
-                                          </div>
+                                      <span className="truncate">
+                                        {player.playerName}
+                                        {player.cost !== undefined && player.cost !== null && (
+                                          <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
                                         )}
-                                        <span className="truncate">{player.playerName}</span>
-                                      </div>
+                                      </span>
                                     </td>
                                     <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center">
                                       {player.liveScore?.position ? (

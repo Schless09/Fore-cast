@@ -493,12 +493,13 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   // Get player IDs on user's roster for highlighting  
   const userRosterPlayerIds = existingRosterData?.playerIds || [];
   
-  // Create a map of player names to IDs from tournament_players for highlighting
+  // Create a map of player names to IDs and costs from tournament_players
   const playerNameToIdMap = new Map<string, string>();
+  const playerCostMap = new Map<string, number>();
   if ((tournament.status === 'active' || tournament.status === 'completed') && (existingRoster || tournament.status === 'completed')) {
     const { data: allPlayers } = await supabase
       .from('tournament_players')
-      .select('pga_player_id, pga_players(name)')
+      .select('pga_player_id, cost, pga_players(name)')
       .eq('tournament_id', id);
     
     allPlayers?.forEach((tp) => {
@@ -511,6 +512,10 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '');
         playerNameToIdMap.set(normalized, tp.pga_player_id);
+        // Add cost map entry with the exact player name
+        if (tp.cost !== null && tp.cost !== undefined) {
+          playerCostMap.set(name, tp.cost);
+        }
       }
     });
   }
@@ -599,6 +604,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             tournamentStatus={tournament.status}
             currentRound={tournament.current_round}
             teeTimeMap={teeTimeMap}
+            playerCostMap={playerCostMap}
           />
         </CardContent>
       </Card>
@@ -753,9 +759,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       )}
 
       {/* Links */}
-      <div className="mt-8 flex justify-center">
+      <div className="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
         <Link href="/standings/weekly">
           <Button variant="ghost">← Back to Weekly Standings</Button>
+        </Link>
+        <Link href={`/tournaments/${id}/analytics`}>
+          <Button variant="outline">📊 Inside the Field Analytics</Button>
         </Link>
       </div>
     </div>
