@@ -325,7 +325,35 @@ export function LiveLeaderboard({
               .normalize('NFD')
               .replace(/[\u0300-\u036f]/g, '');
 
-            const playerId = playerNameToIdMap.get(normalizedName) || playerNameToIdMap.get(name.toLowerCase().trim());
+            // Try exact match first
+            let playerId = playerNameToIdMap.get(normalizedName) || playerNameToIdMap.get(name.toLowerCase().trim());
+            
+            // If no match, try fuzzy matching (e.g., "Cam Davis" vs "Cameron Davis")
+            if (!playerId) {
+              const nameParts = normalizedName.split(' ');
+              if (nameParts.length >= 2) {
+                const apiLastName = nameParts[nameParts.length - 1];
+                const apiFirstName = nameParts[0];
+                
+                // Search through all player names in the map
+                for (const [mapName, mapId] of playerNameToIdMap.entries()) {
+                  const mapParts = mapName.split(' ');
+                  if (mapParts.length >= 2) {
+                    const mapLastName = mapParts[mapParts.length - 1];
+                    const mapFirstName = mapParts[0];
+                    
+                    // Match if last names match and one first name starts with the other
+                    if (apiLastName === mapLastName) {
+                      if (apiFirstName.startsWith(mapFirstName) || mapFirstName.startsWith(apiFirstName)) {
+                        playerId = mapId;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            
             const isUserPlayer = playerId && userRosterPlayerIds.includes(playerId);
 
             const pos = row.position

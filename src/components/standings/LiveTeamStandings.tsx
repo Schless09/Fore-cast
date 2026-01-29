@@ -58,7 +58,7 @@ export function LiveTeamStandings({
   liveGolfAPITournamentId,
   prizeDistributions,
   currentUserId,
-  tournamentStatus,
+  tournamentStatus: _tournamentStatus,
   userLeagueId,
 }: LiveTeamStandingsProps) {
   const [rosters, setRosters] = useState<RosterData[]>([]);
@@ -108,15 +108,55 @@ export function LiveTeamStandings({
       .replace(/\s+/g, ' '); // Normalize spaces
   };
 
-  // Create a map of player name -> live score data
+  // Create a map of player name -> live score data with multiple lookup keys
   const playerScoreMap = useMemo(() => {
     const map = new Map<string, LiveScore>();
     liveScores.forEach((score) => {
       const normalizedName = normalizeName(score.player);
       map.set(normalizedName, score);
+      
+      // Also add lookup by last name for fuzzy matching
+      const nameParts = normalizedName.split(' ');
+      if (nameParts.length >= 2) {
+        const lastName = nameParts[nameParts.length - 1];
+        const firstName = nameParts[0];
+        // Store "lastname_firstname" pattern for fuzzy lookup
+        map.set(`__fuzzy__${lastName}__${firstName}`, score);
+      }
     });
     return map;
   }, [liveScores]);
+
+  // Find live score with fuzzy matching for nicknames like "Cam" vs "Cameron"
+  const findLiveScore = useCallback((playerName: string): LiveScore | undefined => {
+    const normalizedName = normalizeName(playerName);
+    
+    // Try exact match first
+    let match = playerScoreMap.get(normalizedName);
+    if (match) return match;
+    
+    // Try fuzzy matching by last name + first name starts with
+    const nameParts = normalizedName.split(' ');
+    if (nameParts.length >= 2) {
+      const lastName = nameParts[nameParts.length - 1];
+      const firstName = nameParts[0];
+      
+      // Look through all fuzzy keys
+      for (const [key, score] of playerScoreMap.entries()) {
+        if (key.startsWith('__fuzzy__')) {
+          const [, fuzzyLastName, fuzzyFirstName] = key.split('__').filter(Boolean);
+          // Match if last names match and one first name starts with the other
+          if (fuzzyLastName === lastName) {
+            if (firstName.startsWith(fuzzyFirstName) || fuzzyFirstName.startsWith(firstName)) {
+              return score;
+            }
+          }
+        }
+      }
+    }
+    
+    return undefined;
+  }, [playerScoreMap]);
 
   // Count players at each position to detect ties
   const positionCounts = useMemo(() => {
@@ -152,8 +192,8 @@ export function LiveTeamStandings({
     return rosters.map((roster) => {
       let totalWinnings = 0;
       const playersWithScores = roster.players.map((player) => {
-        const normalizedName = normalizeName(player.playerName);
-        const liveScore = playerScoreMap.get(normalizedName);
+        // Use fuzzy matching to find live score
+        const liveScore = findLiveScore(player.playerName);
         
         const position = liveScore?.positionValue;
         
@@ -178,7 +218,7 @@ export function LiveTeamStandings({
         totalWinnings,
       };
     }).sort((a, b) => b.totalWinnings - a.totalWinnings);
-  }, [rosters, playerScoreMap, calculateTiePrizeMoney]);
+  }, [rosters, findLiveScore, calculateTiePrizeMoney]);
 
   // Fetch rosters from database
   const fetchRosters = useCallback(async () => {

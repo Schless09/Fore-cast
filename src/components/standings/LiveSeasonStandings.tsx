@@ -40,6 +40,21 @@ interface LiveScore {
   currentRoundScore: string;
 }
 
+interface RosterPlayer {
+  tournament_player?: {
+    pga_players?: {
+      name: string;
+    } | null;
+  } | null;
+}
+
+interface ActiveRosterData {
+  id: string;
+  user_id: string;
+  roster_name: string;
+  roster_players: RosterPlayer[] | null;
+}
+
 interface LiveSeasonStandingsProps {
   completedStandings: CompletedStanding[];
   currentUserId: string;
@@ -89,15 +104,52 @@ export function LiveSeasonStandings({
     [prizeDistributions]
   );
 
-  // Create a map of player name -> live score data
+  // Create a map of player name -> live score data with multiple lookup keys
   const playerScoreMap = useMemo(() => {
     const map = new Map<string, LiveScore>();
     liveScores.forEach((score) => {
       const normalizedName = normalizeName(score.player);
       map.set(normalizedName, score);
+      
+      // Also add lookup by last name for fuzzy matching
+      const nameParts = normalizedName.split(' ');
+      if (nameParts.length >= 2) {
+        const lastName = nameParts[nameParts.length - 1];
+        const firstName = nameParts[0];
+        map.set(`__fuzzy__${lastName}__${firstName}`, score);
+      }
     });
     return map;
   }, [liveScores]);
+
+  // Find live score with fuzzy matching for nicknames
+  const findLiveScore = useCallback((playerName: string): LiveScore | undefined => {
+    const normalizedName = normalizeName(playerName);
+    
+    // Try exact match first
+    const match = playerScoreMap.get(normalizedName);
+    if (match) return match;
+    
+    // Try fuzzy matching by last name + first name starts with
+    const nameParts = normalizedName.split(' ');
+    if (nameParts.length >= 2) {
+      const lastName = nameParts[nameParts.length - 1];
+      const firstName = nameParts[0];
+      
+      for (const [key, score] of playerScoreMap.entries()) {
+        if (key.startsWith('__fuzzy__')) {
+          const [, fuzzyLastName, fuzzyFirstName] = key.split('__').filter(Boolean);
+          if (fuzzyLastName === lastName) {
+            if (firstName.startsWith(fuzzyFirstName) || fuzzyFirstName.startsWith(firstName)) {
+              return score;
+            }
+          }
+        }
+      }
+    }
+    
+    return undefined;
+  }, [playerScoreMap]);
 
   // Count players at each position to detect ties
   const positionCounts = useMemo(() => {
@@ -132,8 +184,8 @@ export function LiveSeasonStandings({
   const calculateLiveWinnings = useCallback((playerNames: string[]): number => {
     let total = 0;
     playerNames.forEach((name) => {
-      const normalizedName = normalizeName(name);
-      const liveScore = playerScoreMap.get(normalizedName);
+      // Use fuzzy matching to find live score
+      const liveScore = findLiveScore(name);
       const position = liveScore?.positionValue;
       if (position && position > 0) {
         // Use tie-aware prize calculation
@@ -141,7 +193,7 @@ export function LiveSeasonStandings({
       }
     });
     return total;
-  }, [playerScoreMap, calculateTiePrizeMoney]);
+  }, [findLiveScore, calculateTiePrizeMoney]);
 
   // Combined standings with live data, filtered by selected period
   const combinedStandings = useMemo(() => {
@@ -229,10 +281,10 @@ export function LiveSeasonStandings({
 
     const rostersMap = new Map<string, { rosterId: string; rosterName: string; playerNames: string[] }>();
     
-    (data || []).forEach((roster: any) => {
+    ((data || []) as ActiveRosterData[]).forEach((roster) => {
       const playerNames = (roster.roster_players || [])
-        .map((rp: any) => rp.tournament_player?.pga_players?.name)
-        .filter(Boolean);
+        .map((rp: RosterPlayer) => rp.tournament_player?.pga_players?.name)
+        .filter((name): name is string => Boolean(name));
       
       rostersMap.set(roster.user_id, {
         rosterId: roster.id,
