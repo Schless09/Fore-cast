@@ -135,12 +135,11 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       .eq('tournament_id', id)
       .maybeSingle(),
     
-    // Get earliest tee time for countdown
+    // Get tee times for all players (for countdown and leaderboard display)
     supabase
       .from('tournament_players')
-      .select('tee_time_r1')
+      .select('tee_time_r1, tee_time_r2, starting_tee_r1, starting_tee_r2, pga_players(name)')
       .eq('tournament_id', id)
-      .not('tee_time_r1', 'is', null)
       .limit(200),
   ]);
 
@@ -196,8 +195,10 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     };
   }
   
-  // Parse and find earliest tee time
+  // Parse and find earliest tee time + build tee time map for leaderboard
   let earliestTeeTime: string | undefined;
+  const teeTimeMap = new Map<string, { tee_time_r1: string | null; tee_time_r2: string | null; starting_tee_r1: number | null; starting_tee_r2: number | null }>();
+  
   if (teeTimeData && teeTimeData.length > 0) {
     const parseTime = (timeStr: string): number => {
       const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -210,8 +211,31 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       return hours * 60 + minutes;
     };
     
+    // Build tee time map for leaderboard display
+    interface TeeTimeRow {
+      tee_time_r1: string | null;
+      tee_time_r2: string | null;
+      starting_tee_r1: number | null;
+      starting_tee_r2: number | null;
+      pga_players: { name: string } | null;
+    }
+    
+    teeTimeData.forEach((t) => {
+      const row = t as unknown as TeeTimeRow;
+      const pga = row.pga_players as unknown as { name: string } | null;
+      if (pga?.name) {
+        teeTimeMap.set(pga.name, {
+          tee_time_r1: row.tee_time_r1,
+          tee_time_r2: row.tee_time_r2,
+          starting_tee_r1: row.starting_tee_r1,
+          starting_tee_r2: row.starting_tee_r2,
+        });
+      }
+    });
+    
+    // Find earliest tee time for countdown
     const teeTimes = teeTimeData
-      .map((t: { tee_time_r1: string | null }) => t.tee_time_r1)
+      .map((t) => (t as unknown as TeeTimeRow).tee_time_r1)
       .filter((t): t is string => t !== null);
     
     if (teeTimes.length > 0) {
@@ -600,6 +624,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             playerNameToIdMap={playerNameToIdMap}
             liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
             tournamentStatus={tournament.status}
+            currentRound={tournament.current_round}
+            teeTimeMap={teeTimeMap}
           />
         </CardContent>
       </Card>

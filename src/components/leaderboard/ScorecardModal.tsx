@@ -41,7 +41,8 @@ interface ScorecardModalProps {
   onClose: () => void;
   playerId: string;
   playerName: string;
-  eventId: string;
+  eventId: string; // This is the tournId (e.g., "004")
+  year?: string; // Tournament year, defaults to current year
 }
 
 // Helper to parse score string like "-9", "+2", "E"
@@ -107,11 +108,14 @@ function HoleScore({ strokes, scoreToPar }: { strokes: number | string; scoreToP
   );
 }
 
-export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId }: ScorecardModalProps) {
+export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId, year }: ScorecardModalProps) {
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
+
+  // Use provided year or default to current year
+  const tournamentYear = year || new Date().getFullYear().toString();
 
   const fetchScorecard = useCallback(async () => {
     if (!playerId || !eventId) return;
@@ -120,7 +124,7 @@ export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId 
     setError(null);
     
     try {
-      const response = await fetch(`/api/scores/scorecard?eventId=${eventId}&playerId=${playerId}`);
+      const response = await fetch(`/api/scores/scorecard?year=${tournamentYear}&tournId=${eventId}&playerId=${playerId}`);
       const result = await response.json();
       
       if (!response.ok || !result.data) {
@@ -141,7 +145,7 @@ export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId 
     } finally {
       setIsLoading(false);
     }
-  }, [playerId, eventId]);
+  }, [playerId, eventId, tournamentYear]);
 
   useEffect(() => {
     if (isOpen && playerId) {

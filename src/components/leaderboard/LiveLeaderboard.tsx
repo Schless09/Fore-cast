@@ -387,10 +387,16 @@ export function LiveLeaderboard({
                     formatScore(row.today_score)
                   )}
                 </td>
-                <td className="px-2 sm:px-4 py-2 text-casino-gray text-xs sm:text-sm hidden sm:table-cell">
-                  {row.thru && row.thru !== '-' && row.thru !== '0' 
-                    ? row.thru 
-                    : getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound) || '-'}
+                <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm hidden sm:table-cell">
+                  {row.thru === 'F' || row.thru === 18 || row.thru === '18' ? (
+                    <span className="text-casino-green font-medium">F</span>
+                  ) : row.thru && row.thru !== '-' && row.thru !== '0' && row.thru !== 0 ? (
+                    <span className="text-casino-blue">{row.thru}</span>
+                  ) : getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound) ? (
+                    <span className="text-casino-gray">{getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound)}</span>
+                  ) : (
+                    <span className="text-casino-gray-dark">-</span>
+                  )}
                 </td>
                 <td className="px-2 sm:px-4 py-2 text-right text-xs sm:text-sm text-casino-gold">
                   {formatCurrency(prizeAmount || 0)}
