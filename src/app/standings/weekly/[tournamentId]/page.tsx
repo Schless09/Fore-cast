@@ -366,6 +366,13 @@ export default async function WeeklyStandingsByTournamentPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Back to Leaderboard Link */}
+      <div className="mt-8 flex justify-center">
+        <Link href={`/tournaments/${tournamentId}`}>
+          <Button variant="ghost">← Back to Live Leaderboard</Button>
+        </Link>
+      </div>
     </div>
   );
 }

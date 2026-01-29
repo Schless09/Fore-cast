@@ -698,15 +698,10 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       )}
 
       {/* Links */}
-      <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:justify-between">
-        <Link href="/tournaments" className="w-full sm:w-auto">
-          <Button variant="ghost" className="w-full sm:w-auto">← Back to Tournaments</Button>
+      <div className="mt-8 flex justify-center">
+        <Link href="/standings/weekly">
+          <Button variant="ghost">← Back to Weekly Standings</Button>
         </Link>
-        {(tournament.status === 'active' || tournament.status === 'completed') && (
-          <Link href="/standings/weekly" className="w-full sm:w-auto">
-            <Button variant="outline" className="w-full sm:w-auto">View Weekly Standings</Button>
-          </Link>
-        )}
       </div>
     </div>
   );
