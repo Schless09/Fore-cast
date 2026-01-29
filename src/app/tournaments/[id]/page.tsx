@@ -11,7 +11,7 @@ import { TournamentSelector } from '@/components/tournaments/TournamentSelector'
 import { LiveRoundBadge } from '@/components/tournaments/LiveRoundBadge';
 import { LineupCountdown } from '@/components/ui/LineupCountdown';
 import Link from 'next/link';
-import { formatDate, formatTimestampCST } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
 
 // No more mapping needed - rapidapi_tourn_id now stores the RapidAPI tournId directly (e.g., "002", "004")
@@ -82,11 +82,6 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   }
   
   const supabase = createServiceClient();
-
-  // Add timestamp for debugging revalidation and cache busting
-  const pageGeneratedAt = new Date().getTime();
-  // Use last 6 digits of timestamp as cache identifier (deterministic, avoids impure Math.random)
-  const cacheBuster = pageGeneratedAt.toString(36).slice(-6);
 
   // Get tournament first (need it for early bail)
   const { data: tournament, error: tournamentError } = await supabase
@@ -281,7 +276,6 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
   let tournamentLeaderboard: LeaderboardRow[] = [];
   let leaderboardSource: 'database' | 'rapidapi' | 'cache' | 'none' = 'none';
-  let lastUpdated: number | null = null;
 
   // Helper to parse LiveGolfAPI scores
   const parseScore = (score: string | number | null): number => {
@@ -339,7 +333,6 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     
     if (cachedData?.data?.data && Array.isArray(cachedData.data.data) && cachedData.data.data.length > 0) {
         leaderboardSource = 'cache';
-        lastUpdated = cachedData.data.timestamp || new Date(cachedData.updated_at).getTime();
         
         const scores = cachedData.data.data;
         
@@ -453,7 +446,6 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           
           if (leaderboard.length > 0) {
             leaderboardSource = 'rapidapi';
-            lastUpdated = pageGeneratedAt;
             
             // Count positions for ties
             const positionCounts = new Map<number, number>();
@@ -583,36 +575,17 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     return (
       <Card>
         <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <div>
               <CardTitle className="text-lg sm:text-xl">
                 {tournament.status === 'active' ? 'Live Leaderboard' : 'Final Leaderboard'}
-                <div className="text-xs text-casino-gray mt-1">
-                  Tournament: {tournament.name} (ID: {id})
-                </div>
               </CardTitle>
-          {tournament.status === 'active' && existingRoster && (
-            <p className="text-sm text-casino-green mt-2">
-              ⭐ Your players are highlighted below
-            </p>
-          )}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-casino-gray mt-2">
-            <span>
-              Source:{' '}
-              {leaderboardSource === 'database'
-                ? 'Database'
-                : leaderboardSource === 'cache'
-                ? 'Cache'
-                : leaderboardSource === 'rapidapi'
-                ? 'RapidAPI'
-                : 'Unknown'} | Cache: {cacheBuster}
-            </span>
-            <span className="text-casino-gray">
-              Page generated: {formatTimestampCST(pageGeneratedAt)}
-            </span>
-            {lastUpdated && (
-              <span className="text-casino-gray">
-                Data updated: {formatTimestampCST(lastUpdated)} ({Math.round((pageGeneratedAt - lastUpdated) / 1000 / 60)} minutes ago)
-              </span>
-            )}
+              {tournament.status === 'active' && existingRoster && (
+                <p className="text-xs text-casino-green mt-1">
+                  ⭐ Your players are highlighted
+                </p>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>

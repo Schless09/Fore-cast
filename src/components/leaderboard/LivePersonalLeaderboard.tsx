@@ -244,41 +244,31 @@ export function LivePersonalLeaderboard({
       </CardHeader>
       <CardContent>
         {/* Refresh Status Bar */}
-        <div className="mb-4 space-y-2">
-          <div className="flex items-center justify-between p-2 bg-casino-elevated rounded-lg border border-casino-gold/20">
-            <div className="flex items-center gap-2 text-xs text-casino-gray">
-              {isRefreshing ? (
-                <>
-                  <span className="animate-spin">🔄</span>
-                  <span>Refreshing...</span>
-                </>
-              ) : syncError ? (
-                <>
-                  <span className="text-yellow-500">⚠</span>
-                  <span>Retry in {formatCountdown(nextRefreshIn)}</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-green-500">●</span>
-                  <span>Live</span>
-                  <span className="text-casino-gray-dark">|</span>
-                  <span>Next: {formatCountdown(nextRefreshIn)}</span>
-                </>
-              )}
-            </div>
-            <button
-              onClick={fetchLiveScores}
-              disabled={isRefreshing}
-              className="text-xs px-3 py-1 bg-casino-gold/20 hover:bg-casino-gold/30 text-casino-gold rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
+        <div className="mb-3 flex items-center justify-between text-xs text-casino-gray">
+          <div className="flex items-center gap-2">
+            {isRefreshing ? (
+              <>
+                <span className="animate-spin">🔄</span>
+                <span>Updating...</span>
+              </>
+            ) : syncError ? (
+              <span className="text-yellow-500">⚠ Retry in {formatCountdown(nextRefreshIn)}</span>
+            ) : (
+              <>
+                <span className="text-green-500">●</span>
+                <span>Live</span>
+                <span className="text-casino-gray-dark">•</span>
+                <span>Next update: {formatCountdown(nextRefreshIn)}</span>
+              </>
+            )}
           </div>
-          {syncError && (
-            <div className="p-2 bg-yellow-900/30 border border-yellow-600/50 rounded-lg text-xs text-yellow-300">
-              ⚠️ {syncError}
-            </div>
-          )}
+          <button
+            onClick={fetchLiveScores}
+            disabled={isRefreshing}
+            className="text-xs px-2 py-0.5 text-casino-gold hover:text-casino-gold/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isRefreshing ? '...' : 'Refresh'}
+          </button>
         </div>
 
         <div className="overflow-x-auto">

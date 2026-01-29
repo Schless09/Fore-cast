@@ -93,7 +93,6 @@ export function LiveLeaderboard({
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [apiTournamentStatus, setApiTournamentStatus] = useState<string>('In Progress');
-  const [cacheAge, setCacheAge] = useState<number | null>(null); // How old the server cache is
   const hasInitialSynced = useRef(false);
   
   // Scorecard modal state
@@ -136,12 +135,9 @@ export function LiveLeaderboard({
         return;
       }
 
-      // Update tournament status and cache age
+      // Update tournament status
       if (result.tournamentStatus) {
         setApiTournamentStatus(result.tournamentStatus);
-      }
-      if (result.cacheAge !== undefined) {
-        setCacheAge(result.cacheAge);
       }
 
       // Transform API data directly to display format
@@ -270,36 +266,27 @@ export function LiveLeaderboard({
     <div>
       {/* Refresh Status Bar */}
       {liveGolfAPITournamentId && (
-        <div className="mb-4 space-y-2">
-          <div className="flex items-center justify-between p-2 bg-casino-elevated rounded-lg border border-casino-gold/20">
-            <div className="flex items-center gap-2 text-xs text-casino-gray">
+        <div className="mb-3">
+          <div className="flex items-center justify-between text-xs text-casino-gray">
+            <div className="flex items-center gap-2">
               {isCompleted ? (
                 <>
                   <span className="text-casino-gold">🏆</span>
-                  <span className="text-casino-gold font-medium">Tournament Completed</span>
+                  <span className="text-casino-gold font-medium">Final</span>
                 </>
               ) : isRefreshing ? (
                 <>
                   <span className="animate-spin">🔄</span>
-                  <span>Refreshing live scores...</span>
+                  <span>Updating...</span>
                 </>
               ) : syncError ? (
-                <>
-                  <span className="text-yellow-500">⚠</span>
-                  <span>Retry in {formatCountdown(nextRefreshIn)}</span>
-                </>
+                <span className="text-yellow-500">⚠ Retry in {formatCountdown(nextRefreshIn)}</span>
               ) : (
                 <>
                   <span className="text-green-500">●</span>
-                  <span>Live updates active</span>
-                  {cacheAge !== null && (
-                    <>
-                      <span className="text-casino-gray-dark">|</span>
-                      <span>Data {cacheAge < 60 ? `${cacheAge}s` : `${Math.floor(cacheAge / 60)}m`} old</span>
-                    </>
-                  )}
-                  <span className="text-casino-gray-dark">|</span>
-                  <span>Next check in {formatCountdown(nextRefreshIn)}</span>
+                  <span>Live</span>
+                  <span className="text-casino-gray-dark">•</span>
+                  <span>Next update: {formatCountdown(nextRefreshIn)}</span>
                 </>
               )}
             </div>
@@ -307,17 +294,12 @@ export function LiveLeaderboard({
               <button
                 onClick={fetchFromAPI}
                 disabled={isRefreshing}
-                className="text-xs px-3 py-1 bg-casino-gold/20 hover:bg-casino-gold/30 text-casino-gold rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="text-xs px-2 py-0.5 text-casino-gold hover:text-casino-gold/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isRefreshing ? 'Refreshing...' : 'Refresh Now'}
+                {isRefreshing ? '...' : 'Refresh'}
               </button>
             )}
           </div>
-          {syncError && (
-            <div className="p-2 bg-yellow-900/30 border border-yellow-600/50 rounded-lg text-xs text-yellow-300">
-              ⚠️ {syncError}
-            </div>
-          )}
         </div>
       )}
 
