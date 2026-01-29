@@ -19,8 +19,6 @@ interface LiveScore {
 
 interface RosterPlayer {
   playerName: string;
-  imageUrl?: string;
-  country?: string;
   teeTimeR1?: string | null;
   teeTimeR2?: string | null;
 }
@@ -151,7 +149,7 @@ export function LivePersonalLeaderboard({
           pga_player_id,
           tee_time_r1,
           tee_time_r2,
-          pga_players(name, image_url, country)
+          pga_players(name)
         )
       `)
       .eq('roster_id', rosterId);
@@ -163,8 +161,6 @@ export function LivePersonalLeaderboard({
 
     const players: RosterPlayer[] = (data || []).map((rp: any) => ({
       playerName: rp.tournament_player?.pga_players?.name || 'Unknown',
-      imageUrl: rp.tournament_player?.pga_players?.image_url,
-      country: rp.tournament_player?.pga_players?.country,
       teeTimeR1: rp.tournament_player?.tee_time_r1,
       teeTimeR2: rp.tournament_player?.tee_time_r2,
     }));
@@ -280,7 +276,7 @@ export function LivePersonalLeaderboard({
                 <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Pos</th>
                 <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Total</th>
                 <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Today</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase hidden md:table-cell">Thru</th>
+                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Thru</th>
                 <th className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Prize</th>
               </tr>
             </thead>
@@ -289,21 +285,8 @@ export function LivePersonalLeaderboard({
                 playersWithLiveData.map((player, index) => (
                   <tr key={index} className="border-b border-casino-gold/10 hover:bg-casino-elevated transition-colors">
                     <td className="px-2 sm:px-4 py-2 text-casino-gray">{index + 1}</td>
-                    <td className="px-2 sm:px-4 py-2">
-                      <div className="flex items-center gap-2">
-                        {player.imageUrl ? (
-                          <img
-                            src={player.imageUrl}
-                            alt={player.playerName}
-                            className="w-6 h-6 rounded-full object-cover border border-casino-gold/20"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-casino-card border border-casino-gold/20 flex items-center justify-center text-xs">
-                            <span className="text-casino-gray">{player.playerName.charAt(0)}</span>
-                          </div>
-                        )}
-                        <span className="text-casino-text">{player.playerName}</span>
-                      </div>
+                    <td className="px-2 sm:px-4 py-2 text-casino-text">
+                      {player.playerName}
                     </td>
                     <td className="px-2 sm:px-4 py-2">
                       {player.liveScore?.position ? (
@@ -344,7 +327,7 @@ export function LivePersonalLeaderboard({
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-2 sm:px-4 py-2 hidden md:table-cell">
+                    <td className="px-2 sm:px-4 py-2">
                       {player.liveScore?.thru === 'F' ? (
                         <span className="text-casino-green font-medium">F</span>
                       ) : player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0' ? (

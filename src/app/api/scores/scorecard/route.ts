@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CACHE_TTL_MS } from '@/lib/config';
+import { createServiceClient } from '@/lib/supabase/service';
 
 /**
  * Fetch player scorecard from RapidAPI Live Golf Data
@@ -82,6 +83,16 @@ export async function GET(request: NextRequest) {
       });
     }
     
+    // Get course name from our database
+    const supabase = createServiceClient();
+    const { data: tournament } = await supabase
+      .from('tournaments')
+      .select('course, name')
+      .eq('rapidapi_tourn_id', tournId)
+      .single();
+    
+    const courseName = tournament?.course || '';
+    
     // Get player info from first round
     const firstRound = roundsArray[0];
     
@@ -94,8 +105,8 @@ export async function GET(request: NextRequest) {
         country: firstRound.country || '',
       },
       tournament: {
-        name: '', // Not provided in this endpoint
-        courseName: '',
+        name: tournament?.name || '',
+        courseName: courseName,
       },
       rounds: roundsArray.map((round: any) => {
         // holes is an object keyed by hole number, convert to sorted array
@@ -117,7 +128,7 @@ export async function GET(request: NextRequest) {
         
         return {
           roundNumber: round.roundId?.$numberInt || round.roundId,
-          courseName: `Course ${round.courseId || ''}`,
+          courseName: round.courseName || round.course || courseName,
           scoreToPar: round.currentRoundScore || '0',
           strokes: round.totalShots?.$numberInt || round.totalShots,
           holes: holesArray,

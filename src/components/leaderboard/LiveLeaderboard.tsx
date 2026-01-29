@@ -311,7 +311,7 @@ export function LiveLeaderboard({
             <th className="px-2 sm:px-4 py-2">Golfer</th>
             <th className="px-2 sm:px-4 py-2">Total</th>
             <th className="px-2 sm:px-4 py-2" title="Click score to view scorecard">Today</th>
-            <th className="px-2 sm:px-4 py-2 hidden sm:table-cell" title="Holes completed or tee time">Thru</th>
+            <th className="px-2 sm:px-4 py-2" title="Holes completed or tee time">Thru</th>
             <th className="px-2 sm:px-4 py-2 text-right">Prize</th>
           </tr>
         </thead>
@@ -369,7 +369,7 @@ export function LiveLeaderboard({
                     formatScore(row.today_score)
                   )}
                 </td>
-                <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm hidden sm:table-cell">
+                <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm">
                   {row.thru === 'F' || row.thru === 18 || row.thru === '18' ? (
                     <span className="text-casino-green font-medium">F</span>
                   ) : row.thru && row.thru !== '-' && row.thru !== '0' && row.thru !== 0 ? (
