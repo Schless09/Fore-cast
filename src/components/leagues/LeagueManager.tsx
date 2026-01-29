@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { JoinLeagueModal } from './JoinLeagueModal';
@@ -11,6 +12,7 @@ interface League {
   id: string;
   name: string;
   joined_at: string;
+  is_commissioner?: boolean;
 }
 
 interface LeagueManagerProps {
@@ -120,6 +122,11 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueM
                         <div>
                           <h3 className="font-bold text-casino-text">
                             {league.name}
+                            {league.is_commissioner && (
+                              <span className="ml-2 text-xs px-2 py-0.5 bg-casino-gold/20 text-casino-gold rounded-full font-normal">
+                                Commissioner
+                              </span>
+                            )}
                           </h3>
                           <p className="text-xs text-casino-gray">
                             Joined {new Date(league.joined_at).toLocaleDateString()}
@@ -128,6 +135,17 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueM
                       </div>
 
                       <div className="flex items-center gap-2 flex-wrap">
+                        {league.is_commissioner && (
+                          <Link href={`/leagues/${league.id}/settings`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-casino-gold border-casino-gold/30 hover:bg-casino-gold/10"
+                            >
+                              ⚙️ Settings
+                            </Button>
+                          </Link>
+                        )}
                         <Button
                           onClick={() => handleGenerateInvite(league.id)}
                           disabled={loading === league.id}

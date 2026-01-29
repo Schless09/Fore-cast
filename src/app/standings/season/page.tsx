@@ -26,6 +26,17 @@ interface SupabaseError extends Error {
   hint?: string;
 }
 
+interface LeagueTournamentSetting {
+  tournament_id: string;
+  segments: number[];
+  is_excluded: boolean;
+}
+
+interface SegmentDefinition {
+  number: number;
+  name: string;
+}
+
 // Revalidate page every 3 minutes
 export const revalidate = 180;
 
@@ -59,7 +70,49 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
     }, tournamentsError as Error);
   }
 
-  const tournamentIds = tournaments?.map(t => t.id) || [];
+  // Get league tournament settings (if league has custom configuration)
+  let leagueTournamentSettings: LeagueTournamentSetting[] = [];
+  let segmentDefinitions: SegmentDefinition[] = [];
+  
+  if (userLeagueId) {
+    // Get tournament settings with segments array
+    const { data: ltData } = await supabase
+      .from('league_tournaments')
+      .select('tournament_id, segments, is_excluded')
+      .eq('league_id', userLeagueId);
+    
+    leagueTournamentSettings = (ltData || []).map(lt => ({
+      tournament_id: lt.tournament_id,
+      segments: lt.segments || [],
+      is_excluded: lt.is_excluded,
+    }));
+    
+    // Get custom segment names
+    const { data: segData } = await supabase
+      .from('league_segments')
+      .select('segment_number, name')
+      .eq('league_id', userLeagueId)
+      .order('segment_number', { ascending: true });
+    
+    segmentDefinitions = (segData || []).map(s => ({
+      number: s.segment_number,
+      name: s.name,
+    }));
+  }
+
+  // Create a map for quick lookup of tournament settings
+  const tournamentSettingsMap = new Map<string, LeagueTournamentSetting>(
+    leagueTournamentSettings.map(lt => [lt.tournament_id, lt])
+  );
+
+  // Filter out excluded tournaments
+  const filteredTournaments = (tournaments || []).filter(t => {
+    const setting = tournamentSettingsMap.get(t.id);
+    // If no setting exists, tournament is included by default
+    return !setting?.is_excluded;
+  });
+
+  const tournamentIds = filteredTournaments.map(t => t.id);
   
   // Find active tournament
   const activeTournamentData = tournaments?.find(t => t.status === 'active');
@@ -122,9 +175,10 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
     rosters: Array<{
       roster_name: string;
       tournament_name: string;
+      tournament_id: string;
       winnings: number;
       is_active: boolean;
-      is_first_half: boolean;
+      segments: number[]; // Changed from segment: number | null
     }>;
   }
   
@@ -137,41 +191,21 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
     return bDate.localeCompare(aDate); // Most recent first
   });
 
-  // Define first half tournaments (AT&T Pro-Am through Byron Nelson)
-  // These are the tournament names that constitute the first half
-  const firstHalfTournaments = [
-    'AT&T Pebble Beach Pro-Am',
-    'AT&T Pro-Am',
-    'Genesis Invitational',
-    'Mexico Open',
-    'Cognizant Classic',
-    'Arnold Palmer Invitational',
-    'THE PLAYERS Championship',
-    'Valspar Championship',
-    'Texas Children\'s Houston Open',
-    'Houston Open',
-    'Valero Texas Open',
-    'Masters Tournament',
-    'The Masters',
-    'RBC Heritage',
-    'Zurich Classic',
-    'THE CJ CUP Byron Nelson',
-    'Byron Nelson',
-  ];
-
-  const isFirstHalfTournament = (name: string): boolean => {
-    const normalizedName = name.toLowerCase();
-    return firstHalfTournaments.some(t => normalizedName.includes(t.toLowerCase()));
+  // Helper to get tournament segments from league settings
+  const getTournamentSegments = (tournamentId: string): number[] => {
+    const setting = tournamentSettingsMap.get(tournamentId);
+    return setting?.segments ?? [];
   };
 
   sortedRosters.forEach((roster: RosterData) => {
     const userId = roster.user_id;
     const username = roster.profiles?.username || 'Unknown';
     const tournamentName = roster.tournament?.name || 'Unknown Tournament';
+    const tournamentId = roster.tournament?.id || '';
     const isActive = roster.tournament?.status === 'active';
     
-    // Determine which half this tournament belongs to
-    const isFirstHalf = isFirstHalfTournament(tournamentName);
+    // Get segments from league settings (empty array means included in all segments)
+    const segments = getTournamentSegments(tournamentId);
     
     // Only count completed tournament winnings in base (live will be added client-side)
     const winnings = isActive ? 0 : (roster.total_winnings || 0);
@@ -192,9 +226,10 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
     standing.rosters.push({
       roster_name: roster.roster_name,
       tournament_name: tournamentName,
+      tournament_id: tournamentId,
       winnings: isActive ? 0 : (roster.total_winnings || 0), // Will be updated live for active
       is_active: isActive,
-      is_first_half: isFirstHalf,
+      segments: segments,
     });
   });
 
@@ -226,6 +261,7 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
         prizeDistributions={prizeDistributions}
         userLeagueId={userLeagueId || undefined}
         initialPeriod={initialPeriod}
+        segmentDefinitions={segmentDefinitions}
       />
     </div>
   );

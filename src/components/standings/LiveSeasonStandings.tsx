@@ -16,13 +16,19 @@ interface CompletedStanding {
   rosters: Array<{
     roster_name: string;
     tournament_name: string;
+    tournament_id: string;
     winnings: number;
     is_active: boolean;
-    is_first_half: boolean;
+    segments: number[]; // empty array means included in all segments
   }>;
 }
 
-type SeasonPeriod = 'full' | 'first' | 'second';
+interface SegmentDefinition {
+  number: number;
+  name: string;
+}
+
+type SeasonPeriod = 'full' | number; // 'full' or segment number (1, 2, 3...)
 
 interface LiveScore {
   player: string;
@@ -48,6 +54,7 @@ interface LiveSeasonStandingsProps {
   }>;
   userLeagueId?: string;
   initialPeriod?: SeasonPeriod;
+  segmentDefinitions?: SegmentDefinition[];
 }
 
 // Normalize name for matching
@@ -67,6 +74,7 @@ export function LiveSeasonStandings({
   prizeDistributions,
   userLeagueId,
   initialPeriod,
+  segmentDefinitions = [],
 }: LiveSeasonStandingsProps) {
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
   const [activeRosters, setActiveRosters] = useState<Map<string, { rosterId: string; rosterName: string; playerNames: string[] }>>(new Map());
@@ -146,12 +154,13 @@ export function LiveSeasonStandings({
         liveWinnings = calculateLiveWinnings(activeRoster.playerNames);
       }
 
-      // Filter rosters based on selected period
+      // Filter rosters based on selected period (segment)
       const filteredRosters = standing.rosters.filter((roster) => {
         if (selectedPeriod === 'full') return true;
-        if (selectedPeriod === 'first') return roster.is_first_half;
-        if (selectedPeriod === 'second') return !roster.is_first_half;
-        return true;
+        // If roster has no segments assigned (empty array), include it in all periods
+        if (roster.segments.length === 0) return true;
+        // Otherwise, check if the selected segment is in the roster's segments
+        return roster.segments.includes(selectedPeriod as number);
       });
 
       // Calculate winnings for filtered rosters only
@@ -159,10 +168,10 @@ export function LiveSeasonStandings({
         .filter(r => !r.is_active)
         .reduce((sum, r) => sum + r.winnings, 0);
 
-      // Only include live winnings if this period includes active tournament
-      // (assume active tournament is in second half if it exists)
-      const includeLiveWinnings = selectedPeriod === 'full' || selectedPeriod === 'second';
-      const periodLiveWinnings = includeLiveWinnings ? liveWinnings : 0;
+      // Check if active tournament should be included in this period
+      // Find the active roster in filtered rosters to determine if it's in this period
+      const activeRosterInPeriod = filteredRosters.some(r => r.is_active);
+      const periodLiveWinnings = activeRosterInPeriod ? liveWinnings : 0;
 
       const totalWinnings = periodCompletedWinnings + periodLiveWinnings;
 
@@ -289,27 +298,41 @@ export function LiveSeasonStandings({
   const userRank = userStandingIndex !== -1 ? userStandingIndex + 1 : null;
   const userStanding = userStandingIndex !== -1 ? combinedStandings[userStandingIndex] : null;
 
-  const periodLabels: Record<SeasonPeriod, string> = {
-    full: 'Full Season',
-    first: '1st Half',
-    second: '2nd Half',
+  // Generate period options based on segment definitions
+  const periodOptions = useMemo(() => {
+    const options: Array<{ value: SeasonPeriod; label: string }> = [
+      { value: 'full', label: 'Full Season' },
+    ];
+    
+    // Add segment options with custom names
+    segmentDefinitions.forEach(seg => {
+      options.push({ value: seg.number, label: seg.name });
+    });
+    
+    return options;
+  }, [segmentDefinitions]);
+
+  const getPeriodLabel = (period: SeasonPeriod): string => {
+    if (period === 'full') return 'Full Season';
+    const segDef = segmentDefinitions.find(s => s.number === period);
+    return segDef?.name || `Segment ${period}`;
   };
 
   return (
     <div>
       {/* Period Toggle */}
       <div className="mb-6 flex flex-wrap gap-2">
-        {(['full', 'first', 'second'] as SeasonPeriod[]).map((period) => (
+        {periodOptions.map(({ value, label }) => (
           <button
-            key={period}
-            onClick={() => setSelectedPeriod(period)}
+            key={String(value)}
+            onClick={() => setSelectedPeriod(value)}
             className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-              selectedPeriod === period
+              selectedPeriod === value
                 ? 'bg-casino-gold text-casino-dark'
                 : 'bg-casino-elevated text-casino-gray hover:bg-casino-gold/20 hover:text-casino-gold border border-casino-gold/20'
             }`}
           >
-            {periodLabels[period]}
+            {label}
           </button>
         ))}
       </div>
@@ -372,7 +395,7 @@ export function LiveSeasonStandings({
       {/* Season Standings Table */}
       <Card>
         <CardHeader>
-          <CardTitle>{periodLabels[selectedPeriod]} Leaderboard</CardTitle>
+          <CardTitle>{getPeriodLabel(selectedPeriod)} Leaderboard</CardTitle>
         </CardHeader>
         <CardContent>
           {combinedStandings.length > 0 ? (

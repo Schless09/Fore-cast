@@ -59,14 +59,15 @@ export default async function LeaguesPage() {
   // Get all leagues user is a member of
   const { data: memberships } = await supabase
     .from('league_members')
-    .select('league_id, joined_at, leagues(id, name)')
+    .select('league_id, joined_at, leagues(id, name, created_by)')
     .eq('user_id', profile?.id)
     .order('joined_at', { ascending: false });
 
   const leagues = memberships?.map(m => ({
     id: (m.leagues as any)?.id,
     name: (m.leagues as any)?.name,
-    joined_at: m.joined_at
+    joined_at: m.joined_at,
+    is_commissioner: (m.leagues as any)?.created_by === profile?.id,
   })) || [];
 
   const activeLeagueId = profile?.active_league_id || null;
