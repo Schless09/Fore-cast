@@ -349,7 +349,6 @@ export function LiveLeaderboard({
                 }`}
               >
                 <td className="px-1 sm:px-3 py-2 font-medium text-casino-text text-xs sm:text-sm">
-                  {isUserPlayer && <span className="mr-1">⭐</span>}
                   {pos}
                 </td>
                 <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>
