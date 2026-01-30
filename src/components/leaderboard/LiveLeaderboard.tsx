@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from 'react';
 import { formatScore, getScoreColor } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
@@ -29,6 +29,11 @@ interface TeeTimeData {
   starting_tee_r2: number | null;
 }
 
+interface CutLineData {
+  cutScore: string;
+  cutCount: number;
+}
+
 interface LiveLeaderboardProps {
   initialData: LeaderboardRow[];
   tournamentId: string;
@@ -45,6 +50,7 @@ interface LiveLeaderboardProps {
   currentRound?: number;
   teeTimeMap?: Map<string, TeeTimeData>; // Map of player name to tee time data
   playerCostMap?: Map<string, number>; // Map of player name to salary cost
+  initialCutLine?: CutLineData | null;
 }
 
 // Helper to parse scores from API
@@ -93,6 +99,7 @@ export function LiveLeaderboard({
   currentRound,
   teeTimeMap,
   playerCostMap,
+  initialCutLine,
 }: LiveLeaderboardProps) {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardRow[]>(initialData);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -100,6 +107,7 @@ export function LiveLeaderboard({
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [apiTournamentStatus, setApiTournamentStatus] = useState<string>('In Progress');
+  const [cutLine, setCutLine] = useState<CutLineData | null>(initialCutLine || null);
   const hasInitialSynced = useRef(false);
   
   // Scorecard modal state
@@ -214,6 +222,12 @@ export function LiveLeaderboard({
       setLeaderboardData(transformed);
       setLastRefresh(new Date());
       setSyncError(null);
+      
+      // Update cut line if available
+      if (result.cutLine) {
+        setCutLine(result.cutLine);
+      }
+      
       console.log('[LiveLeaderboard] Refreshed directly from API at', new Date().toLocaleTimeString());
 
     } catch (error) {
@@ -412,13 +426,53 @@ export function LiveLeaderboard({
             const todayClass = getScoreColor(row.today_score);
 
             // Use prize_money from row, or look up from prize distribution
-            const prizeAmount = row.prize_money ||
+            // If player's score is worse than the cut score, show $0
+            // cutScore is like "-3", so we need to parse and compare
+            const cutScoreNum = cutLine ? parseScore(cutLine.cutScore) : null;
+            const isBelowProjectedCut = cutLine && row.position !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
+            const prizeAmount = isBelowProjectedCut ? 0 : (
+              row.prize_money ||
               (row.position ? prizeDistributionMap.get(row.position) : 0) ||
-              0;
+              0
+            );
+
+            // Check if this is the first CUT player (to show cut line)
+            const prevRow = idx > 0 ? leaderboardData[idx - 1] : null;
+            const isFirstCutPlayer = row.position === null && prevRow?.position !== null;
+            
+            // Check if this is where the projected cut line should be shown
+            // Show line between the last player at cutScore and first player worse than cutScore
+            const prevRowScore = prevRow ? prevRow.total_score : null;
+            const isProjectedCutPosition = cutLine && 
+              row.position !== null && 
+              cutScoreNum !== null &&
+              prevRowScore !== null &&
+              prevRowScore <= cutScoreNum && // Previous player is at or better than cut
+              row.total_score > cutScoreNum;  // This player is worse than cut
 
             return (
+              <Fragment key={`${row.position}-${name}-${idx}`}>
+                {/* Actual Cut Line Bar (after cut is made) */}
+                {isFirstCutPlayer && cutLine && (
+                  <tr className="bg-red-900/30 border-y-2 border-red-500/50">
+                    <td colSpan={6} className="px-3 py-2 text-center">
+                      <span className="text-red-400 font-semibold text-sm">
+                        CUT LINE: {cutLine.cutScore} ({cutLine.cutCount} players made the cut)
+                      </span>
+                    </td>
+                  </tr>
+                )}
+                {/* Projected Cut Line Bar (during R1/R2) */}
+                {isProjectedCutPosition && !isFirstCutPlayer && (
+                  <tr className="bg-yellow-900/20 border-y-2 border-yellow-500/40">
+                    <td colSpan={6} className="px-3 py-2 text-center">
+                      <span className="text-yellow-400 font-semibold text-sm">
+                        PROJECTED CUT: {cutLine.cutScore} (Top {cutLine.cutCount} make the cut)
+                      </span>
+                    </td>
+                  </tr>
+                )}
               <tr
-                key={`${row.position}-${name}-${idx}`}
                 className={`border-b transition-colors ${
                   isUserPlayer
                     ? 'bg-casino-gold/20 border-casino-gold/40 hover:bg-casino-gold/30'
@@ -474,6 +528,7 @@ export function LiveLeaderboard({
                   {formatCurrency(prizeAmount || 0)}
                 </td>
               </tr>
+              </Fragment>
             );
           })}
         </tbody>

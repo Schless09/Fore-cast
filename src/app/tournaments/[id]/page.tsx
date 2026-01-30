@@ -355,6 +355,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
   let tournamentLeaderboard: LeaderboardRow[] = [];
   let leaderboardSource: 'database' | 'rapidapi' | 'cache' | 'none' = 'none';
+  let cutLine: { cutScore: string; cutCount: number } | null = null;
 
   // Helper to parse LiveGolfAPI scores
   const parseScore = (score: string | number | null): number => {
@@ -410,6 +411,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       .eq('tournament_id', id)
       .single();
     
+    // Extract cut line from cached data
+    cutLine = cachedData?.data?.cutLine || null;
+
     if (cachedData?.data?.data && Array.isArray(cachedData.data.data) && cachedData.data.data.length > 0) {
         leaderboardSource = 'cache';
         
@@ -684,6 +688,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             currentRound={displayRound}
             teeTimeMap={teeTimeMap}
             playerCostMap={playerCostMap}
+            initialCutLine={cutLine}
           />
         </CardContent>
       </Card>

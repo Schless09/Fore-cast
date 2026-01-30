@@ -245,6 +245,9 @@ export async function GET(request: NextRequest) {
           };
         });
 
+        // Extract cut line info
+        const cutLine = json.cutLines?.[0] || null;
+
         const cacheData = {
           data: transformedData,
           source: 'rapidapi',
@@ -252,6 +255,10 @@ export async function GET(request: NextRequest) {
           tournamentStatus: status,
           currentRound: roundId,
           lastUpdated: json.lastUpdated,
+          cutLine: cutLine ? {
+            cutScore: cutLine.cutScore,
+            cutCount: cutLine.cutCount,
+          } : null,
         };
 
         // Upsert into cache table
