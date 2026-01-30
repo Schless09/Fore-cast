@@ -3,17 +3,13 @@
  * 
  * Optimizes API calls based on tournament schedule:
  * - Only polls on tournament days (Thu-Sun)
- * - Different frequencies for different tournament days
+ * - Hourly polling to conserve API credits
  * - No hour restrictions (tournaments can be in any time zone)
- * - Respects API rate limits (2,000 calls/month)
  * 
  * Budget calculation (5 tournaments/month):
- * - Thu: 24 hrs × 7.5 calls/hr (8 min) = 180 calls
- * - Fri: 24 hrs × 7.5 calls/hr (8 min) = 180 calls
- * - Sat: 24 hrs × 15 calls/hr (4 min) = 360 calls
- * - Sun: 24 hrs × 15 calls/hr (4 min) = 360 calls
- * - Total per tournament: ~1,080 calls (worst case, full 24hr polling)
- * - Realistically ~50% of that since we skip when no active tournament
+ * - Thu-Sun: 24 hrs × 1 call/hr = 24 calls per day
+ * - Total per tournament: ~96 calls (4 days × 24 calls)
+ * - Monthly (5 tournaments): ~480 calls
  * 
  * Note: The cron only polls when there's an active tournament in the DB.
  * No active tournament = no API calls, regardless of day/time.
@@ -33,26 +29,26 @@ export const TOURNAMENT_SCHEDULE: TournamentDay[] = [
   {
     day: 'thursday',
     dayOfWeek: 4,
-    pollIntervalMinutes: 8,
-    description: 'Round 1 - Full field, 8 min polling',
+    pollIntervalMinutes: 60,
+    description: 'Round 1 - Hourly polling',
   },
   {
     day: 'friday',
     dayOfWeek: 5,
-    pollIntervalMinutes: 8,
-    description: 'Round 2 - Full field, 8 min polling',
+    pollIntervalMinutes: 60,
+    description: 'Round 2 - Hourly polling',
   },
   {
     day: 'saturday',
     dayOfWeek: 6,
-    pollIntervalMinutes: 4,
-    description: 'Round 3 - Moving Day, 4 min polling',
+    pollIntervalMinutes: 60,
+    description: 'Round 3 - Hourly polling',
   },
   {
     day: 'sunday',
     dayOfWeek: 0,
-    pollIntervalMinutes: 4,
-    description: 'Final Round, 4 min polling',
+    pollIntervalMinutes: 60,
+    description: 'Final Round - Hourly polling',
   },
 ];
 
