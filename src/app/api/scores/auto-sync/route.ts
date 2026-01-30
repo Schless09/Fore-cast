@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     // Get all active tournaments
     const { data: tournaments, error: tournamentsError } = await supabase
       .from('tournaments')
-      .select('id, name, rapidapi_tourn_id, start_date, end_date')
+      .select('id, name, rapidapi_tourn_id, start_date, end_date, current_round')
       .eq('status', 'active')
       .not('rapidapi_tourn_id', 'is', null);
 
