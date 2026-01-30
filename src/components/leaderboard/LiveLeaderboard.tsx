@@ -17,6 +17,7 @@ interface LeaderboardRow {
   prize_money: number;
   name: string;
   apiPlayerId?: string; // Player ID from RapidAPI for scorecard lookup
+  roundComplete?: boolean; // Whether player finished current round
 }
 
 interface TeeTimeData {
@@ -199,6 +200,7 @@ export function LiveLeaderboard({
           prize_money: prizeMoney,
           name: scorecard.player || 'Unknown',
           apiPlayerId: scorecard.playerId, // Store API player ID for scorecard lookup
+          roundComplete: scorecard.roundComplete === true, // Whether player finished current round
         };
       });
 
@@ -329,6 +331,37 @@ export function LiveLeaderboard({
               .normalize('NFD')
               .replace(/[\u0300-\u036f]/g, '');
 
+            // Nickname mappings for fuzzy matching
+            const nicknameMap: Record<string, string[]> = {
+              'cam': ['cameron'],
+              'cameron': ['cam'],
+              'dan': ['daniel'],
+              'daniel': ['dan'],
+              'john': ['johnny', 'jon'],
+              'johnny': ['john', 'jon'],
+              'jon': ['john', 'johnny'],
+              'mike': ['michael'],
+              'michael': ['mike'],
+              'matt': ['matthew', 'matthias', 'matti'],
+              'matthew': ['matt'],
+              'matthias': ['matt', 'matti'],
+              'matti': ['matt', 'matthias'],
+              'bob': ['robert'],
+              'robert': ['bob'],
+              'bill': ['william', 'billy'],
+              'billy': ['william', 'bill'],
+              'william': ['bill', 'billy'],
+              'nick': ['nicholas'],
+              'nicholas': ['nick'],
+              'alex': ['alexander'],
+              'alexander': ['alex'],
+              'chris': ['christopher'],
+              'christopher': ['chris'],
+              'jim': ['james'],
+              'james': ['jim'],
+              's.t.': ['seung taek'],
+            };
+
             // Try exact match first
             let playerId = playerNameToIdMap.get(normalizedName) || playerNameToIdMap.get(name.toLowerCase().trim());
             let matchedMapName = normalizedName; // Track which name matched for cost lookup
@@ -347,11 +380,20 @@ export function LiveLeaderboard({
                     const mapLastName = mapParts[mapParts.length - 1];
                     const mapFirstName = mapParts[0];
                     
-                    // Match if last names match and one first name starts with the other
+                    // Match if last names match
                     if (apiLastName === mapLastName) {
+                      // Check if first names match via prefix
                       if (apiFirstName.startsWith(mapFirstName) || mapFirstName.startsWith(apiFirstName)) {
                         playerId = mapId;
-                        matchedMapName = mapName; // Use the matched name for cost lookup
+                        matchedMapName = mapName;
+                        break;
+                      }
+                      // Check nickname mappings
+                      const apiNicknames = nicknameMap[apiFirstName] || [];
+                      const mapNicknames = nicknameMap[mapFirstName] || [];
+                      if (apiNicknames.includes(mapFirstName) || mapNicknames.includes(apiFirstName)) {
+                        playerId = mapId;
+                        matchedMapName = mapName;
                         break;
                       }
                     }
@@ -395,9 +437,9 @@ export function LiveLeaderboard({
                 <td className={`px-1 sm:px-3 py-2 font-semibold text-xs sm:text-sm ${totalClass}`}>
                   {formatScore(row.total_score)}
                 </td>
-                <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${(currentRound || 1) >= 2 && (row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18') ? 'text-casino-gray-dark' : todayClass}`}>
-                  {/* If displayRound is 2+ and player finished R1 but hasn't started R2, show dash */}
-                  {(currentRound || 1) >= 2 && (row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18') ? (
+                <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${!row.roundComplete && (row.thru === '-' || row.thru === '0' || row.thru === 0 || !row.thru) ? 'text-casino-gray-dark' : todayClass}`}>
+                  {/* If player hasn't started current round, show dash */}
+                  {!row.roundComplete && (row.thru === '-' || row.thru === '0' || row.thru === 0 || !row.thru) ? (
                     <span>-</span>
                   ) : row.apiPlayerId ? (
                     <button
@@ -412,14 +454,17 @@ export function LiveLeaderboard({
                   )}
                 </td>
                 <td className="px-1 sm:px-3 py-2 text-xs sm:text-sm">
-                  {/* If displayRound is 2+ and player finished previous round (F, F*, 18), show next round tee time */}
-                  {(currentRound || 1) >= 2 && (row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18') && getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound) ? (
-                    <span className="text-casino-gray">{getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound)}</span>
-                  ) : row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18' ? (
+                  {/* If player missed the cut or was DQ'd, show dash */}
+                  {!row.position ? (
+                    <span className="text-casino-gray-dark">-</span>
+                  ) : row.roundComplete || row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18' ? (
+                    /* Player finished current round - show F or F* */
                     <span className="text-casino-green font-medium">{row.thru === 18 || row.thru === '18' ? 'F' : row.thru}</span>
                   ) : row.thru && row.thru !== '-' && row.thru !== '0' && row.thru !== 0 ? (
+                    /* Player is on course - show holes completed */
                     <span className="text-casino-blue">{row.thru}</span>
                   ) : getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound) ? (
+                    /* Player hasn't started - show tee time */
                     <span className="text-casino-gray">{getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound)}</span>
                   ) : (
                     <span className="text-casino-gray-dark">-</span>

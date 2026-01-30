@@ -30,6 +30,7 @@ interface LiveScore {
   total: string;
   thru: string;
   currentRoundScore: string;
+  roundComplete?: boolean;
 }
 
 interface LiveTeamStandingsProps {
@@ -522,13 +523,9 @@ export function LiveTeamStandings({
                                         };
                                         const teeTime = getTeeTimeForRound();
                                         
-                                        // If player finished previous round (F or F*), show next round tee time
-                                        if ((player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') && teeTime) {
-                                          return <span className="text-casino-gray">{convertESTtoLocal(teeTime)}</span>;
-                                        }
-                                        // Player finished but no tee time for next round
-                                        if (player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') {
-                                          return <span className="text-casino-green font-medium">{player.liveScore.thru}</span>;
+                                        // Player finished current round - show F or F*
+                                        if (player.liveScore?.roundComplete || player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') {
+                                          return <span className="text-casino-green font-medium">{player.liveScore?.thru === '18' ? 'F' : player.liveScore?.thru}</span>;
                                         }
                                         // Player is on course
                                         if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {

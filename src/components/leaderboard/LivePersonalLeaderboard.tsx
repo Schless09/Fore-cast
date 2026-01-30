@@ -15,6 +15,7 @@ interface LiveScore {
   total: string;
   thru: string;
   currentRoundScore: string;
+  roundComplete?: boolean;
 }
 
 interface RosterPlayer {
@@ -360,8 +361,8 @@ export function LivePersonalLeaderboard({
                       )}
                     </td>
                     <td className="px-1 sm:px-3 py-2 hidden sm:table-cell">
-                      {/* If displayRound is 2+ and player finished R1 but hasn't started R2, show dash */}
-                      {displayRound >= 2 && (player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') ? (
+                      {/* If player hasn't started current round, show dash */}
+                      {!player.liveScore?.roundComplete && (!player.liveScore?.thru || player.liveScore?.thru === '-' || player.liveScore?.thru === '0') ? (
                         <span className="text-casino-gray-dark">-</span>
                       ) : player.liveScore ? (
                         <span className={
@@ -387,13 +388,9 @@ export function LivePersonalLeaderboard({
                         };
                         const teeTime = getTeeTimeForRound();
                         
-                        // If player finished previous round (F or F*), show next round tee time
-                        if ((player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') && teeTime) {
-                          return <span className="text-casino-gray">{convertESTtoLocal(teeTime)}</span>;
-                        }
-                        // Player finished but no tee time for next round
-                        if (player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') {
-                          return <span className="text-casino-green font-medium">{player.liveScore.thru}</span>;
+                        // Player finished current round - show F or F*
+                        if (player.liveScore?.roundComplete || player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') {
+                          return <span className="text-casino-green font-medium">{player.liveScore?.thru === '18' ? 'F' : player.liveScore?.thru}</span>;
                         }
                         // Player is on course
                         if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
