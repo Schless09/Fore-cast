@@ -75,15 +75,52 @@ export function LivePersonalLeaderboard({
     [prizeDistributions]
   );
 
-  // Create a map of player name -> live score data
+  // Create a map of player name -> live score data with multiple lookup keys
   const playerScoreMap = useMemo(() => {
     const map = new Map<string, LiveScore>();
     liveScores.forEach((score) => {
       const normalizedName = normalizeName(score.player);
       map.set(normalizedName, score);
+      
+      // Also add lookup by last name for fuzzy matching
+      const nameParts = normalizedName.split(' ');
+      if (nameParts.length >= 2) {
+        const lastName = nameParts[nameParts.length - 1];
+        const firstName = nameParts[0];
+        map.set(`__fuzzy__${lastName}__${firstName}`, score);
+      }
     });
     return map;
   }, [liveScores]);
+
+  // Find live score with fuzzy matching for nicknames like "Cam" vs "Cameron"
+  const findLiveScore = useCallback((playerName: string): LiveScore | undefined => {
+    const normalizedName = normalizeName(playerName);
+    
+    // Try exact match first
+    const match = playerScoreMap.get(normalizedName);
+    if (match) return match;
+    
+    // Try fuzzy matching by last name + first name starts with
+    const nameParts = normalizedName.split(' ');
+    if (nameParts.length >= 2) {
+      const lastName = nameParts[nameParts.length - 1];
+      const firstName = nameParts[0];
+      
+      for (const [key, score] of playerScoreMap.entries()) {
+        if (key.startsWith('__fuzzy__')) {
+          const [, fuzzyLastName, fuzzyFirstName] = key.split('__').filter(Boolean);
+          if (fuzzyLastName === lastName) {
+            if (firstName.startsWith(fuzzyFirstName) || fuzzyFirstName.startsWith(firstName)) {
+              return score;
+            }
+          }
+        }
+      }
+    }
+    
+    return undefined;
+  }, [playerScoreMap]);
 
   // Count players at each position to detect ties
   const positionCounts = useMemo(() => {
@@ -117,8 +154,8 @@ export function LivePersonalLeaderboard({
   // Calculate winnings for each player based on live scores
   const playersWithLiveData = useMemo(() => {
     return rosterPlayers.map((player) => {
-      const normalizedName = normalizeName(player.playerName);
-      const liveScore = playerScoreMap.get(normalizedName);
+      // Use fuzzy matching to find live score
+      const liveScore = findLiveScore(player.playerName);
       
       const position = liveScore?.positionValue;
       
@@ -131,7 +168,7 @@ export function LivePersonalLeaderboard({
         winnings,
       };
     }).sort((a, b) => b.winnings - a.winnings);
-  }, [rosterPlayers, playerScoreMap, calculateTiePrizeMoney]);
+  }, [rosterPlayers, findLiveScore, calculateTiePrizeMoney]);
 
   // Calculate total winnings
   const totalWinnings = useMemo(() => {
