@@ -32,13 +32,13 @@ export default async function TheMoneyBoardPage() {
             {/* Payment Info */}
             <div className="text-center md:text-left">
               <h2 className="text-xl font-bold text-casino-gold mb-2">
-                💰 Season Buy-In: $403
+                💰 Season Buy-In: $409
               </h2>
               <p className="text-casino-gray mb-3">
                 Payment due before the start of the first tournament
               </p>
               <Link
-                href="https://venmo.com/Andrew-Schuessler-2?txn=pay&amount=403&note=Bama%20Boys%20Golf%20%2726%20Buy-in"
+                href="https://venmo.com/Andrew-Schuessler-2?txn=pay&amount=409&note=Bama%20Boys%20Golf%20%2726%20Buy-in"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-[#008CFF] hover:bg-[#0074D4] text-white font-semibold rounded-lg transition-colors"
