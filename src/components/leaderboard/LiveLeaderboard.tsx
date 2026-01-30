@@ -331,6 +331,7 @@ export function LiveLeaderboard({
 
             // Try exact match first
             let playerId = playerNameToIdMap.get(normalizedName) || playerNameToIdMap.get(name.toLowerCase().trim());
+            let matchedMapName = normalizedName; // Track which name matched for cost lookup
             
             // If no match, try fuzzy matching (e.g., "Cam Davis" vs "Cameron Davis")
             if (!playerId) {
@@ -350,6 +351,7 @@ export function LiveLeaderboard({
                     if (apiLastName === mapLastName) {
                       if (apiFirstName.startsWith(mapFirstName) || mapFirstName.startsWith(apiFirstName)) {
                         playerId = mapId;
+                        matchedMapName = mapName; // Use the matched name for cost lookup
                         break;
                       }
                     }
@@ -359,6 +361,7 @@ export function LiveLeaderboard({
             }
             
             const isUserPlayer = playerId && userRosterPlayerIds.includes(playerId);
+            const playerCost = playerCostMap?.get(matchedMapName);
 
             const pos = row.position
               ? `${row.is_tied ? 'T' : ''}${row.position}`
@@ -385,8 +388,8 @@ export function LiveLeaderboard({
                 </td>
                 <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>
                   {name}
-                  {playerCostMap?.has(name) && (
-                    <span className="text-casino-gray font-normal ml-1">(${playerCostMap.get(name)})</span>
+                  {playerCost !== undefined && (
+                    <span className="text-casino-gray font-normal ml-1">(${playerCost})</span>
                   )}
                 </td>
                 <td className={`px-1 sm:px-3 py-2 font-semibold text-xs sm:text-sm ${totalClass}`}>

@@ -591,9 +591,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '');
         playerNameToIdMap.set(normalized, tp.pga_player_id);
-        // Add cost map entry with the exact player name
+        // Add cost map entry with normalized name for consistent lookups
         if (tp.cost !== null && tp.cost !== undefined) {
-          playerCostMap.set(name, tp.cost);
+          playerCostMap.set(normalized, tp.cost);
         }
       }
     });
