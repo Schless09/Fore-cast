@@ -31,6 +31,7 @@ interface LiveScore {
   thru: string;
   currentRoundScore: string;
   roundComplete?: boolean;
+  isAmateur?: boolean;
 }
 
 interface LiveTeamStandingsProps {
@@ -201,9 +202,11 @@ export function LiveTeamStandings({
         const liveScore = findLiveScore(player.playerName);
         
         const position = liveScore?.positionValue;
+        const isAmateur = liveScore?.isAmateur === true;
         
         // Calculate winnings with proper tie handling
-        const winnings = calculateTiePrizeMoney(position || null);
+        // Amateurs cannot collect prize money
+        const winnings = isAmateur ? 0 : calculateTiePrizeMoney(position || null);
         
         totalWinnings += winnings;
 
@@ -211,6 +214,7 @@ export function LiveTeamStandings({
           ...player,
           liveScore,
           winnings,
+          isAmateur,
         };
       });
 
@@ -480,6 +484,7 @@ export function LiveTeamStandings({
                                     <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-casino-text">
                                       <span className="truncate">
                                         {player.playerName}
+                                        {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
                                         {player.cost !== undefined && player.cost !== null && (
                                           <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
                                         )}

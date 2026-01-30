@@ -242,6 +242,7 @@ export async function GET(request: NextRequest) {
             currentRoundScore: player.currentRoundScore,
             teeTime: player.teeTime,
             roundComplete: player.roundComplete,
+            isAmateur: player.isAmateur === true,
           };
         });
 

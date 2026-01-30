@@ -16,6 +16,7 @@ interface LiveScore {
   thru: string;
   currentRoundScore: string;
   roundComplete?: boolean;
+  isAmateur?: boolean;
 }
 
 interface RosterPlayer {
@@ -163,14 +164,17 @@ export function LivePersonalLeaderboard({
       const liveScore = findLiveScore(player.playerName);
       
       const position = liveScore?.positionValue;
+      const isAmateur = liveScore?.isAmateur === true;
       
       // Calculate winnings with proper tie handling
-      const winnings = calculateTiePrizeMoney(position || null);
+      // Amateurs cannot collect prize money
+      const winnings = isAmateur ? 0 : calculateTiePrizeMoney(position || null);
 
       return {
         ...player,
         liveScore,
         winnings,
+        isAmateur,
       };
     }).sort((a, b) => b.winnings - a.winnings);
   }, [rosterPlayers, findLiveScore, calculateTiePrizeMoney]);
@@ -333,6 +337,7 @@ export function LivePersonalLeaderboard({
                     <td className="px-1 sm:px-3 py-2 text-casino-gray">{index + 1}</td>
                     <td className="px-1 sm:px-3 py-2 text-casino-text">
                       {player.playerName}
+                      {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
                     </td>
                     <td className="px-1 sm:px-3 py-2">
                       {player.liveScore?.position ? (

@@ -18,6 +18,7 @@ interface LeaderboardRow {
   name: string;
   apiPlayerId?: string; // Player ID from RapidAPI for scorecard lookup
   roundComplete?: boolean; // Whether player finished current round
+  is_amateur?: boolean; // Amateurs cannot collect prize money
 }
 
 interface TeeTimeData {
@@ -43,6 +44,7 @@ interface APIScorecard {
   thru: string;
   currentRoundScore: string;
   roundComplete?: boolean;
+  isAmateur?: boolean;
 }
 
 interface LiveLeaderboardProps {
@@ -209,7 +211,9 @@ export function LiveLeaderboard({
           : parseScore(scorecard.total);
         
         // Calculate prize money with proper tie handling
-        const prizeMoney = calculateTiePrizeMoney(position, tieCount);
+        // Amateurs cannot collect prize money
+        const isAmateur = scorecard.isAmateur === true;
+        const prizeMoney = isAmateur ? 0 : calculateTiePrizeMoney(position, tieCount);
 
         return {
           position,
@@ -222,6 +226,7 @@ export function LiveLeaderboard({
           name: scorecard.player || 'Unknown',
           apiPlayerId: scorecard.playerId, // Store API player ID for scorecard lookup
           roundComplete: scorecard.roundComplete === true, // Whether player finished current round
+          is_amateur: isAmateur,
         };
       });
 
@@ -439,11 +444,12 @@ export function LiveLeaderboard({
             const todayClass = getScoreColor(row.today_score);
 
             // Use prize_money from row, or look up from prize distribution
+            // Amateurs cannot collect prize money
             // If player's score is worse than the cut score, show $0
             // cutScore is like "-3", so we need to parse and compare
             const cutScoreNum = cutLine ? parseScore(cutLine.cutScore) : null;
             const isBelowProjectedCut = cutLine && row.position !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
-            const prizeAmount = isBelowProjectedCut ? 0 : (
+            const prizeAmount = (row.is_amateur || isBelowProjectedCut) ? 0 : (
               row.prize_money ||
               (row.position ? prizeDistributionMap.get(row.position) : 0) ||
               0
@@ -485,6 +491,7 @@ export function LiveLeaderboard({
                 </td>
                 <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>
                   {name}
+                  {row.is_amateur && <span className="text-casino-gray font-normal ml-1">(a)</span>}
                   {playerCost !== undefined && (
                     <span className="text-casino-gray font-normal ml-1">(${playerCost})</span>
                   )}

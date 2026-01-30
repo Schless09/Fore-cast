@@ -38,6 +38,7 @@ interface LiveScore {
   total: string;
   thru: string;
   currentRoundScore: string;
+  isAmateur?: boolean;
 }
 
 interface RosterPlayer {
@@ -187,7 +188,9 @@ export function LiveSeasonStandings({
       // Use fuzzy matching to find live score
       const liveScore = findLiveScore(name);
       const position = liveScore?.positionValue;
-      if (position && position > 0) {
+      const isAmateur = liveScore?.isAmateur === true;
+      // Amateurs cannot collect prize money
+      if (position && position > 0 && !isAmateur) {
         // Use tie-aware prize calculation
         total += calculateTiePrizeMoney(position);
       }
