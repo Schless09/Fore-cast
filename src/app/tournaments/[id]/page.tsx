@@ -318,12 +318,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
   // Determine what to show
   // - Upcoming: roster builder (if tournament not excluded from league)
-  // - Active: roster builder if no roster yet; live leaderboard if roster exists
+  // - Active: NO roster builder - lineups are locked once tournament starts
   // - Completed: golfer leaderboard (regardless of user's roster)
   const showRosterBuilder =
-    !isTournamentExcluded &&
-    (tournament.status === 'upcoming' ||
-    (tournament.status === 'active' && !existingRoster));
+    !isTournamentExcluded && tournament.status === 'upcoming';
+  const showLineupLocked =
+    tournament.status === 'active' && !existingRoster && !isTournamentExcluded;
   const showPersonalLeaderboard =
     tournament.status === 'active' && !!existingRoster;
   const showGolferLeaderboard = tournament.status === 'completed' || (tournament.status === 'active' && !!existingRoster);
@@ -796,6 +796,23 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               This tournament is not included in your league&apos;s schedule.
               <br />
               Contact your commissioner if you believe this is an error.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Lineup Locked Message - tournament started without a roster */}
+      {showLineupLocked && (
+        <Card className="mb-6 border-red-500/30">
+          <CardContent className="py-8 text-center">
+            <div className="text-red-500 text-4xl mb-4">🔒</div>
+            <h3 className="text-xl font-semibold text-casino-text mb-2">
+              Lineups Are Locked
+            </h3>
+            <p className="text-casino-gray">
+              The tournament has started and lineups can no longer be submitted.
+              <br />
+              Come back next week to set your lineup before the tournament begins!
             </p>
           </CardContent>
         </Card>

@@ -19,6 +19,7 @@ interface RosterBuilderProps {
     playerIds: string[];
   };
   onSave?: () => void;
+  tournamentStatus?: 'upcoming' | 'active' | 'completed';
 }
 
 const MAX_PLAYERS = 10;
@@ -28,6 +29,7 @@ export function RosterBuilder({
   tournamentId,
   existingRoster,
   onSave,
+  tournamentStatus,
 }: RosterBuilderProps) {
   const router = useRouter();
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
@@ -140,6 +142,12 @@ export function RosterBuilder({
   }
 
   async function handleSave() {
+    // Check tournament status - only allow saves for upcoming tournaments
+    if (tournamentStatus && tournamentStatus !== 'upcoming') {
+      setError('Lineups are locked - the tournament has already started.');
+      return;
+    }
+
     if (!username.trim()) {
       setError('Unable to load username. Please refresh the page.');
       return;

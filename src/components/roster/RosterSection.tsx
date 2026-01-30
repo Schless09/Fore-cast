@@ -43,11 +43,12 @@ export function RosterSection({
     router.refresh();
   };
 
-  // No roster yet - show builder to create
+  // No roster yet - show builder to create (only for upcoming tournaments)
   if (!existingRoster) {
     return (
       <RosterBuilder
         tournamentId={tournamentId}
+        tournamentStatus={tournamentStatus}
       />
     );
   }
@@ -152,6 +153,7 @@ export function RosterSection({
           playerIds: existingRoster.playerIds,
         }}
         onSave={handleSave}
+        tournamentStatus={tournamentStatus}
       />
     </div>
   );
