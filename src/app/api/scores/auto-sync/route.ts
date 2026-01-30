@@ -279,6 +279,15 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
+        // Auto-update tournament current_round
+        if (roundId && roundId !== tournament.current_round) {
+          await supabase
+            .from('tournaments')
+            .update({ current_round: roundId })
+            .eq('id', tournament.id);
+          console.log(`[AUTO-SYNC] 📍 Updated ${tournament.name} to Round ${roundId}`);
+        }
+
         // Auto-update tournament status if completed
         if (status === 'Official') {
           await supabase
