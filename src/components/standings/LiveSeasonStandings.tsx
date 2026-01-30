@@ -455,11 +455,11 @@ export function LiveSeasonStandings({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-casino-gold/30">
-                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Rank</th>
-                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
-                    <th className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Winnings</th>
-                    <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Tournaments</th>
-                    <th className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase hidden md:table-cell">Avg.</th>
+                    <th className="px-1 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Rank</th>
+                    <th className="px-1 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
+                    <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Winnings</th>
+                    <th className="px-1 sm:px-4 py-2 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Tournaments</th>
+                    <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase hidden md:table-cell">Avg.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -477,7 +477,7 @@ export function LiveSeasonStandings({
                           isUser ? 'bg-casino-green/10 hover:bg-casino-green/20' : 'hover:bg-casino-elevated'
                         }`}
                       >
-                        <td className="px-2 sm:px-4 py-3">
+                        <td className="px-1 sm:px-4 py-3">
                           <div className="flex items-center gap-1 sm:gap-2">
                             <span className="text-xs sm:text-sm font-medium text-casino-text">{rank}</span>
                             {rank === 1 && <span className="text-base sm:text-lg">🏆</span>}
@@ -488,10 +488,10 @@ export function LiveSeasonStandings({
                             )}
                           </div>
                         </td>
-                        <td className="px-2 sm:px-4 py-3">
+                        <td className="px-1 sm:px-4 py-3">
                           <span className="font-medium text-casino-text text-xs sm:text-sm">{standing.username}</span>
                         </td>
-                        <td className="px-2 sm:px-4 py-3 text-right">
+                        <td className="px-1 sm:px-4 py-3 text-right">
                           <span className="font-semibold text-casino-green text-xs sm:text-sm">
                             {formatCurrency(standing.total_winnings)}
                           </span>
@@ -501,10 +501,10 @@ export function LiveSeasonStandings({
                             </span>
                           )}
                         </td>
-                        <td className="px-2 sm:px-4 py-3 text-center text-xs sm:text-sm text-casino-gray hidden sm:table-cell">
+                        <td className="px-1 sm:px-4 py-3 text-center text-xs sm:text-sm text-casino-gray hidden sm:table-cell">
                           {standing.tournaments_played}
                         </td>
-                        <td className="px-2 sm:px-4 py-3 text-right text-xs sm:text-sm text-casino-gray hidden md:table-cell">
+                        <td className="px-1 sm:px-4 py-3 text-right text-xs sm:text-sm text-casino-gray hidden md:table-cell">
                           {formatCurrency(avgWinnings)}
                         </td>
                       </tr>
