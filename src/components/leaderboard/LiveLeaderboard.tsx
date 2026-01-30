@@ -34,6 +34,17 @@ interface CutLineData {
   cutCount: number;
 }
 
+interface APIScorecard {
+  player: string;
+  playerId: string;
+  position: string;
+  positionValue: number | null;
+  total: string;
+  thru: string;
+  currentRoundScore: string;
+  roundComplete?: boolean;
+}
+
 interface LiveLeaderboardProps {
   initialData: LeaderboardRow[];
   tournamentId: string;
@@ -90,6 +101,7 @@ function getTeeTimeForRound(teeTime: TeeTimeData | undefined, currentRound?: num
 
 export function LiveLeaderboard({
   initialData,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   tournamentId,
   prizeDistributions,
   userRosterPlayerIds,
@@ -102,6 +114,7 @@ export function LiveLeaderboard({
   initialCutLine,
 }: LiveLeaderboardProps) {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardRow[]>(initialData);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
@@ -160,7 +173,7 @@ export function LiveLeaderboard({
       
       // First pass: count players at each position to detect ties
       const positionCounts = new Map<number, number>();
-      scores.forEach((scorecard: any) => {
+      scores.forEach((scorecard: APIScorecard) => {
         const position = scorecard.positionValue || 
           (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null);
         if (position && position > 0) {
@@ -183,7 +196,7 @@ export function LiveLeaderboard({
         return Math.round(totalPrize / tieCount);
       };
       
-      const transformed: LeaderboardRow[] = scores.map((scorecard: any) => {
+      const transformed: LeaderboardRow[] = scores.map((scorecard: APIScorecard) => {
         // Handle both RapidAPI and LiveGolfAPI formats
         const position = scorecard.positionValue || 
           (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null);
@@ -436,11 +449,9 @@ export function LiveLeaderboard({
               0
             );
 
-            // Check if this is the first CUT player (to show cut line)
             const prevRow = idx > 0 ? leaderboardData[idx - 1] : null;
-            const isFirstCutPlayer = row.position === null && prevRow?.position !== null;
             
-            // Check if this is where the projected cut line should be shown
+            // Check if this is where the cut line should be shown
             // Show line between the last player at cutScore and first player worse than cutScore
             const prevRowScore = prevRow ? prevRow.total_score : null;
             const isProjectedCutPosition = cutLine && 
@@ -452,22 +463,12 @@ export function LiveLeaderboard({
 
             return (
               <Fragment key={`${row.position}-${name}-${idx}`}>
-                {/* Actual Cut Line Bar (after cut is made) */}
-                {isFirstCutPlayer && cutLine && (
-                  <tr className="bg-red-900/30 border-y-2 border-red-500/50">
-                    <td colSpan={6} className="px-3 py-2 text-center">
-                      <span className="text-red-400 font-semibold text-sm">
-                        CUT LINE: {cutLine.cutScore} ({cutLine.cutCount} players made the cut)
-                      </span>
-                    </td>
-                  </tr>
-                )}
-                {/* Projected Cut Line Bar (during R1/R2) */}
-                {isProjectedCutPosition && !isFirstCutPlayer && (
+                {/* Cut Line Bar - projected during R1/R2, official after R3+ */}
+                {isProjectedCutPosition && (
                   <tr className="bg-yellow-900/20 border-y-2 border-yellow-500/40">
                     <td colSpan={6} className="px-3 py-2 text-center">
                       <span className="text-yellow-400 font-semibold text-sm">
-                        PROJECTED CUT: {cutLine.cutScore} (Top {cutLine.cutCount} make the cut)
+                        {(currentRound || 1) >= 3 ? 'CUT LINE' : 'PROJECTED CUT'}: {cutLine.cutScore} ({cutLine.cutCount} players made the cut)
                       </span>
                     </td>
                   </tr>
