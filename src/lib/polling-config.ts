@@ -25,6 +25,8 @@ export interface TournamentDay {
 // Tournament schedule - polls all day on Thu-Sun
 // No hour restrictions since tournaments can be in any time zone
 // (East Coast, West Coast, Hawaii, Scotland, etc.)
+
+// === HOURLY POLLING (conserves API credits) ===
 export const TOURNAMENT_SCHEDULE: TournamentDay[] = [
   {
     day: 'thursday',
@@ -51,6 +53,37 @@ export const TOURNAMENT_SCHEDULE: TournamentDay[] = [
     description: 'Final Round - Hourly polling',
   },
 ];
+
+// === FREQUENT POLLING (better UX, uses more API credits) ===
+// Uncomment below and comment out the above to enable frequent polling
+// ~1,080 calls per tournament vs ~96 calls with hourly
+//
+// export const TOURNAMENT_SCHEDULE: TournamentDay[] = [
+//   {
+//     day: 'thursday',
+//     dayOfWeek: 4,
+//     pollIntervalMinutes: 8,
+//     description: 'Round 1 - Full field, 8 min polling',
+//   },
+//   {
+//     day: 'friday',
+//     dayOfWeek: 5,
+//     pollIntervalMinutes: 8,
+//     description: 'Round 2 - Full field, 8 min polling',
+//   },
+//   {
+//     day: 'saturday',
+//     dayOfWeek: 6,
+//     pollIntervalMinutes: 4,
+//     description: 'Round 3 - Moving Day, 4 min polling',
+//   },
+//   {
+//     day: 'sunday',
+//     dayOfWeek: 0,
+//     pollIntervalMinutes: 4,
+//     description: 'Final Round, 4 min polling',
+//   },
+// ];
 
 // Non-tournament days - very infrequent polling to check for updates
 export const OFF_TOURNAMENT_POLL_INTERVAL_MINUTES = 60; // 1 hour
