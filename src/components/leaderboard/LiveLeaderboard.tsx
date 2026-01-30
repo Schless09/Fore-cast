@@ -22,6 +22,8 @@ interface LeaderboardRow {
 interface TeeTimeData {
   tee_time_r1: string | null;
   tee_time_r2: string | null;
+  tee_time_r3: string | null;
+  tee_time_r4: string | null;
   starting_tee_r1: number | null;
   starting_tee_r2: number | null;
 }
@@ -64,13 +66,15 @@ function getTeeTimeForRound(teeTime: TeeTimeData | undefined, currentRound?: num
   
   let estTime: string | null = null;
   
-  // For round 1 or before tournament starts, show R1 tee time
+  // Select tee time based on display round
   if (!currentRound || currentRound === 1) {
     estTime = teeTime.tee_time_r1;
-  }
-  // For round 2, show R2 tee time
-  else if (currentRound === 2) {
+  } else if (currentRound === 2) {
     estTime = teeTime.tee_time_r2;
+  } else if (currentRound === 3) {
+    estTime = teeTime.tee_time_r3;
+  } else if (currentRound === 4) {
+    estTime = teeTime.tee_time_r4;
   }
   
   // Convert EST to local timezone
@@ -388,8 +392,11 @@ export function LiveLeaderboard({
                 <td className={`px-1 sm:px-3 py-2 font-semibold text-xs sm:text-sm ${totalClass}`}>
                   {formatScore(row.total_score)}
                 </td>
-                <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${todayClass}`}>
-                  {row.apiPlayerId ? (
+                <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${(currentRound || 1) >= 2 && (row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18') ? 'text-casino-gray-dark' : todayClass}`}>
+                  {/* If displayRound is 2+ and player finished R1 but hasn't started R2, show dash */}
+                  {(currentRound || 1) >= 2 && (row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18') ? (
+                    <span>-</span>
+                  ) : row.apiPlayerId ? (
                     <button
                       onClick={() => setSelectedPlayer({ id: row.apiPlayerId!, name: row.name })}
                       className="hover:underline hover:text-casino-gold transition-colors cursor-pointer"
@@ -402,8 +409,11 @@ export function LiveLeaderboard({
                   )}
                 </td>
                 <td className="px-1 sm:px-3 py-2 text-xs sm:text-sm">
-                  {row.thru === 'F' || row.thru === 18 || row.thru === '18' ? (
-                    <span className="text-casino-green font-medium">F</span>
+                  {/* If displayRound is 2+ and player finished previous round (F, F*, 18), show next round tee time */}
+                  {(currentRound || 1) >= 2 && (row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18') && getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound) ? (
+                    <span className="text-casino-gray">{getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound)}</span>
+                  ) : row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18' ? (
+                    <span className="text-casino-green font-medium">{row.thru === 18 || row.thru === '18' ? 'F' : row.thru}</span>
                   ) : row.thru && row.thru !== '-' && row.thru !== '0' && row.thru !== 0 ? (
                     <span className="text-casino-blue">{row.thru}</span>
                   ) : getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound) ? (

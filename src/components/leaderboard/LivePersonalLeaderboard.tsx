@@ -21,6 +21,8 @@ interface RosterPlayer {
   playerName: string;
   teeTimeR1?: string | null;
   teeTimeR2?: string | null;
+  teeTimeR3?: string | null;
+  teeTimeR4?: string | null;
 }
 
 interface LivePersonalLeaderboardProps {
@@ -32,6 +34,7 @@ interface LivePersonalLeaderboardProps {
     position: number;
     amount: number;
   }>;
+  displayRound?: number;
 }
 
 // Helper to parse scores
@@ -61,6 +64,7 @@ export function LivePersonalLeaderboard({
   tournamentName,
   liveGolfAPITournamentId,
   prizeDistributions,
+  displayRound = 1,
 }: LivePersonalLeaderboardProps) {
   const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>([]);
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
@@ -186,6 +190,8 @@ export function LivePersonalLeaderboard({
           pga_player_id,
           tee_time_r1,
           tee_time_r2,
+          tee_time_r3,
+          tee_time_r4,
           pga_players(name)
         )
       `)
@@ -200,6 +206,8 @@ export function LivePersonalLeaderboard({
       playerName: rp.tournament_player?.pga_players?.name || 'Unknown',
       teeTimeR1: rp.tournament_player?.tee_time_r1,
       teeTimeR2: rp.tournament_player?.tee_time_r2,
+      teeTimeR3: rp.tournament_player?.tee_time_r3,
+      teeTimeR4: rp.tournament_player?.tee_time_r4,
     }));
 
     setRosterPlayers(players);
@@ -352,7 +360,10 @@ export function LivePersonalLeaderboard({
                       )}
                     </td>
                     <td className="px-1 sm:px-3 py-2 hidden sm:table-cell">
-                      {player.liveScore ? (
+                      {/* If displayRound is 2+ and player finished R1 but hasn't started R2, show dash */}
+                      {displayRound >= 2 && (player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') ? (
+                        <span className="text-casino-gray-dark">-</span>
+                      ) : player.liveScore ? (
                         <span className={
                           parseScore(player.liveScore.currentRoundScore) < 0 ? 'text-casino-green' :
                           parseScore(player.liveScore.currentRoundScore) > 0 ? 'text-casino-red' :
@@ -365,15 +376,35 @@ export function LivePersonalLeaderboard({
                       )}
                     </td>
                     <td className="px-1 sm:px-3 py-2">
-                      {player.liveScore?.thru === 'F' ? (
-                        <span className="text-casino-green font-medium">F</span>
-                      ) : player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0' ? (
-                        <span className="text-casino-blue">{player.liveScore.thru}</span>
-                      ) : player.teeTimeR1 ? (
-                        <span className="text-casino-gray">{convertESTtoLocal(player.teeTimeR1)}</span>
-                      ) : (
-                        <span className="text-casino-gray-dark">-</span>
-                      )}
+                      {(() => {
+                        // Helper to get tee time for current display round
+                        const getTeeTimeForRound = () => {
+                          if (displayRound === 1) return player.teeTimeR1;
+                          if (displayRound === 2) return player.teeTimeR2;
+                          if (displayRound === 3) return player.teeTimeR3;
+                          if (displayRound === 4) return player.teeTimeR4;
+                          return player.teeTimeR1;
+                        };
+                        const teeTime = getTeeTimeForRound();
+                        
+                        // If player finished previous round (F or F*), show next round tee time
+                        if ((player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') && teeTime) {
+                          return <span className="text-casino-gray">{convertESTtoLocal(teeTime)}</span>;
+                        }
+                        // Player finished but no tee time for next round
+                        if (player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') {
+                          return <span className="text-casino-green font-medium">{player.liveScore.thru}</span>;
+                        }
+                        // Player is on course
+                        if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
+                          return <span className="text-casino-blue">{player.liveScore.thru}</span>;
+                        }
+                        // Player hasn't started, show tee time
+                        if (teeTime) {
+                          return <span className="text-casino-gray">{convertESTtoLocal(teeTime)}</span>;
+                        }
+                        return <span className="text-casino-gray-dark">-</span>;
+                      })()}
                     </td>
                     <td className="px-1 sm:px-3 py-2 text-right">
                       <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>

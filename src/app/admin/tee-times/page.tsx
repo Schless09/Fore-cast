@@ -18,6 +18,8 @@ interface ParsedTeeTime {
   country: string;
   tee_time_r1: string | null;
   tee_time_r2: string | null;
+  tee_time_r3: string | null;
+  tee_time_r4: string | null;
   starting_tee_r1: number | null;
   starting_tee_r2: number | null;
 }
@@ -31,6 +33,12 @@ export default function TeeTimesAdminPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [matchResults, setMatchResults] = useState<{ matched: number; unmatched: string[] } | null>(null);
+  
+  // Weekend tee times (R3/R4) via JSON
+  const [jsonInput, setJsonInput] = useState('');
+  const [selectedRound, setSelectedRound] = useState<'3' | '4'>('3');
+  const [jsonMessage, setJsonMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSavingJson, setIsSavingJson] = useState(false);
 
   useEffect(() => {
     loadTournaments();
@@ -82,6 +90,8 @@ export default function TeeTimesAdminPage() {
           country: '',
           tee_time_r1: r1Time || null,
           tee_time_r2: r2Time || null,
+          tee_time_r3: null,
+          tee_time_r4: null,
           starting_tee_r1: r1Tee10?.toUpperCase() === 'TRUE' ? 10 : 1,
           starting_tee_r2: r2Tee10?.toUpperCase() === 'TRUE' ? 10 : 1,
         });
@@ -146,6 +156,8 @@ export default function TeeTimesAdminPage() {
             country: currentCountry,
             tee_time_r1: r1Parsed.time,
             tee_time_r2: r2Parsed.time,
+            tee_time_r3: null,
+            tee_time_r4: null,
             starting_tee_r1: r1Parsed.startingTee,
             starting_tee_r2: r2Parsed.startingTee,
           });
@@ -235,6 +247,8 @@ export default function TeeTimesAdminPage() {
         'j j': ['jj'],
         'sh': ['s h'],
         's h': ['sh'],
+        'cam': ['cameron'],
+        'cameron': ['cam'],
       };
 
       // Create a map of normalized names to tournament_player IDs
@@ -310,6 +324,173 @@ export default function TeeTimesAdminPage() {
       setMessage({ type: 'error', text: error.message || 'Failed to save tee times' });
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  /**
+   * Handle JSON input for R3/R4 tee times
+   * Expected format:
+   * [
+   *   { "name": "Player Name", "tee_time": "8:30 AM" },
+   *   ...
+   * ]
+   */
+  async function handleSaveJson() {
+    if (!selectedTournamentId) {
+      setJsonMessage({ type: 'error', text: 'Please select a tournament' });
+      return;
+    }
+    if (!jsonInput.trim()) {
+      setJsonMessage({ type: 'error', text: 'Please enter JSON data' });
+      return;
+    }
+
+    setIsSavingJson(true);
+    setJsonMessage(null);
+
+    try {
+      const supabase = createClient();
+      
+      // Parse JSON input
+      let teeTimes: Array<{ name: string; tee_time: string; starting_tee?: number }>;
+      try {
+        teeTimes = JSON.parse(jsonInput);
+        if (!Array.isArray(teeTimes)) {
+          throw new Error('JSON must be an array');
+        }
+      } catch (e: any) {
+        setJsonMessage({ type: 'error', text: `Invalid JSON: ${e.message}` });
+        setIsSavingJson(false);
+        return;
+      }
+
+      // Get tournament players with their PGA player names
+      const { data: tournamentPlayers, error: tpError } = await supabase
+        .from('tournament_players')
+        .select('id, pga_player_id, pga_players(name)')
+        .eq('tournament_id', selectedTournamentId);
+
+      if (tpError) throw tpError;
+
+      // Fuzzy name normalization for better matching
+      const normalizeName = (name: string): string => {
+        return name
+          .toLowerCase()
+          .trim()
+          .replace(/\./g, '')
+          .replace(/ø/g, 'o')
+          .replace(/ö/g, 'o')
+          .replace(/ü/g, 'u')
+          .replace(/é/g, 'e')
+          .replace(/á/g, 'a')
+          .replace(/í/g, 'i')
+          .replace(/\s+/g, ' ');
+      };
+
+      // Common nickname mappings
+      const nicknameMap: Record<string, string[]> = {
+        'zach': ['zachary', 'zack'],
+        'zachary': ['zach', 'zack'],
+        'john': ['johnny', 'jon'],
+        'johnny': ['john', 'jon'],
+        'mike': ['michael'],
+        'michael': ['mike'],
+        'bob': ['robert', 'bobby'],
+        'robert': ['bob', 'bobby'],
+        'will': ['william', 'bill'],
+        'william': ['will', 'bill'],
+        'tom': ['thomas', 'tommy'],
+        'thomas': ['tom', 'tommy'],
+        'jim': ['james', 'jimmy'],
+        'james': ['jim', 'jimmy'],
+        'chris': ['christopher'],
+        'christopher': ['chris'],
+        'matt': ['matthew'],
+        'matthew': ['matt'],
+        'dan': ['daniel', 'danny'],
+        'daniel': ['dan', 'danny'],
+        'nick': ['nicholas'],
+        'nicholas': ['nick'],
+        'aj': ['a j'],
+        'a j': ['aj'],
+        'jj': ['j j'],
+        'j j': ['jj'],
+        'cam': ['cameron'],
+        'cameron': ['cam'],
+      };
+
+      // Create a map of normalized names to tournament_player IDs
+      const nameToIdMap = new Map<string, string>();
+      
+      tournamentPlayers?.forEach((tp: any) => {
+        const playerName = tp.pga_players?.name;
+        if (playerName) {
+          const normalized = normalizeName(playerName);
+          nameToIdMap.set(normalized, tp.id);
+        }
+      });
+
+      // Find match with nickname fallback
+      const findMatch = (jsonName: string): string | null => {
+        const normalized = normalizeName(jsonName);
+        
+        // Direct match
+        if (nameToIdMap.has(normalized)) {
+          return nameToIdMap.get(normalized)!;
+        }
+        
+        // Try nickname variations
+        const firstName = normalized.split(' ')[0];
+        const lastName = normalized.split(' ').slice(1).join(' ');
+        const nicknames = nicknameMap[firstName] || [];
+        
+        for (const nickname of nicknames) {
+          const altName = `${nickname} ${lastName}`;
+          if (nameToIdMap.has(altName)) {
+            return nameToIdMap.get(altName)!;
+          }
+        }
+        
+        return null;
+      };
+
+      let matchedCount = 0;
+      const unmatchedNames: string[] = [];
+      const teeTimeColumn = selectedRound === '3' ? 'tee_time_r3' : 'tee_time_r4';
+      const startingTeeColumn = selectedRound === '3' ? 'starting_tee_r3' : 'starting_tee_r4';
+
+      // Update each player's tee time
+      for (const entry of teeTimes) {
+        const tournamentPlayerId = findMatch(entry.name);
+
+        if (tournamentPlayerId) {
+          const updateData: Record<string, string | number> = { 
+            [teeTimeColumn]: entry.tee_time,
+            [startingTeeColumn]: entry.starting_tee || 1, // Default to tee 1
+          };
+          
+          const { error: updateError } = await supabase
+            .from('tournament_players')
+            .update(updateData)
+            .eq('id', tournamentPlayerId);
+
+          if (!updateError) {
+            matchedCount++;
+          }
+        } else {
+          unmatchedNames.push(entry.name);
+        }
+      }
+
+      setJsonMessage({
+        type: unmatchedNames.length > 0 ? 'success' : 'success',
+        text: `Updated R${selectedRound} tee times for ${matchedCount} of ${teeTimes.length} players${unmatchedNames.length > 0 ? `. Unmatched: ${unmatchedNames.join(', ')}` : ''}`,
+      });
+
+    } catch (error: any) {
+      setJsonMessage({ type: 'error', text: error.message || 'Failed to save tee times' });
+    } finally {
+      setIsSavingJson(false);
     }
   }
 
@@ -474,6 +655,92 @@ Chad Ramey,12:10 PM,FALSE,1:16 PM,TRUE
                 )}
               </div>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Weekend Tee Times (R3/R4) via JSON */}
+      <div className="mt-8">
+        <h2 className="text-2xl font-bold text-casino-gold mb-4">Weekend Tee Times (R3/R4)</h2>
+        <p className="text-casino-gray mb-4">
+          After the cut on Friday, upload Round 3 and Round 4 tee times via JSON format.
+        </p>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Upload Weekend Tee Times (JSON)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-casino-gray mb-2">
+                  Tournament (same as above)
+                </label>
+                <select
+                  value={selectedTournamentId}
+                  onChange={(e) => setSelectedTournamentId(e.target.value)}
+                  className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded-lg text-casino-text focus:outline-none focus:border-casino-gold"
+                >
+                  <option value="">Select a tournament...</option>
+                  {tournaments.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({new Date(t.start_date).toLocaleDateString()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-casino-gray mb-2">
+                  Round
+                </label>
+                <select
+                  value={selectedRound}
+                  onChange={(e) => setSelectedRound(e.target.value as '3' | '4')}
+                  className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded-lg text-casino-text focus:outline-none focus:border-casino-gold"
+                >
+                  <option value="3">Round 3 (Saturday)</option>
+                  <option value="4">Round 4 (Sunday)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-casino-gray mb-2">
+                JSON Data
+              </label>
+              <textarea
+                value={jsonInput}
+                onChange={(e) => setJsonInput(e.target.value)}
+                placeholder={`[
+  { "name": "Scottie Scheffler", "tee_time": "8:30 AM" },
+  { "name": "Rory McIlroy", "tee_time": "8:41 AM" },
+  { "name": "Jon Rahm", "tee_time": "8:52 AM", "starting_tee": 10 }
+]`}
+                className="w-full h-64 px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded-lg text-casino-text font-mono text-sm focus:outline-none focus:border-casino-gold"
+              />
+              <p className="text-xs text-casino-gray mt-2">
+                Format: Array of objects with &quot;name&quot;, &quot;tee_time&quot;, and optional &quot;starting_tee&quot; (1 or 10, defaults to 1)
+              </p>
+            </div>
+
+            {jsonMessage && (
+              <div
+                className={`p-3 rounded-lg ${
+                  jsonMessage.type === 'success'
+                    ? 'bg-green-900/30 border border-green-500/30 text-green-400'
+                    : 'bg-red-900/30 border border-red-500/30 text-red-400'
+                }`}
+              >
+                {jsonMessage.text}
+              </div>
+            )}
+
+            <Button
+              onClick={handleSaveJson}
+              disabled={isSavingJson || !selectedTournamentId || !jsonInput.trim()}
+            >
+              {isSavingJson ? 'Saving...' : `Save Round ${selectedRound} Tee Times`}
+            </Button>
           </CardContent>
         </Card>
       </div>

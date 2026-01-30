@@ -59,7 +59,7 @@ export default async function WeeklyStandingsByTournamentPage({
   }
 
   // Run remaining queries in parallel for faster page load
-  const [prizeDistributionsResult, rostersResult, allTournamentsResult] = await Promise.all([
+  const [prizeDistributionsResult, rostersResult, allTournamentsResult, teeTimeResult] = await Promise.all([
     // Get prize distributions for live calculations
     supabase
       .from('prize_money_distributions')
@@ -89,14 +89,78 @@ export default async function WeeklyStandingsByTournamentPage({
       .select('id, name, status, start_date')
       .order('status', { ascending: true })
       .order('start_date', { ascending: false }),
+    
+    // Get tee times for display round calculation
+    supabase
+      .from('tournament_players')
+      .select('tee_time_r2, tee_time_r3, tee_time_r4')
+      .eq('tournament_id', tournamentId)
+      .limit(200),
   ]);
 
   const prizeDistributions = prizeDistributionsResult.data;
   const rosters = rostersResult.data;
   const allTournaments = allTournamentsResult.data;
+  const teeTimeData = teeTimeResult.data;
 
   if (rostersResult.error) {
     console.error('Error loading rosters:', rostersResult.error);
+  }
+
+  // Calculate display round - switch to next round 5 hours before first tee time
+  let displayRound = tournament.current_round || 1;
+  if (teeTimeData && teeTimeData.length > 0 && displayRound < 4) {
+    const parseTime = (timeStr: string): number => {
+      const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!match) return 9999;
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const period = match[3].toUpperCase();
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    };
+
+    // Get current time in EST
+    const now = new Date();
+    const estFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const parts = estFormatter.formatToParts(now);
+    const estHours = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+    const estMinutes = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+    const currentMinutes = estHours * 60 + estMinutes;
+
+    // Helper to find earliest tee time and check if we should advance
+    const findEarliestTeeTime = (teeTimes: (string | null | undefined)[]): string | null => {
+      const validTimes = teeTimes.filter((t): t is string => t !== null && t !== undefined);
+      if (validTimes.length === 0) return null;
+      return validTimes.sort((a, b) => parseTime(a) - parseTime(b))[0];
+    };
+
+    const shouldAdvanceToRound = (earliestTeeTime: string | null): boolean => {
+      if (!earliestTeeTime) return false;
+      const teeTimeMinutes = parseTime(earliestTeeTime);
+      const hoursUntil = (teeTimeMinutes - currentMinutes) / 60;
+      return hoursUntil <= 5 && hoursUntil > -2;
+    };
+
+    // Check each round transition
+    if (displayRound === 1) {
+      const earliestR2 = findEarliestTeeTime(teeTimeData.map((t) => t.tee_time_r2));
+      if (shouldAdvanceToRound(earliestR2)) displayRound = 2;
+    }
+    if (displayRound === 2) {
+      const earliestR3 = findEarliestTeeTime(teeTimeData.map((t) => t.tee_time_r3));
+      if (shouldAdvanceToRound(earliestR3)) displayRound = 3;
+    }
+    if (displayRound === 3) {
+      const earliestR4 = findEarliestTeeTime(teeTimeData.map((t) => t.tee_time_r4));
+      if (shouldAdvanceToRound(earliestR4)) displayRound = 4;
+    }
   }
 
   // Check if we should use live standings (active tournament with API ID)
@@ -284,6 +348,7 @@ export default async function WeeklyStandingsByTournamentPage({
               currentUserId={profile.id}
               tournamentStatus={tournament.status}
               userLeagueId={userLeagueId || undefined}
+              displayRound={displayRound}
             />
           ) : rosters && rosters.length > 0 ? (
             <>

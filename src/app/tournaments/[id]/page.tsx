@@ -8,7 +8,6 @@ import { LiveLeaderboard } from '@/components/leaderboard/LiveLeaderboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { TournamentSelector } from '@/components/tournaments/TournamentSelector';
-import { LiveRoundBadge } from '@/components/tournaments/LiveRoundBadge';
 import { LineupCountdown } from '@/components/ui/LineupCountdown';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
@@ -106,7 +105,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   }
 
   // Run remaining queries in parallel for faster page load
-  const [allTournamentsResult, existingRosterResult, teeTimeResult] = await Promise.all([
+  const [allTournamentsResult, existingRosterResult, teeTimeResult, leagueTournamentResult] = await Promise.all([
     // Get all tournaments for selector
     supabase
       .from('tournaments')
@@ -133,14 +132,27 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     // Get tee times for all players (for countdown and leaderboard display)
     supabase
       .from('tournament_players')
-      .select('tee_time_r1, tee_time_r2, starting_tee_r1, starting_tee_r2, pga_players(name)')
+      .select('tee_time_r1, tee_time_r2, tee_time_r3, tee_time_r4, starting_tee_r1, starting_tee_r2, pga_players(name)')
       .eq('tournament_id', id)
       .limit(200),
+    
+    // Check if tournament is excluded from user's active league
+    profile.active_league_id
+      ? supabase
+          .from('league_tournaments')
+          .select('is_excluded')
+          .eq('league_id', profile.active_league_id)
+          .eq('tournament_id', id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const allTournaments = allTournamentsResult.data;
   const existingRoster = existingRosterResult.data;
   const teeTimeData = teeTimeResult.data;
+  
+  // Tournament is excluded if there's a record with is_excluded = true
+  const isTournamentExcluded = leagueTournamentResult.data?.is_excluded === true;
 
   // Sort tournaments: active first, then upcoming (by date), then completed (recent first)
   const sortedTournaments = allTournaments
@@ -192,7 +204,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   
   // Parse and find earliest tee time + build tee time map for leaderboard
   let earliestTeeTime: string | undefined;
-  const teeTimeMap = new Map<string, { tee_time_r1: string | null; tee_time_r2: string | null; starting_tee_r1: number | null; starting_tee_r2: number | null }>();
+  const teeTimeMap = new Map<string, { tee_time_r1: string | null; tee_time_r2: string | null; tee_time_r3: string | null; tee_time_r4: string | null; starting_tee_r1: number | null; starting_tee_r2: number | null }>();
   
   if (teeTimeData && teeTimeData.length > 0) {
     const parseTime = (timeStr: string): number => {
@@ -210,6 +222,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     interface TeeTimeRow {
       tee_time_r1: string | null;
       tee_time_r2: string | null;
+      tee_time_r3: string | null;
+      tee_time_r4: string | null;
       starting_tee_r1: number | null;
       starting_tee_r2: number | null;
       pga_players: { name: string } | null;
@@ -222,6 +236,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         teeTimeMap.set(pga.name, {
           tee_time_r1: row.tee_time_r1,
           tee_time_r2: row.tee_time_r2,
+          tee_time_r3: row.tee_time_r3,
+          tee_time_r4: row.tee_time_r4,
           starting_tee_r1: row.starting_tee_r1,
           starting_tee_r2: row.starting_tee_r2,
         });
@@ -238,13 +254,76 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     }
   }
 
+  // Calculate display round - switch to next round 5 hours before first tee time
+  let displayRound = tournament.current_round || 1;
+  if (teeTimeData && teeTimeData.length > 0 && displayRound < 4) {
+    const parseTime = (timeStr: string): number => {
+      const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!match) return 9999;
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const period = match[3].toUpperCase();
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    };
+
+    // Get current time in EST
+    const now = new Date();
+    const estFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const parts = estFormatter.formatToParts(now);
+    const estHours = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+    const estMinutes = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+    const currentMinutes = estHours * 60 + estMinutes;
+
+    // Helper to find earliest tee time and check if we should advance to that round
+    interface TeeTimeRow {
+      tee_time_r2: string | null;
+      tee_time_r3: string | null;
+      tee_time_r4: string | null;
+    }
+    
+    const findEarliestTeeTime = (teeTimes: (string | null)[]): string | null => {
+      const validTimes = teeTimes.filter((t): t is string => t !== null);
+      if (validTimes.length === 0) return null;
+      return validTimes.sort((a, b) => parseTime(a) - parseTime(b))[0];
+    };
+
+    const shouldAdvanceToRound = (earliestTeeTime: string | null): boolean => {
+      if (!earliestTeeTime) return false;
+      const teeTimeMinutes = parseTime(earliestTeeTime);
+      const hoursUntil = (teeTimeMinutes - currentMinutes) / 60;
+      return hoursUntil <= 5 && hoursUntil > -2;
+    };
+
+    // Check each round transition
+    if (displayRound === 1) {
+      const earliestR2 = findEarliestTeeTime(teeTimeData.map((t) => (t as unknown as TeeTimeRow).tee_time_r2));
+      if (shouldAdvanceToRound(earliestR2)) displayRound = 2;
+    }
+    if (displayRound === 2) {
+      const earliestR3 = findEarliestTeeTime(teeTimeData.map((t) => (t as unknown as TeeTimeRow).tee_time_r3));
+      if (shouldAdvanceToRound(earliestR3)) displayRound = 3;
+    }
+    if (displayRound === 3) {
+      const earliestR4 = findEarliestTeeTime(teeTimeData.map((t) => (t as unknown as TeeTimeRow).tee_time_r4));
+      if (shouldAdvanceToRound(earliestR4)) displayRound = 4;
+    }
+  }
+
   // Determine what to show
-  // - Upcoming: roster builder
+  // - Upcoming: roster builder (if tournament not excluded from league)
   // - Active: roster builder if no roster yet; live leaderboard if roster exists
   // - Completed: golfer leaderboard (regardless of user's roster)
   const showRosterBuilder =
-    tournament.status === 'upcoming' ||
-    (tournament.status === 'active' && !existingRoster);
+    !isTournamentExcluded &&
+    (tournament.status === 'upcoming' ||
+    (tournament.status === 'active' && !existingRoster));
   const showPersonalLeaderboard =
     tournament.status === 'active' && !!existingRoster;
   const showGolferLeaderboard = tournament.status === 'completed' || (tournament.status === 'active' && !!existingRoster);
@@ -602,7 +681,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             playerNameToIdMap={playerNameToIdMap}
             liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
             tournamentStatus={tournament.status}
-            currentRound={tournament.current_round}
+            currentRound={displayRound}
             teeTimeMap={teeTimeMap}
             playerCostMap={playerCostMap}
           />
@@ -673,16 +752,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                   {formatDate(tournament.end_date)}
                 </span>
                 {tournament.status === 'active' && (
-                  tournament.rapidapi_tourn_id ? (
-                    <LiveRoundBadge 
-                      liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
-                      fallbackRound={tournament.current_round || 1}
-                    />
-                  ) : (
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                      Round {tournament.current_round}/4
-                    </span>
-                  )
+                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                    Round {displayRound}/4
+                  </span>
                 )}
               </div>
             </div>
@@ -710,6 +782,23 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             status={tournament.status}
           />
         </div>
+      )}
+
+      {/* Tournament Excluded Message */}
+      {isTournamentExcluded && tournament.status !== 'completed' && !existingRoster && (
+        <Card className="mb-6 border-casino-gold/30">
+          <CardContent className="py-8 text-center">
+            <div className="text-casino-gold text-4xl mb-4">🚫</div>
+            <h3 className="text-xl font-semibold text-casino-text mb-2">
+              Tournament Not Included
+            </h3>
+            <p className="text-casino-gray">
+              This tournament is not included in your league&apos;s schedule.
+              <br />
+              Contact your commissioner if you believe this is an error.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Roster Section - shows summary with edit option, or builder for new rosters */}
@@ -741,6 +830,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 position: typeof p.position === 'string' ? parseInt(p.position, 10) : p.position,
                 amount: p.amount || 0,
               }))}
+              displayRound={displayRound}
             />
           ) : (
             <PersonalLeaderboard
