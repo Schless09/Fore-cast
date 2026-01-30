@@ -3,6 +3,7 @@ import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/prize-money';
+import { PickedByTooltip } from '@/components/ui/PickedByTooltip';
 import Link from 'next/link';
 
 interface AnalyticsPageProps {
@@ -17,6 +18,7 @@ interface PlayerSelectionStats {
   prizeMoney: number;
   isOnUserRoster: boolean;
   cost: number;
+  pickedByUsers: string[]; // Names of users who picked this player
 }
 
 interface CachedPlayer {
@@ -176,9 +178,23 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
   let playerStats: PlayerSelectionStats[] = [];
 
   if (rosterIds.length > 0) {
+    // Build a map from roster_id to username
+    const rosterToUserMap = new Map<string, string>();
+    for (const roster of leagueRosters || []) {
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', roster.user_id)
+        .single();
+      if (userProfile?.username) {
+        rosterToUserMap.set(roster.id, userProfile.username);
+      }
+    }
+
     const { data: selectionData, error: selectionError } = await supabase
       .from('roster_players')
       .select(`
+        roster_id,
         tournament_player:tournament_players!inner(
           pga_players!inner(name)
         )
@@ -190,14 +206,25 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
     }
 
     if (selectionData) {
-      // Count selections per player
+      // Count selections per player and track who picked them
       const playerCounts = new Map<string, number>();
+      const playerPickedBy = new Map<string, string[]>();
       
       selectionData.forEach((row) => {
         const tp = row.tournament_player as unknown as { pga_players: { name: string } };
         const playerName = tp?.pga_players?.name;
         if (playerName) {
           playerCounts.set(playerName, (playerCounts.get(playerName) || 0) + 1);
+          
+          // Track which user picked this player
+          const username = rosterToUserMap.get(row.roster_id);
+          if (username) {
+            const currentPickers = playerPickedBy.get(playerName) || [];
+            if (!currentPickers.includes(username)) {
+              currentPickers.push(username);
+              playerPickedBy.set(playerName, currentPickers);
+            }
+          }
         }
       });
 
@@ -213,6 +240,7 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
             prizeMoney: liveData.prizeMoney,
             isOnUserRoster: userRosterPlayerNames.has(playerName),
             cost: playerCostMap.get(playerName) || 0,
+            pickedByUsers: playerPickedBy.get(playerName) || [],
           };
         })
         .sort((a, b) => b.selectionCount - a.selectionCount);
@@ -283,16 +311,12 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
                           </div>
                         </td>
                         <td className="px-1 sm:px-3 py-3 text-center hidden sm:table-cell">
-                          <span className={`font-semibold ${
-                            player.selectionCount >= totalRosters * 0.75 ? 'text-casino-gold' :
-                            player.selectionCount >= totalRosters * 0.5 ? 'text-casino-green' :
-                            'text-casino-text'
-                          }`}>
-                            {player.selectionCount}
-                          </span>
-                          <span className="text-casino-gray text-xs ml-1">
-                            ({player.percentage}%)
-                          </span>
+                          <PickedByTooltip
+                            selectionCount={player.selectionCount}
+                            percentage={player.percentage}
+                            totalRosters={totalRosters}
+                            pickedByUsers={player.pickedByUsers}
+                          />
                         </td>
                         <td className="px-1 sm:px-3 py-3 text-center">
                           {player.position ? (
