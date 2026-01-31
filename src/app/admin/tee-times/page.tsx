@@ -351,13 +351,19 @@ export default function TeeTimesAdminPage() {
     try {
       const supabase = createClient();
       
-      // Parse JSON input
+      // Parse JSON input - accept both "name" and "player" keys
       let teeTimes: Array<{ name: string; tee_time: string; starting_tee?: number }>;
       try {
-        teeTimes = JSON.parse(jsonInput);
-        if (!Array.isArray(teeTimes)) {
+        const parsed = JSON.parse(jsonInput);
+        if (!Array.isArray(parsed)) {
           throw new Error('JSON must be an array');
         }
+        // Normalize to use "name" key (accept "player" as alias)
+        teeTimes = parsed.map((entry: { name?: string; player?: string; tee_time: string; starting_tee?: number }) => ({
+          name: entry.name || entry.player || '',
+          tee_time: entry.tee_time,
+          starting_tee: entry.starting_tee,
+        }));
       } catch (e: any) {
         setJsonMessage({ type: 'error', text: `Invalid JSON: ${e.message}` });
         setIsSavingJson(false);
