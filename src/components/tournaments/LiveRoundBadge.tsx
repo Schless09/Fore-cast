@@ -18,7 +18,11 @@ export function LiveRoundBadge({ liveGolfAPITournamentId, fallbackRound = 1 }: L
         const result = await response.json();
         
         if (result.currentRound) {
-          setCurrentRound(result.currentRound);
+          // Handle MongoDB extended JSON format {$numberInt: "1"}
+          const round = typeof result.currentRound === 'object' && result.currentRound?.$numberInt
+            ? parseInt(result.currentRound.$numberInt, 10)
+            : (typeof result.currentRound === 'number' ? result.currentRound : parseInt(result.currentRound, 10));
+          setCurrentRound(round || fallbackRound);
         }
         setIsLoaded(true);
       } catch (error) {

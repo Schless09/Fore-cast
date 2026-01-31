@@ -4,6 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { formatDate } from '@/lib/utils';
 
+// Helper to safely extract round number from potentially MongoDB extended JSON format
+function safeRoundNumber(round: unknown): number {
+  if (typeof round === 'object' && round !== null && '$numberInt' in round) {
+    return parseInt((round as { $numberInt: string }).$numberInt, 10) || 1;
+  }
+  if (typeof round === 'number') return round;
+  if (typeof round === 'string') return parseInt(round, 10) || 1;
+  return 1;
+}
+
 interface TournamentCardProps {
   tournament: Tournament;
 }
@@ -42,7 +52,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
             <p>{formatDate(tournament.start_date)} - {formatDate(tournament.end_date)}</p>
             {tournament.status === 'active' && (
               <p className="mt-1 font-medium text-gray-900">
-                Round {tournament.current_round}/4
+                Round {safeRoundNumber(tournament.current_round)}/4
               </p>
             )}
           </div>

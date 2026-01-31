@@ -108,7 +108,11 @@ export default async function WeeklyStandingsByTournamentPage({
   }
 
   // Calculate display round - switch to next round 5 hours before first tee time
-  let displayRound = tournament.current_round || 1;
+  // Handle MongoDB extended JSON format {$numberInt: "1"} that may come from RapidAPI
+  const rawRound = tournament.current_round as unknown;
+  let displayRound = typeof rawRound === 'object' && rawRound !== null && '$numberInt' in rawRound
+    ? parseInt((rawRound as { $numberInt: string }).$numberInt, 10) 
+    : (typeof rawRound === 'number' ? rawRound : 1);
   if (teeTimeData && teeTimeData.length > 0 && displayRound < 4) {
     const parseTime = (timeStr: string): number => {
       const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);

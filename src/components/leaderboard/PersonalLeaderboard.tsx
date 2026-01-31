@@ -12,6 +12,16 @@ interface PersonalLeaderboardProps {
   initialRoster?: RosterWithDetails;
 }
 
+// Helper to safely extract round number from potentially MongoDB extended JSON format
+function safeRoundNumber(round: unknown): number | undefined {
+  if (typeof round === 'object' && round !== null && '$numberInt' in round) {
+    return parseInt((round as { $numberInt: string }).$numberInt, 10);
+  }
+  if (typeof round === 'number') return round;
+  if (typeof round === 'string') return parseInt(round, 10);
+  return undefined;
+}
+
 export function PersonalLeaderboard({
   rosterId,
   initialRoster,
@@ -199,7 +209,7 @@ export function PersonalLeaderboard({
                       player={rp.tournament_player}
                       playerWinnings={rp.player_winnings || 0}
                       rank={index + 1}
-                      currentRound={roster.tournament?.current_round}
+                      currentRound={safeRoundNumber(roster.tournament?.current_round)}
                     />
                   );
                 })

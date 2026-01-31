@@ -217,7 +217,9 @@ export async function GET(request: NextRequest) {
         
         // Transform and prepare data
         const leaderboard = json.leaderboardRows || [];
-        const roundId = json.roundId?.$numberInt || json.roundId || 1;
+        // Handle MongoDB extended JSON format and ensure roundId is always a number
+        const rawRoundId = json.roundId?.$numberInt || json.roundId || 1;
+        const roundId = typeof rawRoundId === 'string' ? parseInt(rawRoundId, 10) : rawRoundId;
         const status = json.status || 'Unknown';
         
         // Transform to our format
@@ -246,8 +248,18 @@ export async function GET(request: NextRequest) {
           };
         });
 
-        // Extract cut line info
+        // Extract cut line info - handle MongoDB extended JSON format
         const cutLine = json.cutLines?.[0] || null;
+        
+        // Helper to extract number from potential {$numberInt: "value"} format
+        const extractNumber = (val: unknown): number | null => {
+          if (typeof val === 'object' && val !== null && '$numberInt' in val) {
+            return parseInt((val as { $numberInt: string }).$numberInt, 10);
+          }
+          if (typeof val === 'number') return val;
+          if (typeof val === 'string') return parseInt(val, 10) || null;
+          return null;
+        };
 
         const cacheData = {
           data: transformedData,
@@ -258,7 +270,7 @@ export async function GET(request: NextRequest) {
           lastUpdated: json.lastUpdated,
           cutLine: cutLine ? {
             cutScore: cutLine.cutScore,
-            cutCount: cutLine.cutCount,
+            cutCount: extractNumber(cutLine.cutCount) || cutLine.cutCount,
           } : null,
         };
 
