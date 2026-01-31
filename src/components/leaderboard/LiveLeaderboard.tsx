@@ -302,6 +302,15 @@ export function LiveLeaderboard({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Compute "made the cut" count from leaderboard (players at or better than cut score)
+  const madeCutCount = useMemo(() => {
+    if (!cutLine) return null;
+    const cutScoreNum = parseScore(cutLine.cutScore);
+    return leaderboardData.filter(
+      (row) => row.position !== null && row.total_score <= cutScoreNum
+    ).length;
+  }, [leaderboardData, cutLine]);
+
   return (
     <div>
       {/* Refresh Status Bar */}
@@ -474,7 +483,7 @@ export function LiveLeaderboard({
                   <tr className="bg-yellow-900/20 border-y-2 border-yellow-500/40">
                     <td colSpan={6} className="px-3 py-2 text-center">
                       <span className="text-yellow-400 font-semibold text-sm">
-                        {(currentRound || 1) >= 3 ? 'CUT LINE' : 'PROJECTED CUT'}: {cutLine.cutScore} ({typeof cutLine.cutCount === 'object' && cutLine.cutCount !== null && '$numberInt' in cutLine.cutCount ? (cutLine.cutCount as unknown as {$numberInt: string}).$numberInt : cutLine.cutCount} players made the cut)
+                        {(currentRound || 1) >= 3 ? 'CUT LINE' : 'PROJECTED CUT'}: {cutLine.cutScore} ({madeCutCount ?? (typeof cutLine.cutCount === 'object' && cutLine.cutCount !== null && '$numberInt' in cutLine.cutCount ? (cutLine.cutCount as unknown as {$numberInt: string}).$numberInt : cutLine.cutCount)} players made the cut)
                       </span>
                     </td>
                   </tr>
