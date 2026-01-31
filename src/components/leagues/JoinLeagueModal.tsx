@@ -83,6 +83,16 @@ export function JoinLeagueModal({ onClose, canClose = false }: JoinLeagueModalPr
               ? 'Enter your league name and password to join your group'
               : 'Create a new league for your friend group'}
           </p>
+          {mode === 'create' && (
+            <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <p className="text-sm text-amber-200">
+                There is a <strong>$4 per league member</strong> administrative fee for running and maintaining the league.
+              </p>
+              <p className="text-xs text-amber-200/90 mt-2">
+                The league will be disabled if administrative fees are not paid prior to the 2nd tournament.
+              </p>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
