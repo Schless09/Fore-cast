@@ -5,12 +5,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useUser, useClerk, SignUpButton } from '@clerk/nextjs';
+import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 
 export function Navbar() {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useUser();
   const { signOut } = useClerk();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const unreadCount = useUnreadMessages();
 
   const handleSignOut = async () => {
     await signOut();
@@ -120,6 +122,17 @@ export function Navbar() {
           >
             Season
           </Link>
+          <Link
+            href="/chat"
+            className="text-casino-text hover:text-casino-gold font-medium transition-all hover:tracking-wide relative"
+          >
+            💬 Chat
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-3 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </Link>
           <div className="flex items-center gap-3 pl-6 border-l border-casino-gold/30">
             <span className="text-sm text-casino-gold font-semibold tracking-wide">
               {displayName}
@@ -187,6 +200,18 @@ export function Navbar() {
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Season Standings
+            </Link>
+            <Link
+              href="/chat"
+              className="text-casino-text hover:text-casino-gold hover:bg-casino-card/50 font-medium transition-all px-4 py-3 rounded-lg flex items-center justify-between"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <span>💬 League Chat</span>
+              {unreadCount > 0 && (
+                <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </Link>
             <div className="border-t border-casino-gold/20 mt-2 pt-2 px-4">
               <p className="text-sm text-casino-gold font-semibold mb-3">
