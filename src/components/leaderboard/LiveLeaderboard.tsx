@@ -454,11 +454,13 @@ export function LiveLeaderboard({
 
             // Use prize_money from row, or look up from prize distribution
             // Amateurs cannot collect prize money
-            // If player's score is worse than the cut score, show $0
-            // cutScore is like "-3", so we need to parse and compare
+            // R1/R2: zero prize if score is worse than projected cut
+            // R3+: only zero if CUT (position null) or amateur — everyone with a standing gets prize
             const cutScoreNum = cutLine ? parseScore(cutLine.cutScore) : null;
-            const isBelowProjectedCut = cutLine && row.position !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
-            const prizeAmount = (row.is_amateur || isBelowProjectedCut) ? 0 : (
+            const isRound3OrLater = (currentRound || 1) >= 3;
+            const isBelowProjectedCut = !isRound3OrLater && cutLine && row.position !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
+            const isCut = row.position === null;
+            const prizeAmount = (row.is_amateur || isCut || isBelowProjectedCut) ? 0 : (
               row.prize_money ||
               (row.position ? prizeDistributionMap.get(row.position) : 0) ||
               0
@@ -466,24 +468,23 @@ export function LiveLeaderboard({
 
             const prevRow = idx > 0 ? leaderboardData[idx - 1] : null;
             
-            // Check if this is where the cut line should be shown
-            // Show line between the last player at cutScore and first player worse than cutScore
+            // Cut line bar: only in R1/R2 (projected cut). R3+ no bar — CUT shows in standing column
             const prevRowScore = prevRow ? prevRow.total_score : null;
-            const isProjectedCutPosition = cutLine && 
-              row.position !== null && 
+            const isProjectedCutPosition = !isRound3OrLater && cutLine &&
+              row.position !== null &&
               cutScoreNum !== null &&
               prevRowScore !== null &&
-              prevRowScore <= cutScoreNum && // Previous player is at or better than cut
-              row.total_score > cutScoreNum;  // This player is worse than cut
+              prevRowScore <= cutScoreNum &&
+              row.total_score > cutScoreNum;
 
             return (
               <Fragment key={`${row.position}-${name}-${idx}`}>
-                {/* Cut Line Bar - projected during R1/R2, official after R3+ */}
+                {/* Cut Line Bar - only R1/R2 */}
                 {isProjectedCutPosition && (
                   <tr className="bg-yellow-900/20 border-y-2 border-yellow-500/40">
                     <td colSpan={6} className="px-3 py-2 text-center">
                       <span className="text-yellow-400 font-semibold text-sm">
-                        {(currentRound || 1) >= 3 ? 'CUT LINE' : 'PROJECTED CUT'}: {cutLine.cutScore} ({madeCutCount ?? (typeof cutLine.cutCount === 'object' && cutLine.cutCount !== null && '$numberInt' in cutLine.cutCount ? (cutLine.cutCount as unknown as {$numberInt: string}).$numberInt : cutLine.cutCount)} players made the cut)
+                        PROJECTED CUT: {cutLine.cutScore} ({madeCutCount ?? (typeof cutLine.cutCount === 'object' && cutLine.cutCount !== null && '$numberInt' in cutLine.cutCount ? (cutLine.cutCount as unknown as {$numberInt: string}).$numberInt : cutLine.cutCount)} players made the cut)
                       </span>
                     </td>
                   </tr>

@@ -2,8 +2,7 @@ import { redirect } from 'next/navigation';
 import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { formatCurrency } from '@/lib/prize-money';
-import { PickedByTooltip } from '@/components/ui/PickedByTooltip';
+import { InsideTheFieldTable } from '@/components/tournaments/InsideTheFieldTable';
 import Link from 'next/link';
 
 interface AnalyticsPageProps {
@@ -274,73 +273,7 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
           </CardHeader>
           <CardContent>
             {playerStats.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
-                      <th className="px-1 sm:px-3 py-3 w-8">#</th>
-                      <th className="px-1 sm:px-3 py-3">Player</th>
-                      <th className="px-1 sm:px-3 py-3 text-center hidden sm:table-cell">Picked</th>
-                      <th className="px-1 sm:px-3 py-3 text-center">Pos</th>
-                      <th className="px-1 sm:px-3 py-3 text-right">Earnings</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {playerStats.map((player, index) => (
-                      <tr 
-                        key={player.playerName}
-                        className={`border-b transition-colors ${
-                          player.isOnUserRoster
-                            ? 'bg-casino-gold/20 border-casino-gold/40 hover:bg-casino-gold/30'
-                            : 'border-casino-gold/10 hover:bg-casino-elevated'
-                        }`}
-                      >
-                        <td className="px-1 sm:px-3 py-3 text-casino-gray">
-                          {player.isOnUserRoster && <span className="mr-1"></span>}
-                          {index + 1}
-                        </td>
-                        <td className={`px-1 sm:px-3 py-3 font-medium ${player.isOnUserRoster ? 'text-casino-gold' : 'text-casino-text'}`}>
-                          <div className="flex flex-col">
-                            <span>
-                              {player.playerName}
-                              <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
-                            </span>
-                            <span className="text-xs text-casino-gray sm:hidden">
-                              {player.selectionCount}/{totalRosters} teams ({player.percentage}%)
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-1 sm:px-3 py-3 text-center hidden sm:table-cell">
-                          <PickedByTooltip
-                            selectionCount={player.selectionCount}
-                            percentage={player.percentage}
-                            totalRosters={totalRosters}
-                            pickedByUsers={player.pickedByUsers}
-                          />
-                        </td>
-                        <td className="px-1 sm:px-3 py-3 text-center">
-                          {player.position ? (
-                            <span className={`font-medium ${
-                              parseInt(player.position.replace('T', '')) === 1 ? 'text-casino-gold' :
-                              parseInt(player.position.replace('T', '')) <= 10 ? 'text-casino-green' :
-                              'text-casino-text'
-                            }`}>
-                              {player.position}
-                            </span>
-                          ) : (
-                            <span className="text-casino-gray-dark">-</span>
-                          )}
-                        </td>
-                        <td className="px-1 sm:px-3 py-3 text-right">
-                          <span className={player.prizeMoney > 0 ? 'text-casino-green' : 'text-casino-gray-dark'}>
-                            {formatCurrency(player.prizeMoney)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <InsideTheFieldTable playerStats={playerStats} totalRosters={totalRosters} />
             ) : (
               <div className="text-center py-8 text-casino-gray">
                 No player selections found for this tournament in your league.
