@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { formatCurrency } from '@/lib/prize-money';
 import { PickedByTooltip } from '@/components/ui/PickedByTooltip';
 
@@ -43,9 +44,16 @@ interface InsideTheFieldTableProps {
   totalRosters: number;
 }
 
+const VALUE_TOOLTIP = 'Return per dollar spent (earnings ÷ cost)';
+
 export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFieldTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('picked');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [showValueTooltip, setShowValueTooltip] = useState(false);
+  const [valueTooltipCoords, setValueTooltipCoords] = useState({ x: 0, y: 0 });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -90,10 +98,11 @@ export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFiel
     return arr;
   }, [playerStats, sortKey, sortDir]);
 
-  const SortHeader = ({ label, sortKey: k, align = 'center' }: { label: string; sortKey: SortKey; align?: 'left' | 'center' | 'right' }) => (
+  const SortHeader = ({ label, sortKey: k, align = 'center', title }: { label: string; sortKey: SortKey; align?: 'left' | 'center' | 'right'; title?: string }) => (
     <th
       className={`px-1 sm:px-3 py-3 cursor-pointer select-none hover:text-casino-gold transition-colors ${align === 'right' ? 'text-right' : align === 'left' ? 'text-left' : 'text-center'}`}
       onClick={() => handleSort(k)}
+      title={title}
     >
       {label}
       {sortKey === k && (
@@ -112,7 +121,28 @@ export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFiel
             <SortHeader label="Picked" sortKey="picked" />
             <SortHeader label="POS" sortKey="pos" />
             <SortHeader label="Earnings" sortKey="earnings" align="right" />
-            <SortHeader label="Value" sortKey="roi" align="right" />
+            <th
+              className="px-1 sm:px-3 py-3 cursor-pointer select-none hover:text-casino-gold transition-colors text-right"
+              onClick={() => handleSort('roi')}
+            >
+              <span className="inline-flex items-center gap-1">
+                Value
+                {sortKey === 'roi' && (
+                  <span className="ml-1 text-casino-gold">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                )}
+                <span
+                  className="text-casino-gray hover:text-casino-gold cursor-default text-xs font-normal normal-case"
+                  onMouseEnter={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setValueTooltipCoords({ x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+                    setShowValueTooltip(true);
+                  }}
+                  onMouseLeave={() => setShowValueTooltip(false)}
+                >
+                  ⓘ
+                </span>
+              </span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -181,6 +211,19 @@ export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFiel
           })}
         </tbody>
       </table>
+      {mounted && showValueTooltip && createPortal(
+        <div
+          className="fixed z-[100] px-2 py-1.5 text-xs text-white bg-gray-900 border border-casino-gold/40 rounded shadow-lg max-w-[200px] text-center pointer-events-none"
+          style={{
+            left: valueTooltipCoords.x,
+            top: valueTooltipCoords.y,
+            transform: 'translate(-50%, 0)',
+          }}
+        >
+          {VALUE_TOOLTIP}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
