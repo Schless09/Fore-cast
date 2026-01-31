@@ -286,8 +286,11 @@ export async function GET(request: NextRequest) {
     // Create a map of normalized names to tournament_player IDs
     const nameToIdMap = new Map<string, string>();
     
-    tournamentPlayers?.forEach((tp: { id: string; pga_players: { name: string } | null }) => {
-      const playerName = tp.pga_players?.name;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tournamentPlayers?.forEach((tp: any) => {
+      // pga_players comes back as an array from the join
+      const pgaPlayer = Array.isArray(tp.pga_players) ? tp.pga_players[0] : tp.pga_players;
+      const playerName = pgaPlayer?.name;
       if (playerName) {
         const normalized = normalizeName(playerName);
         nameToIdMap.set(normalized, tp.id);
