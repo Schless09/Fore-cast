@@ -44,7 +44,8 @@ export default async function AdminLeaguesPage() {
   const { data: memberCounts } = await supabase
     .from('league_members')
     .select('league_id')
-    .in('league_id', leagueIds);
+    .in('league_id', leagueIds)
+    .limit(10000);
 
   const countByLeague: Record<string, number> = {};
   (memberCounts ?? []).forEach((row: { league_id: string }) => {
