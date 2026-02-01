@@ -38,7 +38,7 @@ export default async function TheMoneyBoardPage() {
                 Payment due before the start of the first tournament
               </p>
               <Link
-                href="https://venmo.com/Andrew-Schuessler-2?txn=pay&amount=409&note=Bama%20Boys%20Golf%20%2726%20Buy-in"
+                href="https://venmo.com/Andrew-Schuessler-2?txn=pay&amount=409&note=Bama%20Boys%20Golf"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-[#008CFF] hover:bg-[#0074D4] text-white font-semibold rounded-lg transition-colors"
