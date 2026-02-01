@@ -126,6 +126,22 @@ export default async function AdminPage() {
           </Card>
         </Link>
 
+        <Link href="/admin/leagues">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle>Leagues</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 text-sm mb-4">
+                View all leagues and who created them
+              </p>
+              <Button variant="outline" className="w-full">
+                View Leagues
+              </Button>
+            </CardContent>
+          </Card>
+        </Link>
+
         <Link href="/admin/rosters">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader>
