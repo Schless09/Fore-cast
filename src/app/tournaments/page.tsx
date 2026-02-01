@@ -1,5 +1,12 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createServiceClient } from '@/lib/supabase/service';
+
+export const metadata: Metadata = {
+  title: 'Fantasy Golf Tournaments',
+  description:
+    'PGA Tour fantasy golf tournaments. Set your lineup, track live scores, and see weekly fantasy golf standings.',
+};
 
 // Force dynamic rendering to ensure fresh data
 export const dynamic = 'force-dynamic';

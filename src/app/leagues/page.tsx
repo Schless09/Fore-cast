@@ -1,7 +1,19 @@
+import type { Metadata } from 'next';
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { LeagueManager } from '@/components/leagues/LeagueManager';
 import { createServiceClient } from '@/lib/supabase/service';
+
+interface LeagueRow {
+  id: string;
+  name: string;
+  created_by: string | null;
+}
+
+export const metadata: Metadata = {
+  title: 'Fantasy Golf Leagues',
+  description:
+    'Create or join a fantasy golf league. Manage your league, invite friends, and compete in FORE!SIGHT fantasy golf.',
+};
 
 async function getProfileForClerkUser() {
   const { userId } = await auth();
@@ -63,12 +75,16 @@ export default async function LeaguesPage() {
     .eq('user_id', profile?.id)
     .order('joined_at', { ascending: false });
 
-  const leagues = memberships?.map(m => ({
-    id: (m.leagues as any)?.id,
-    name: (m.leagues as any)?.name,
-    joined_at: m.joined_at,
-    is_commissioner: (m.leagues as any)?.created_by === profile?.id,
-  })) || [];
+  const leagues = memberships?.map(m => {
+    const raw = m.leagues as LeagueRow | LeagueRow[] | null;
+    const league = Array.isArray(raw) ? raw[0] ?? null : raw;
+    return {
+      id: league?.id ?? '',
+      name: league?.name ?? '',
+      joined_at: m.joined_at,
+      is_commissioner: league?.created_by === profile?.id,
+    };
+  }) || [];
 
   const activeLeagueId = profile?.active_league_id || null;
 

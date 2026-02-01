@@ -1,6 +1,13 @@
+import type { Metadata } from 'next';
 import { Card, CardContent } from '@/components/ui/Card';
 import Image from 'next/image';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'The Money Board',
+  description:
+    'Fantasy golf league rules, payouts, and payment info. Prize money and Venmo for FORE!SIGHT fantasy golf leagues.',
+};
 
 export default async function TheMoneyBoardPage() {
   // Authentication is handled by Clerk middleware

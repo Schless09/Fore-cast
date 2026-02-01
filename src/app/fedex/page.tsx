@@ -1,6 +1,13 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+
+export const metadata: Metadata = {
+  title: 'FedEx Cup Playoffs - Fantasy Golf',
+  description:
+    'Fantasy golf FedEx Cup playoff rules: survive and advance. Weekly fantasy golf lineups still active.',
+};
 
 export default function FedExPage() {
   return (

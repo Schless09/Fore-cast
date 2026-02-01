@@ -1,8 +1,14 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
 import { logger } from '@/lib/logger';
 import { LiveSeasonStandings } from '@/components/standings/LiveSeasonStandings';
+
+export const metadata: Metadata = {
+  title: 'Season Fantasy Golf Standings',
+  description: 'Full season fantasy golf standings and leaderboard. Year-long fantasy golf league results.',
+};
 
 interface RosterData {
   id: string;

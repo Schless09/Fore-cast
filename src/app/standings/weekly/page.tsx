@@ -1,8 +1,14 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/Card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { createServiceClient } from '@/lib/supabase/service';
+
+export const metadata: Metadata = {
+  title: 'Weekly Fantasy Golf Standings',
+  description: 'Weekly fantasy golf standings and tournament results. Live leaderboard for your fantasy golf league.',
+};
 
 // Force fresh data on every request
 export const revalidate = 0;
