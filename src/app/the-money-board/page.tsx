@@ -74,7 +74,8 @@ export default async function TheMoneyBoardPage() {
             {/* FedEx */}
             <div>
               <span className="text-white font-medium">FedEx Cup:</span>
-              <span className="text-casino-gray ml-2">All members → Top 24 → Top 12. Everyone sets lineups (weekly + season prizes still in play).</span>
+              <span className="text-casino-gray ml-2">All members → Top 24 → Top 12.</span>
+              <Link href="/fedex" className="text-casino-gold hover:underline ml-1">Playoff rules →</Link>
             </div>
 
             {/* Season */}
