@@ -738,7 +738,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex-1">
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 flex-wrap">
                 <CardTitle className="text-xl sm:text-2xl flex-1">{tournament.name}</CardTitle>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-medium capitalize whitespace-nowrap sm:hidden ${
@@ -751,6 +751,11 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 >
                   {tournament.status}
                 </span>
+                <Link href={`/tournaments/${id}/analytics`}>
+                  <Button variant="outline" size="sm" className="shrink-0">
+                    📊 Inside the Field
+                  </Button>
+                </Link>
               </div>
               {tournament.course && (
                 <p className="text-gray-600 mt-2 text-sm">📍 {tournament.course}</p>
@@ -767,17 +772,19 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 )}
               </div>
             </div>
-            <span
-              className={`hidden sm:block px-4 py-2 rounded-full text-sm font-medium capitalize whitespace-nowrap ${
-                tournament.status === 'upcoming'
-                  ? 'bg-blue-100 text-blue-800'
-                  : tournament.status === 'active'
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}
-            >
-              {tournament.status}
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span
+                className={`hidden sm:block px-4 py-2 rounded-full text-sm font-medium capitalize whitespace-nowrap ${
+                  tournament.status === 'upcoming'
+                    ? 'bg-blue-100 text-blue-800'
+                    : tournament.status === 'active'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-gray-100 text-gray-800'
+                }`}
+              >
+                {tournament.status}
+              </span>
+            </div>
           </div>
         </CardHeader>
       </Card>
@@ -875,12 +882,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       )}
 
       {/* Links */}
-      <div className="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
+      <div className="mt-8 flex justify-center">
         <Link href="/standings/weekly">
           <Button variant="ghost">← Back to Weekly Standings</Button>
-        </Link>
-        <Link href={`/tournaments/${id}/analytics`}>
-          <Button variant="outline">📊 Inside the Field Analytics</Button>
         </Link>
       </div>
     </div>
