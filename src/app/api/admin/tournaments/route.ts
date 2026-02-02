@@ -3,6 +3,43 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { logger } from '@/lib/logger';
 
 /**
+ * List all tournaments
+ * GET /api/admin/tournaments
+ */
+export async function GET() {
+  try {
+    const supabase = createServiceClient();
+
+    const { data: tournaments, error } = await supabase
+      .from('tournaments')
+      .select('*')
+      .order('start_date', { ascending: false });
+
+    if (error) {
+      logger.error('Failed to fetch tournaments', {
+        errorMessage: error.message,
+        errorCode: error.code,
+      }, error as Error);
+      return NextResponse.json(
+        { error: `Failed to fetch tournaments: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      tournaments,
+    });
+  } catch (error: unknown) {
+    logger.error('Unexpected error fetching tournaments', {}, error as Error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch tournaments' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * Delete all tournaments
  * DELETE /api/admin/tournaments
  */
