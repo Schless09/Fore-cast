@@ -20,13 +20,23 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   // Require admin code cookie for /admin and /api/admin (except unlock page and unlock API)
+  // Also protect sensitive score endpoints that modify data
   const pathname = req.nextUrl.pathname;
   const isUnlockPage = pathname === '/admin/unlock';
   const isUnlockApi = pathname === '/api/admin/unlock';
+  
+  // Score endpoints that require admin access (exclude /api/scores/live which is read-only)
+  const isProtectedScoreEndpoint = 
+    pathname === '/api/scores/update' ||
+    pathname === '/api/scores/sync' ||
+    pathname === '/api/scores/calculate' ||
+    pathname === '/api/scores/calculate-winnings';
+  
   if (
-    (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) &&
+    ((pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) &&
     !isUnlockPage &&
-    !isUnlockApi
+    !isUnlockApi) ||
+    isProtectedScoreEndpoint
   ) {
     const unlocked = req.cookies.get(ADMIN_UNLOCK_COOKIE)?.value === '1';
     if (!unlocked) {

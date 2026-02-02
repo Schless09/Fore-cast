@@ -42,9 +42,9 @@ npm install
 3. Set up environment variables:
 Create a `.env` or `.env.local` file in the root directory (`.env.local` is recommended as it's automatically ignored by git):
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://fqqdqogxuwygozermral.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-SUPABASE_SERVICE_ROLE_KEY=sb_secret_9zwZ-dxJU5qS30c1sqQIXg_LUL8S0Bx
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 

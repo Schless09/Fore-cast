@@ -7,7 +7,7 @@ import { createServiceClient } from '@/lib/supabase/service';
  */
 
 const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com';
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '4786f7c55amshbe62b07d4f84965p1a07a0jsn6aef3153473b';
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
 interface CacheEntry {
   data: any;
@@ -25,6 +25,10 @@ export async function GET(request: NextRequest) {
   const year = searchParams.get('year');
   const tournId = searchParams.get('tournId');
   const orgId = searchParams.get('orgId') || '1'; // Default to PGA Tour
+
+  if (!RAPIDAPI_KEY) {
+    return NextResponse.json({ error: 'API key not configured' }, { status: 500 });
+  }
 
   if (!year || !tournId || !playerId) {
     return NextResponse.json({ 
