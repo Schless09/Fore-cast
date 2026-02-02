@@ -186,8 +186,9 @@ export default async function WeeklyStandingsByTournamentPage({
     }
   }
 
-  // Check if we should use live standings (active tournament with API ID)
-  const useLiveStandings = tournament.status === 'active' && tournament.rapidapi_tourn_id;
+  // Check if we should use live standings (active or completed tournament with API ID)
+  // For completed tournaments, the component will use stored final data instead of polling
+  const useLiveStandings = (tournament.status === 'active' || tournament.status === 'completed') && tournament.rapidapi_tourn_id;
 
   // Get user's roster rank
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

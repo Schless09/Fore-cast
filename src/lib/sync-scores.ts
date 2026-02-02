@@ -170,8 +170,18 @@ async function syncPositionsFromCachedData(
     }
   }
 
+  // Helper to parse score string to number (e.g., "-15" → -15, "E" → 0, "+3" → 3)
+  const parseScoreToNumber = (scoreStr: string): number | null => {
+    if (!scoreStr || scoreStr === '-') return null;
+    if (scoreStr === 'E') return 0;
+    const cleaned = scoreStr.trim();
+    if (cleaned.startsWith('+')) return parseInt(cleaned.slice(1), 10);
+    if (cleaned.startsWith('-')) return parseInt(cleaned, 10);
+    return parseInt(cleaned, 10) || null;
+  };
+
   // Prepare updates from cached data
-  const updates: Array<{ id: string; position: number | null; is_tied: boolean }> = [];
+  const updates: Array<{ id: string; position: number | null; is_tied: boolean; total_score: number | null }> = [];
   
   for (const score of cachedData) {
     // Try to match by playerId first, then by normalized name
@@ -184,10 +194,12 @@ async function syncPositionsFromCachedData(
     
     if (tpId && score.positionValue !== null) {
       const isTied = score.position?.startsWith('T') || false;
+      const totalScore = parseScoreToNumber(score.total);
       updates.push({
         id: tpId,
         position: score.positionValue,
         is_tied: isTied,
+        total_score: totalScore,
       });
     } else if (!tpId && score.positionValue !== null && score.positionValue <= 70) {
       // Log unmatched players who finished in money positions
@@ -197,7 +209,7 @@ async function syncPositionsFromCachedData(
 
   console.log(`[SYNC] Matched ${updates.length} players from cached data`);
 
-  // Update tournament_players with positions
+  // Update tournament_players with positions and scores
   if (updates.length > 0) {
     for (const update of updates) {
       const { error } = await supabase
@@ -205,6 +217,7 @@ async function syncPositionsFromCachedData(
         .update({ 
           position: update.position, 
           is_tied: update.is_tied,
+          total_score: update.total_score,
           updated_at: new Date().toISOString(),
         })
         .eq('id', update.id);

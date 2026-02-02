@@ -19,6 +19,12 @@ interface RosterData {
     teeTimeR3?: string | null;
     teeTimeR4?: string | null;
     cost?: number;
+    // Final data for completed tournaments
+    finalPosition?: number | null;
+    finalIsTied?: boolean | null;
+    finalScore?: number | null;
+    finalPrizeMoney?: number | null;
+    isAmateur?: boolean | null;
   }>;
 }
 
@@ -65,10 +71,12 @@ export function LiveTeamStandings({
   liveGolfAPITournamentId,
   prizeDistributions,
   currentUserId,
+  tournamentStatus,
   userLeagueId,
   leagueMemberIds,
   displayRound = 1,
 }: LiveTeamStandingsProps) {
+  const isCompleted = tournamentStatus === 'completed';
   const [rosters, setRosters] = useState<RosterData[]>([]);
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -195,14 +203,37 @@ export function LiveTeamStandings({
     return Math.round(totalPrize / tieCount);
   }, [positionCounts, prizeMap]);
 
-  // Calculate winnings for each roster based on live scores
+  // Calculate winnings for each roster based on live scores OR stored final data
   const rostersWithLiveWinnings = useMemo(() => {
     return rosters.map((roster) => {
       let totalWinnings = 0;
       const playersWithScores = roster.players.map((player) => {
-        // Use fuzzy matching to find live score
-        const liveScore = findLiveScore(player.playerName);
+        // For completed tournaments, use stored final data
+        if (isCompleted) {
+          const winnings = player.finalPrizeMoney || 0;
+          totalWinnings += winnings;
+          return {
+            ...player,
+            liveScore: player.finalPosition ? {
+              player: player.playerName,
+              playerId: player.playerId,
+              position: player.finalIsTied ? `T${player.finalPosition}` : String(player.finalPosition),
+              positionValue: player.finalPosition,
+              total: player.finalScore !== null && player.finalScore !== undefined
+                ? (player.finalScore === 0 ? 'E' : (player.finalScore > 0 ? `+${player.finalScore}` : String(player.finalScore)))
+                : '-',
+              thru: 'F',
+              currentRoundScore: '-',
+              roundComplete: true,
+              isAmateur: player.isAmateur ?? false,
+            } as LiveScore : undefined,
+            winnings,
+            isAmateur: player.isAmateur ?? false,
+          };
+        }
         
+        // For active tournaments, use live scores
+        const liveScore = findLiveScore(player.playerName);
         const position = liveScore?.positionValue;
         const isAmateur = liveScore?.isAmateur === true;
         
@@ -229,13 +260,14 @@ export function LiveTeamStandings({
         totalWinnings,
       };
     }).sort((a, b) => b.totalWinnings - a.totalWinnings);
-  }, [rosters, findLiveScore, calculateTiePrizeMoney]);
+  }, [rosters, findLiveScore, calculateTiePrizeMoney, isCompleted]);
 
   // Fetch rosters from database
   const fetchRosters = useCallback(async () => {
     const supabase = createClient();
     
     // Get rosters with their players, filtered by league membership (so multi-league users show in each league's standings)
+    // Include final scores for completed tournaments
     let query = supabase
       .from('user_rosters')
       .select(`
@@ -244,6 +276,7 @@ export function LiveTeamStandings({
         user_id,
         profiles(username),
         roster_players(
+          player_winnings,
           tournament_player:tournament_players(
             pga_player_id,
             tee_time_r1,
@@ -251,7 +284,11 @@ export function LiveTeamStandings({
             tee_time_r3,
             tee_time_r4,
             cost,
-            pga_players(name)
+            position,
+            is_tied,
+            total_score,
+            prize_money,
+            pga_players(name, is_amateur)
           )
         )
       `)
@@ -276,14 +313,19 @@ export function LiveTeamStandings({
       user_id: string;
       profiles?: { username?: string } | { username?: string }[] | null;
       roster_players?: Array<{
+        player_winnings?: number | null;
         tournament_player?: {
           pga_player_id?: string;
-          pga_players?: { name?: string } | null;
+          pga_players?: { name?: string; is_amateur?: boolean } | null;
           tee_time_r1?: string | null;
           tee_time_r2?: string | null;
           tee_time_r3?: string | null;
           tee_time_r4?: string | null;
           cost?: number;
+          position?: number | null;
+          is_tied?: boolean | null;
+          total_score?: number | null;
+          prize_money?: number | null;
         } | null;
       }> | null;
     };
@@ -303,6 +345,12 @@ export function LiveTeamStandings({
           teeTimeR3: rp.tournament_player?.tee_time_r3,
           teeTimeR4: rp.tournament_player?.tee_time_r4,
           cost: rp.tournament_player?.cost,
+          // Final data for completed tournaments
+          finalPosition: rp.tournament_player?.position,
+          finalIsTied: rp.tournament_player?.is_tied,
+          finalScore: rp.tournament_player?.total_score,
+          finalPrizeMoney: rp.player_winnings ?? rp.tournament_player?.prize_money,
+          isAmateur: rp.tournament_player?.pga_players?.is_amateur,
         })),
       };
     });
@@ -310,9 +358,10 @@ export function LiveTeamStandings({
     setRosters(transformedRosters);
   }, [tournamentId, userLeagueId, leagueMemberIds]);
 
-  // Fetch live scores from API
+  // Fetch live scores from API (skip for completed tournaments)
   const fetchLiveScores = useCallback(async () => {
-    if (!liveGolfAPITournamentId || isRefreshing) return;
+    // Don't fetch live scores for completed tournaments - use stored final data
+    if (isCompleted || !liveGolfAPITournamentId || isRefreshing) return;
 
     setIsRefreshing(true);
     setSyncError(null);
@@ -335,7 +384,7 @@ export function LiveTeamStandings({
       setIsRefreshing(false);
       setNextRefreshIn(REFRESH_INTERVAL_MS / 1000);
     }
-  }, [liveGolfAPITournamentId, isRefreshing]);
+  }, [liveGolfAPITournamentId, isRefreshing, isCompleted]);
 
   // Initial load
   useEffect(() => {
@@ -346,8 +395,10 @@ export function LiveTeamStandings({
     }
   }, [fetchRosters, fetchLiveScores]);
 
-  // Polling interval
+  // Polling interval (skip for completed tournaments)
   useEffect(() => {
+    if (isCompleted) return; // No polling needed for completed tournaments
+    
     const pollInterval = setInterval(fetchLiveScores, REFRESH_INTERVAL_MS);
     const countdownInterval = setInterval(() => {
       setNextRefreshIn((prev) => Math.max(0, prev - 1));
@@ -357,7 +408,7 @@ export function LiveTeamStandings({
       clearInterval(pollInterval);
       clearInterval(countdownInterval);
     };
-  }, [fetchLiveScores]);
+  }, [fetchLiveScores, isCompleted]);
 
   const formatCountdown = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -374,7 +425,12 @@ export function LiveTeamStandings({
       <div className="mb-4 space-y-2">
         <div className="flex items-center justify-between p-2 bg-casino-elevated rounded-lg border border-casino-gold/20">
           <div className="flex items-center gap-2 text-xs text-casino-gray">
-            {isRefreshing ? (
+            {isCompleted ? (
+              <>
+                <span className="text-casino-gold">🏁</span>
+                <span>Final Results</span>
+              </>
+            ) : isRefreshing ? (
               <>
                 <span className="animate-spin">🔄</span>
                 <span>Refreshing live scores...</span>
@@ -393,15 +449,17 @@ export function LiveTeamStandings({
               </>
             )}
           </div>
-          <button
-            onClick={fetchLiveScores}
-            disabled={isRefreshing}
-            className="text-xs px-3 py-1 bg-casino-gold/20 hover:bg-casino-gold/30 text-casino-gold rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isRefreshing ? 'Refreshing...' : 'Refresh Now'}
-          </button>
+          {!isCompleted && (
+            <button
+              onClick={fetchLiveScores}
+              disabled={isRefreshing}
+              className="text-xs px-3 py-1 bg-casino-gold/20 hover:bg-casino-gold/30 text-casino-gold rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isRefreshing ? 'Refreshing...' : 'Refresh Now'}
+            </button>
+          )}
         </div>
-        {syncError && (
+        {syncError && !isCompleted && (
           <div className="p-2 bg-yellow-900/30 border border-yellow-600/50 rounded-lg text-xs text-yellow-300">
             ⚠️ {syncError}
           </div>
