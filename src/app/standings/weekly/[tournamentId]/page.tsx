@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
+import { isTournamentIncludedInLeague } from '@/lib/league-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/prize-money';
 import { formatTimestampCST } from '@/lib/utils';
@@ -58,7 +59,14 @@ export default async function WeeklyStandingsByTournamentPage({
     );
   }
 
-  // Run remaining queries in parallel for faster page load
+  // Team standings are only shown when this tournament is included in the user's league
+  const tournamentIncludedInLeague = await isTournamentIncludedInLeague(
+    supabase,
+    userLeagueId,
+    tournamentId
+  );
+
+  // Run remaining queries in parallel for faster page load (skip rosters if tournament not in league)
   const [prizeDistributionsResult, rostersResult, allTournamentsResult, teeTimeResult] = await Promise.all([
     // Get prize distributions for live calculations
     supabase
@@ -67,21 +75,22 @@ export default async function WeeklyStandingsByTournamentPage({
       .eq('tournament_id', tournamentId)
       .order('position', { ascending: true }),
     
-    // Get all rosters for this tournament, ranked by total_winnings
-    // Filter by user's league to show only rosters from the same league
-    supabase
-      .from('user_rosters')
-      .select(`
-        id,
-        roster_name,
-        total_winnings,
-        user_id,
-        profiles!inner(username, active_league_id),
-        tournament:tournaments(name, status)
-      `)
-      .eq('tournament_id', tournamentId)
-      .eq('profiles.active_league_id', userLeagueId)
-      .order('total_winnings', { ascending: false }),
+    // Get all rosters only when this tournament is included in the user's league
+    tournamentIncludedInLeague
+      ? supabase
+          .from('user_rosters')
+          .select(`
+            id,
+            roster_name,
+            total_winnings,
+            user_id,
+            profiles!inner(username, active_league_id),
+            tournament:tournaments(name, status)
+          `)
+          .eq('tournament_id', tournamentId)
+          .eq('profiles.active_league_id', userLeagueId)
+          .order('total_winnings', { ascending: false })
+      : Promise.resolve({ data: null, error: null }),
     
     // Get all tournaments for selector
     supabase
@@ -321,96 +330,109 @@ export default async function WeeklyStandingsByTournamentPage({
         </CardHeader>
       </Card>
 
-      {/* Standings Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div>
-              <CardTitle className="text-lg sm:text-xl">Team Standings</CardTitle>
-              {!useLiveStandings && (
-                <p className="text-xs sm:text-sm text-casino-gray mt-1">
-                  Last updated: {formatTimestampCST(pageGeneratedAt)} | Cache: {cacheBuster}
-                </p>
+      {/* Standings Table - only when this tournament is included in the user's league */}
+      {!tournamentIncludedInLeague ? (
+        <Card className="bg-casino-card border-casino-gold/20">
+          <CardContent className="py-12 text-center">
+            <p className="text-casino-text font-medium mb-2">
+              This tournament is not included in your league&apos;s schedule.
+            </p>
+            <p className="text-casino-gray text-sm">
+              Team standings are only shown for tournaments that count toward your league&apos;s season. Switch leagues or select another tournament to see standings.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg sm:text-xl">Team Standings</CardTitle>
+                {!useLiveStandings && (
+                  <p className="text-xs sm:text-sm text-casino-gray mt-1">
+                    Last updated: {formatTimestampCST(pageGeneratedAt)} | Cache: {cacheBuster}
+                  </p>
+                )}
+              </div>
+              {tournament.status === 'upcoming' && (
+                <div className="text-xs text-casino-gray bg-casino-card border border-casino-gold/20 px-3 py-1 rounded-md whitespace-nowrap self-start">
+                  🔒 Rosters locked until tournament starts
+                </div>
               )}
             </div>
-            {tournament.status === 'upcoming' && (
-              <div className="text-xs text-casino-gray bg-casino-card border border-casino-gold/20 px-3 py-1 rounded-md whitespace-nowrap self-start">
-                🔒 Rosters locked until tournament starts
+          </CardHeader>
+          <CardContent>
+            {useLiveStandings ? (
+              <LiveTeamStandings
+                tournamentId={tournamentId}
+                liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
+                prizeDistributions={(prizeDistributions || []).map((p) => ({
+                  position: p.position,
+                  amount: p.amount || 0,
+                }))}
+                currentUserId={profile.id}
+                tournamentStatus={tournament.status}
+                userLeagueId={userLeagueId || undefined}
+                displayRound={displayRound}
+              />
+            ) : rosters && rosters.length > 0 ? (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-casino-gold/30">
+                        <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
+                          Rank
+                        </th>
+                        <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
+                          Team
+                        </th>
+                        <th className="px-1 sm:px-2 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider">
+                          Winnings
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {rosters.map((roster: any, index: number) => {
+                        const isUserRoster = roster.user_id === profile.id;
+
+                        return (
+                          <ExpandableRosterRow
+                            key={`${roster.id}-${cacheBuster}`}
+                            roster={roster}
+                            index={index}
+                            isUserRoster={isUserRoster}
+                            tournamentId={tournamentId}
+                            tournamentStatus={tournament.status}
+                            currentUserId={profile.id}
+                          />
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {(tournament.status === 'active' || tournament.status === 'completed') && (
+                  <p className="text-xs text-casino-gray mt-4 flex items-center gap-1">
+                    <span>💡</span>
+                    <span>Click the arrow next to a team to view their full roster</span>
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-casino-gray mb-4">No rosters submitted yet for this tournament.</p>
+                <Link href={`/tournaments/${tournamentId}`}>
+                  <Button>Create Your Roster</Button>
+                </Link>
               </div>
             )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {useLiveStandings ? (
-            <LiveTeamStandings
-              tournamentId={tournamentId}
-              liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
-              prizeDistributions={(prizeDistributions || []).map((p) => ({
-                position: p.position,
-                amount: p.amount || 0,
-              }))}
-              currentUserId={profile.id}
-              tournamentStatus={tournament.status}
-              userLeagueId={userLeagueId || undefined}
-              displayRound={displayRound}
-            />
-          ) : rosters && rosters.length > 0 ? (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-casino-gold/30">
-                      <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
-                        Rank
-                      </th>
-                      <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
-                        Team
-                      </th>
-                      <th className="px-1 sm:px-2 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider">
-                        Winnings
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {rosters.map((roster: any, index: number) => {
-                      const isUserRoster = roster.user_id === profile.id;
+          </CardContent>
+        </Card>
+      )}
 
-                      return (
-                        <ExpandableRosterRow
-                          key={`${roster.id}-${cacheBuster}`}
-                          roster={roster}
-                          index={index}
-                          isUserRoster={isUserRoster}
-                          tournamentId={tournamentId}
-                          tournamentStatus={tournament.status}
-                          currentUserId={profile.id}
-                        />
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              {(tournament.status === 'active' || tournament.status === 'completed') && (
-                <p className="text-xs text-casino-gray mt-4 flex items-center gap-1">
-                  <span>💡</span>
-                  <span>Click the arrow next to a team to view their full roster</span>
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-casino-gray mb-4">No rosters submitted yet for this tournament.</p>
-              <Link href={`/tournaments/${tournamentId}`}>
-                <Button>Create Your Roster</Button>
-              </Link>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* User's Rank Summary - Only show for non-live standings (live has its own) */}
-      {!useLiveStandings && userRank && (
+      {/* User's Rank Summary - Only show when tournament is in league and non-live standings (live has its own) */}
+      {tournamentIncludedInLeague && !useLiveStandings && userRank && (
         <Card className="mt-6 border-2 border-casino-green/30">
           <CardContent className="pt-6">
             <div className="grid grid-cols-2 gap-4 sm:gap-6">

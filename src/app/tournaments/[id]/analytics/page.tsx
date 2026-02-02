@@ -58,6 +58,32 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
     redirect('/tournaments');
   }
 
+  // Inside the Field is only shown when the tournament is active or completed (not upcoming)
+  if (tournament.status === 'upcoming') {
+    return (
+      <div className="min-h-screen bg-casino-dark p-4 sm:p-8">
+        <div className="max-w-4xl mx-auto">
+          <Link
+            href={`/tournaments/${id}`}
+            className="text-casino-gold hover:text-casino-gold/80 mb-4 inline-block"
+          >
+            ← Back to Tournament
+          </Link>
+          <Card className="bg-casino-card border-casino-gold/20">
+            <CardContent className="py-12 text-center">
+              <p className="text-casino-text font-medium mb-2">
+                Inside the Field is available once the tournament has started.
+              </p>
+              <p className="text-casino-gray text-sm">
+                {tournament.name} is upcoming. Check back when the tournament is in progress or completed.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   // Get total roster count for this tournament in user's league
   const { data: leagueRosters, error: rostersError } = await supabase
     .from('user_rosters')

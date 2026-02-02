@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
+import { filterTournamentsIncludedInLeague } from '@/lib/league-utils';
 
 export const metadata: Metadata = {
   title: 'Fantasy Golf Tournaments',
@@ -12,14 +14,20 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function TournamentsPage() {
+  const profile = await getProfile();
   const supabase = createServiceClient();
+  const userLeagueId = profile?.active_league_id ?? null;
 
   const { data: tournaments } = await supabase
     .from('tournaments')
     .select('*')
     .order('start_date', { ascending: false });
 
-  const all = tournaments || [];
+  const all = await filterTournamentsIncludedInLeague(
+    supabase,
+    userLeagueId,
+    tournaments || []
+  );
 
   // Find the current tournament
   const active = all.filter((t) => t.status === 'active');

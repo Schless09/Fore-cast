@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
+import { isTournamentIncludedInLeague, filterTournamentsIncludedInLeague } from '@/lib/league-utils';
 import { RosterSection } from '@/components/roster/RosterSection';
 import { PersonalLeaderboard } from '@/components/leaderboard/PersonalLeaderboard';
 import { LivePersonalLeaderboard } from '@/components/leaderboard/LivePersonalLeaderboard';
@@ -105,7 +106,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   }
 
   // Run remaining queries in parallel for faster page load
-  const [allTournamentsResult, existingRosterResult, teeTimeResult, leagueTournamentResult] = await Promise.all([
+  const [allTournamentsResult, existingRosterResult, teeTimeResult] = await Promise.all([
     // Get all tournaments for selector
     supabase
       .from('tournaments')
@@ -135,24 +136,18 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       .select('tee_time_r1, tee_time_r2, tee_time_r3, tee_time_r4, starting_tee_r1, starting_tee_r2, pga_players(name)')
       .eq('tournament_id', id)
       .limit(200),
-    
-    // Check if tournament is excluded from user's active league
-    profile.active_league_id
-      ? supabase
-          .from('league_tournaments')
-          .select('is_excluded')
-          .eq('league_id', profile.active_league_id)
-          .eq('tournament_id', id)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const allTournaments = allTournamentsResult.data;
   const existingRoster = existingRosterResult.data;
   const teeTimeData = teeTimeResult.data;
-  
-  // Tournament is excluded if there's a record with is_excluded = true
-  const isTournamentExcluded = leagueTournamentResult.data?.is_excluded === true;
+
+  const tournamentIncluded = await isTournamentIncludedInLeague(
+    supabase,
+    profile.active_league_id,
+    id
+  );
+  const isTournamentExcluded = !tournamentIncluded;
 
   // Sort tournaments: active first, then upcoming (by date), then completed (recent first)
   const sortedTournaments = allTournaments
@@ -172,8 +167,15 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       })
     : [];
 
+  // Only show tournaments included in the user's league in the selector
+  const tournamentsForSelector = await filterTournamentsIncludedInLeague(
+    supabase,
+    profile.active_league_id,
+    sortedTournaments
+  );
+
   // Find current week tournament (active tournament)
-  const currentWeekTournament = sortedTournaments.find((t) => t.status === 'active');
+  const currentWeekTournament = tournamentsForSelector.find((t) => t.status === 'active');
 
   // Get roster players if roster exists
   let existingRosterData = null;
@@ -702,7 +704,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Tournament Selector */}
-      {sortedTournaments && sortedTournaments.length > 1 && (
+      {tournamentsForSelector && tournamentsForSelector.length > 1 && (
         <Card className="mb-6">
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
@@ -718,7 +720,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               )}
             </div>
             <TournamentSelector
-              tournaments={sortedTournaments}
+              tournaments={tournamentsForSelector}
               currentTournamentId={id}
               currentWeekTournamentId={currentWeekTournament?.id || null}
               basePath="/tournaments"

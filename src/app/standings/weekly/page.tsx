@@ -16,7 +16,6 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export default async function WeeklyStandingsPage() {
-  // Auth is handled by middleware
   const supabase = createServiceClient();
 
   // Priority:
