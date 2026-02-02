@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
-import { isTournamentIncludedInLeague } from '@/lib/league-utils';
+import { getLeagueIdForWeeklyStandings } from '@/lib/league-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/prize-money';
 import { formatTimestampCST } from '@/lib/utils';
@@ -35,8 +35,6 @@ export default async function WeeklyStandingsByTournamentPage({
   const pageGeneratedAt = new Date().getTime();
   const cacheBuster = pageGeneratedAt.toString(36);
 
-  const userLeagueId = profile.active_league_id;
-
   // Get tournament first (need it for early bail)
   const { data: tournament, error: tournamentError } = await supabase
     .from('tournaments')
@@ -59,12 +57,24 @@ export default async function WeeklyStandingsByTournamentPage({
     );
   }
 
-  // Team standings are only shown when this tournament is included in the user's league
-  const tournamentIncludedInLeague = await isTournamentIncludedInLeague(
+  // Pick which league to show: active if it includes this tournament, else any league user is in that includes it (so multi-league users show up)
+  const userLeagueId = await getLeagueIdForWeeklyStandings(
     supabase,
-    userLeagueId,
-    tournamentId
+    profile.id,
+    tournamentId,
+    profile.active_league_id
   );
+  const tournamentIncludedInLeague = userLeagueId !== null;
+
+  // Roster filter: show all league members (not just users who have this league as active)
+  let leagueMemberIds: string[] = [];
+  if (tournamentIncludedInLeague && userLeagueId) {
+    const { data: leagueMembers } = await supabase
+      .from('league_members')
+      .select('user_id')
+      .eq('league_id', userLeagueId);
+    leagueMemberIds = (leagueMembers || []).map((m) => m.user_id);
+  }
 
   // Run remaining queries in parallel for faster page load (skip rosters if tournament not in league)
   const [prizeDistributionsResult, rostersResult, allTournamentsResult, teeTimeResult] = await Promise.all([
@@ -75,8 +85,8 @@ export default async function WeeklyStandingsByTournamentPage({
       .eq('tournament_id', tournamentId)
       .order('position', { ascending: true }),
     
-    // Get all rosters only when this tournament is included in the user's league
-    tournamentIncludedInLeague
+    // Get rosters for all league members (not just active_league_id)
+    tournamentIncludedInLeague && leagueMemberIds.length > 0
       ? supabase
           .from('user_rosters')
           .select(`
@@ -84,13 +94,13 @@ export default async function WeeklyStandingsByTournamentPage({
             roster_name,
             total_winnings,
             user_id,
-            profiles!inner(username, active_league_id),
+            profiles(username),
             tournament:tournaments(name, status)
           `)
           .eq('tournament_id', tournamentId)
-          .eq('profiles.active_league_id', userLeagueId)
+          .in('user_id', leagueMemberIds)
           .order('total_winnings', { ascending: false })
-      : Promise.resolve({ data: null, error: null }),
+      : Promise.resolve({ data: tournamentIncludedInLeague ? [] : null, error: null }),
     
     // Get all tournaments for selector
     supabase
@@ -373,6 +383,7 @@ export default async function WeeklyStandingsByTournamentPage({
                 currentUserId={profile.id}
                 tournamentStatus={tournament.status}
                 userLeagueId={userLeagueId || undefined}
+                leagueMemberIds={leagueMemberIds}
                 displayRound={displayRound}
               />
             ) : rosters && rosters.length > 0 ? (

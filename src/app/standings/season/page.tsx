@@ -70,6 +70,16 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
 
   const userLeagueId = profile.active_league_id;
 
+  // League members for roster filter (so multi-league users show in this league's season standings)
+  let leagueMemberIds: string[] = [];
+  if (userLeagueId) {
+    const { data: leagueMembers } = await supabase
+      .from('league_members')
+      .select('user_id')
+      .eq('league_id', userLeagueId);
+    leagueMemberIds = (leagueMembers || []).map((m) => m.user_id);
+  }
+
   // Get all tournaments (completed and active)
   const { data: tournaments, error: tournamentsError } = await supabase
     .from('tournaments')
@@ -150,7 +160,7 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
   let rostersError: SupabaseError | null = null;
 
   if (tournamentIds.length > 0) {
-    const result = await supabase
+    const baseQuery = supabase
       .from('user_rosters')
       .select(
         `
@@ -158,13 +168,16 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
         user_id,
         roster_name,
         total_winnings,
-        profiles!inner(username, active_league_id),
+        profiles(username),
         tournament:tournaments(id, name, status, start_date)
       `
       )
       .in('tournament_id', tournamentIds)
-      .eq('profiles.active_league_id', userLeagueId)
       .order('created_at', { ascending: false });
+
+    const result = leagueMemberIds.length > 0
+      ? await baseQuery.in('user_id', leagueMemberIds)
+      : await baseQuery;
 
     rosters = (result.data as unknown as RosterData[]) || [];
     rostersError = result.error as SupabaseError | null;
@@ -273,6 +286,7 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
         activeTournament={activeTournament}
         prizeDistributions={prizeDistributions}
         userLeagueId={userLeagueId || undefined}
+        leagueMemberIds={leagueMemberIds.length > 0 ? leagueMemberIds : undefined}
         initialPeriod={initialPeriod}
         segmentDefinitions={segmentDefinitions}
       />

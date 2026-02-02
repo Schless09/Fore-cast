@@ -44,6 +44,8 @@ interface LiveTeamStandingsProps {
   currentUserId: string;
   tournamentStatus: string;
   userLeagueId?: string;
+  /** When provided, filter rosters by league membership (not active_league_id) so multi-league users show in each league's standings */
+  leagueMemberIds?: string[];
   displayRound?: number;
 }
 
@@ -63,8 +65,8 @@ export function LiveTeamStandings({
   liveGolfAPITournamentId,
   prizeDistributions,
   currentUserId,
-  tournamentStatus: _tournamentStatus,
   userLeagueId,
+  leagueMemberIds,
   displayRound = 1,
 }: LiveTeamStandingsProps) {
   const [rosters, setRosters] = useState<RosterData[]>([]);
@@ -138,7 +140,7 @@ export function LiveTeamStandings({
     const normalizedName = normalizeName(playerName);
     
     // Try exact match first
-    let match = playerScoreMap.get(normalizedName);
+    const match = playerScoreMap.get(normalizedName);
     if (match) return match;
     
     // Try fuzzy matching by last name + first name starts with
@@ -233,14 +235,14 @@ export function LiveTeamStandings({
   const fetchRosters = useCallback(async () => {
     const supabase = createClient();
     
-    // Get rosters with their players, filtered by league
+    // Get rosters with their players, filtered by league membership (so multi-league users show in each league's standings)
     let query = supabase
       .from('user_rosters')
       .select(`
         id,
         roster_name,
         user_id,
-        profiles!inner(username, active_league_id),
+        profiles(username),
         roster_players(
           tournament_player:tournament_players(
             pga_player_id,
@@ -255,8 +257,9 @@ export function LiveTeamStandings({
       `)
       .eq('tournament_id', tournamentId);
 
-    // Filter by league if provided
-    if (userLeagueId) {
+    if (leagueMemberIds && leagueMemberIds.length > 0) {
+      query = query.in('user_id', leagueMemberIds);
+    } else if (userLeagueId) {
       query = query.eq('profiles.active_league_id', userLeagueId);
     }
 
@@ -267,24 +270,45 @@ export function LiveTeamStandings({
       return;
     }
 
-    const transformedRosters: RosterData[] = (rostersData || []).map((r: any) => ({
-      id: r.id,
-      roster_name: r.roster_name,
-      user_id: r.user_id,
-      username: r.profiles?.username || 'Unknown',
-      players: (r.roster_players || []).map((rp: any) => ({
-        playerId: rp.tournament_player?.pga_player_id,
-        playerName: rp.tournament_player?.pga_players?.name || 'Unknown',
-        teeTimeR1: rp.tournament_player?.tee_time_r1,
-        teeTimeR2: rp.tournament_player?.tee_time_r2,
-        teeTimeR3: rp.tournament_player?.tee_time_r3,
-        teeTimeR4: rp.tournament_player?.tee_time_r4,
-        cost: rp.tournament_player?.cost,
-      })),
-    }));
+    type RawRosterRow = {
+      id: string;
+      roster_name: string;
+      user_id: string;
+      profiles?: { username?: string } | { username?: string }[] | null;
+      roster_players?: Array<{
+        tournament_player?: {
+          pga_player_id?: string;
+          pga_players?: { name?: string } | null;
+          tee_time_r1?: string | null;
+          tee_time_r2?: string | null;
+          tee_time_r3?: string | null;
+          tee_time_r4?: string | null;
+          cost?: number;
+        } | null;
+      }> | null;
+    };
+    const rows = (rostersData || []) as RawRosterRow[];
+    const transformedRosters: RosterData[] = rows.map((r) => {
+      const profiles = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+      return {
+        id: r.id,
+        roster_name: r.roster_name,
+        user_id: r.user_id,
+        username: profiles?.username || 'Unknown',
+        players: (r.roster_players || []).map((rp) => ({
+          playerId: rp.tournament_player?.pga_player_id ?? '',
+          playerName: rp.tournament_player?.pga_players?.name || 'Unknown',
+          teeTimeR1: rp.tournament_player?.tee_time_r1,
+          teeTimeR2: rp.tournament_player?.tee_time_r2,
+          teeTimeR3: rp.tournament_player?.tee_time_r3,
+          teeTimeR4: rp.tournament_player?.tee_time_r4,
+          cost: rp.tournament_player?.cost,
+        })),
+      };
+    });
 
     setRosters(transformedRosters);
-  }, [tournamentId, userLeagueId]);
+  }, [tournamentId, userLeagueId, leagueMemberIds]);
 
   // Fetch live scores from API
   const fetchLiveScores = useCallback(async () => {

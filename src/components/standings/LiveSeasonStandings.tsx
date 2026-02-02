@@ -69,6 +69,8 @@ interface LiveSeasonStandingsProps {
     amount: number;
   }>;
   userLeagueId?: string;
+  /** When provided, filter rosters by league membership (not active_league_id) so multi-league users show in season standings */
+  leagueMemberIds?: string[];
   initialPeriod?: SeasonPeriod;
   segmentDefinitions?: SegmentDefinition[];
 }
@@ -89,6 +91,7 @@ export function LiveSeasonStandings({
   activeTournament,
   prizeDistributions,
   userLeagueId,
+  leagueMemberIds,
   initialPeriod,
   segmentDefinitions = [],
 }: LiveSeasonStandingsProps) {
@@ -262,7 +265,6 @@ export function LiveSeasonStandings({
         id,
         user_id,
         roster_name,
-        profiles!inner(active_league_id),
         roster_players(
           tournament_player:tournament_players(
             pga_players(name)
@@ -271,7 +273,9 @@ export function LiveSeasonStandings({
       `)
       .eq('tournament_id', activeTournament.id);
 
-    if (userLeagueId) {
+    if (leagueMemberIds && leagueMemberIds.length > 0) {
+      query = query.in('user_id', leagueMemberIds);
+    } else if (userLeagueId) {
       query = query.eq('profiles.active_league_id', userLeagueId);
     }
 
@@ -297,7 +301,7 @@ export function LiveSeasonStandings({
     });
 
     setActiveRosters(rostersMap);
-  }, [activeTournament, userLeagueId]);
+  }, [activeTournament, userLeagueId, leagueMemberIds]);
 
   // Fetch live scores from API
   const fetchLiveScores = useCallback(async () => {

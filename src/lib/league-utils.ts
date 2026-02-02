@@ -64,3 +64,41 @@ export async function filterTournamentsIncludedInLeague<T extends { id: string }
   );
   return tournaments.filter((t) => !excludedIds.has(t.id));
 }
+
+/**
+ * For weekly standings: pick which league to show for this user and tournament.
+ * Prefer the user's active league if it includes the tournament; otherwise any
+ * league the user is in that includes the tournament. Ensures multi-league users
+ * (e.g. derranic) show up in the league where the tourney IS included.
+ */
+export async function getLeagueIdForWeeklyStandings(
+  supabase: SupabaseClient,
+  userId: string,
+  tournamentId: string,
+  activeLeagueId: string | null
+): Promise<string | null> {
+  // Prefer active league if it includes this tournament
+  if (activeLeagueId) {
+    const activeIncluded = await isTournamentIncludedInLeague(
+      supabase,
+      activeLeagueId,
+      tournamentId
+    );
+    if (activeIncluded) return activeLeagueId;
+  }
+
+  // Else find any league the user is in that includes this tournament
+  const { data: memberships } = await supabase
+    .from('league_members')
+    .select('league_id')
+    .eq('user_id', userId);
+
+  if (!memberships?.length) return null;
+
+  const leagueIds = [...new Set(memberships.map((m) => m.league_id))];
+  for (const leagueId of leagueIds) {
+    const included = await isTournamentIncludedInLeague(supabase, leagueId, tournamentId);
+    if (included) return leagueId;
+  }
+  return null;
+}
