@@ -288,16 +288,17 @@ export async function GET(request: NextRequest) {
     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tournamentPlayers?.forEach((tp: any) => {
-      // pga_players comes back as an array from the join
       const pgaPlayer = Array.isArray(tp.pga_players) ? tp.pga_players[0] : tp.pga_players;
       const playerName = pgaPlayer?.name;
       if (playerName) {
         const normalized = normalizeName(playerName);
         nameToIdMap.set(normalized, tp.id);
-        
-        // Add first name variations
-        const firstName = normalized.split(' ')[0];
-        const lastName = normalized.split(' ').slice(1).join(' ');
+        const parts = normalized.split(/\s+/);
+        if (parts.length >= 3) {
+          nameToIdMap.set(parts[0] + parts[1] + ' ' + parts.slice(2).join(' '), tp.id);
+        }
+        const firstName = parts[0] ?? '';
+        const lastName = parts.slice(1).join(' ');
         const nicknames = nicknameMap[firstName] || [];
         for (const nickname of nicknames) {
           nameToIdMap.set(`${nickname} ${lastName}`, tp.id);

@@ -33,7 +33,8 @@ export default function TeeTimesAdminPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [matchResults, setMatchResults] = useState<{ matched: number; unmatched: string[] } | null>(null);
-  
+  const [isAddingMissing, setIsAddingMissing] = useState(false);
+
   // Weekend tee times (R3/R4) via JSON
   const [jsonInput, setJsonInput] = useState('');
   const [selectedRound, setSelectedRound] = useState<'3' | '4'>('3');
@@ -261,6 +262,12 @@ export default function TeeTimesAdminPage() {
           const normalized = normalizeName(playerName);
           nameToIdMap.set(normalized, tp.id);
           normalizedDbNames.set(normalized, playerName);
+          // "Seung Taek Lee" (DB) -> also key "seungtaek lee" so "Seungtaek Lee" (CSV) matches
+          const parts = normalized.split(/\s+/);
+          if (parts.length >= 3) {
+            const collapsedFirst = parts[0] + parts[1] + ' ' + parts.slice(2).join(' ');
+            nameToIdMap.set(collapsedFirst, tp.id);
+          }
         }
       });
 
@@ -442,6 +449,10 @@ export default function TeeTimesAdminPage() {
         if (playerName) {
           const normalized = normalizeName(playerName);
           nameToIdMap.set(normalized, tp.id);
+          const parts = normalized.split(/\s+/);
+          if (parts.length >= 3) {
+            nameToIdMap.set(parts[0] + parts[1] + ' ' + parts.slice(2).join(' '), tp.id);
+          }
         }
       });
 
@@ -655,11 +666,57 @@ Chad Ramey,12:10 PM,FALSE,1:16 PM,TRUE
                     <p className="text-sm text-red-400 mb-1">
                       {matchResults.unmatched.length} not found:
                     </p>
-                    <div className="max-h-32 overflow-y-auto text-xs text-casino-gray">
+                    <div className="max-h-32 overflow-y-auto text-xs text-casino-gray mb-2">
                       {matchResults.unmatched.map((name, idx) => (
                         <div key={idx}>{name}</div>
                       ))}
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!selectedTournamentId || isAddingMissing}
+                      onClick={async () => {
+                        setIsAddingMissing(true);
+                        setMessage(null);
+                        try {
+                          const res = await fetch('/api/admin/tee-times/add-missing', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              tournamentId: selectedTournamentId,
+                              names: matchResults.unmatched,
+                            }),
+                          });
+                          const data = await res.json().catch(() => ({}));
+                          if (!res.ok) {
+                            setMessage({ type: 'error', text: data.error ?? 'Failed to add players' });
+                            return;
+                          }
+                          setMatchResults((prev) =>
+                            prev && data.notFound?.length !== undefined
+                              ? { ...prev, unmatched: data.notFound }
+                              : prev
+                          );
+                          const parts: string[] = [];
+                          if (data.added > 0) {
+                            parts.push(`Added ${data.added} to tournament field: ${(data.addedNames ?? []).join(', ')}. Re-parse and Save to apply tee times.`);
+                          }
+                          if (data.notFound?.length > 0) {
+                            parts.push(`Not in pga_players: ${data.notFound.join(', ')}.`);
+                          }
+                          if (parts.length > 0) {
+                            setMessage({ type: data.notFound?.length > 0 ? 'error' : 'success', text: parts.join(' ') });
+                          }
+                        } catch {
+                          setMessage({ type: 'error', text: 'Failed to add players' });
+                        } finally {
+                          setIsAddingMissing(false);
+                        }
+                      }}
+                    >
+                      {isAddingMissing ? 'Adding…' : `Add ${matchResults.unmatched.length} to tournament field`}
+                    </Button>
                   </div>
                 )}
               </div>
