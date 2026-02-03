@@ -204,20 +204,18 @@ export default function TeeTimesAdminPage() {
         return name
           .toLowerCase()
           .trim()
-          // Remove periods
           .replace(/\./g, '')
-          // Normalize special characters
+          .replace(/-/g, '') // "Seung-Taek" -> "Seungtaek" for matching
           .replace(/ø/g, 'o')
           .replace(/ö/g, 'o')
           .replace(/ü/g, 'u')
           .replace(/é/g, 'e')
           .replace(/á/g, 'a')
           .replace(/í/g, 'i')
-          // Remove extra spaces
           .replace(/\s+/g, ' ');
       };
 
-      // Common nickname mappings
+      // Common nickname / alternate-name mappings (CSV vs DB)
       const nicknameMap: Record<string, string[]> = {
         'zach': ['zachary', 'zack'],
         'zachary': ['zach', 'zack'],
@@ -241,6 +239,8 @@ export default function TeeTimesAdminPage() {
         'daniel': ['dan', 'danny'],
         'nick': ['nicholas'],
         'nicholas': ['nick'],
+        'nico': ['nicolas'],
+        'nicolas': ['nico'],
         'aj': ['a j'],
         'a j': ['aj'],
         'jj': ['j j'],
@@ -264,7 +264,7 @@ export default function TeeTimesAdminPage() {
         }
       });
 
-      // Find match with nickname fallback
+      // Find match with nickname fallback and "Last First" / "First Last" try
       const findMatch = (csvName: string): string | null => {
         const normalized = normalizeName(csvName);
         
@@ -273,15 +273,24 @@ export default function TeeTimesAdminPage() {
           return nameToIdMap.get(normalized)!;
         }
         
-        // Try nickname variations
-        const firstName = normalized.split(' ')[0];
-        const lastName = normalized.split(' ').slice(1).join(' ');
-        const nicknames = nicknameMap[firstName] || [];
+        const parts = normalized.split(/\s+/);
+        const firstName = parts[0] ?? '';
+        const lastName = parts.slice(1).join(' ');
         
+        // Try nickname variations (e.g. Nico -> Nicolas)
+        const nicknames = nicknameMap[firstName] || [];
         for (const nickname of nicknames) {
-          const altName = `${nickname} ${lastName}`;
-          if (nameToIdMap.has(altName)) {
+          const altName = `${nickname} ${lastName}`.trim();
+          if (altName && nameToIdMap.has(altName)) {
             return nameToIdMap.get(altName)!;
+          }
+        }
+        
+        // Try "LastName FirstName" in case DB or CSV uses the other order
+        if (parts.length >= 2) {
+          const swapped = `${lastName} ${firstName}`.trim();
+          if (nameToIdMap.has(swapped)) {
+            return nameToIdMap.get(swapped)!;
           }
         }
         
@@ -378,12 +387,12 @@ export default function TeeTimesAdminPage() {
 
       if (tpError) throw tpError;
 
-      // Fuzzy name normalization for better matching
       const normalizeName = (name: string): string => {
         return name
           .toLowerCase()
           .trim()
           .replace(/\./g, '')
+          .replace(/-/g, '')
           .replace(/ø/g, 'o')
           .replace(/ö/g, 'o')
           .replace(/ü/g, 'u')
@@ -393,7 +402,7 @@ export default function TeeTimesAdminPage() {
           .replace(/\s+/g, ' ');
       };
 
-      // Common nickname mappings
+      // Same nickname/alternate mappings as CSV section (e.g. Nico <-> Nicolas)
       const nicknameMap: Record<string, string[]> = {
         'zach': ['zachary', 'zack'],
         'zachary': ['zach', 'zack'],
@@ -417,6 +426,8 @@ export default function TeeTimesAdminPage() {
         'daniel': ['dan', 'danny'],
         'nick': ['nicholas'],
         'nicholas': ['nick'],
+        'nico': ['nicolas'],
+        'nicolas': ['nico'],
         'aj': ['a j'],
         'a j': ['aj'],
         'jj': ['j j'],
@@ -425,9 +436,7 @@ export default function TeeTimesAdminPage() {
         'cameron': ['cam'],
       };
 
-      // Create a map of normalized names to tournament_player IDs
       const nameToIdMap = new Map<string, string>();
-      
       tournamentPlayers?.forEach((tp: any) => {
         const playerName = tp.pga_players?.name;
         if (playerName) {
@@ -436,27 +445,21 @@ export default function TeeTimesAdminPage() {
         }
       });
 
-      // Find match with nickname fallback
       const findMatch = (jsonName: string): string | null => {
         const normalized = normalizeName(jsonName);
-        
-        // Direct match
-        if (nameToIdMap.has(normalized)) {
-          return nameToIdMap.get(normalized)!;
-        }
-        
-        // Try nickname variations
-        const firstName = normalized.split(' ')[0];
-        const lastName = normalized.split(' ').slice(1).join(' ');
+        if (nameToIdMap.has(normalized)) return nameToIdMap.get(normalized)!;
+        const parts = normalized.split(/\s+/);
+        const firstName = parts[0] ?? '';
+        const lastName = parts.slice(1).join(' ');
         const nicknames = nicknameMap[firstName] || [];
-        
         for (const nickname of nicknames) {
-          const altName = `${nickname} ${lastName}`;
-          if (nameToIdMap.has(altName)) {
-            return nameToIdMap.get(altName)!;
-          }
+          const altName = `${nickname} ${lastName}`.trim();
+          if (altName && nameToIdMap.has(altName)) return nameToIdMap.get(altName)!;
         }
-        
+        if (parts.length >= 2) {
+          const swapped = `${lastName} ${firstName}`.trim();
+          if (nameToIdMap.has(swapped)) return nameToIdMap.get(swapped)!;
+        }
         return null;
       };
 
