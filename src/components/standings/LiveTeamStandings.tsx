@@ -520,25 +520,25 @@ export function LiveTeamStandings({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-casino-gold/30">
-              <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider w-12 sm:w-14">
+              <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider w-10 sm:w-14">
                 Rank
               </th>
               <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
                 Team
               </th>
-              <th className="px-3 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider hidden sm:table-cell min-w-14">
+              <th className="px-1 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider min-w-10 sm:min-w-14">
                 Pos
               </th>
-              <th className="px-3 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider hidden sm:table-cell min-w-16">
+              <th className="px-1 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider min-w-10 sm:min-w-16">
                 Score
               </th>
-              <th className="px-3 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider hidden md:table-cell min-w-18">
+              <th className="px-1 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider min-w-10 sm:min-w-18">
                 Thru
               </th>
-              <th className="px-3 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider hidden sm:table-cell min-w-20">
+              <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider min-w-10 sm:min-w-20">
                 $
               </th>
-              <th className="px-3 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider min-w-22 sm:min-w-24">
+              <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider min-w-14 sm:min-w-24">
                 Winnings
               </th>
             </tr>
@@ -586,8 +586,8 @@ export function LiveTeamStandings({
                     <td className="px-1 sm:px-2 py-1.5">
                       <span className="font-medium text-casino-text text-xs sm:text-sm">{roster.roster_name}</span>
                     </td>
-                    <td colSpan={4} className="py-1.5 hidden sm:table-cell" />
-                    <td className="px-3 sm:px-4 py-1.5 text-right">
+                    <td colSpan={4} className="py-1.5 px-1 sm:px-4" />
+                    <td className="px-1 sm:px-4 py-1.5 text-right">
                       {isNoLineup ? (
                         <span className="text-casino-gray text-xs sm:text-sm">No lineup</span>
                       ) : (
@@ -619,9 +619,9 @@ export function LiveTeamStandings({
                     })();
                     return (
                       <tr key={idx} className={`border-b border-casino-gold/10 ${detailBg} hover:bg-casino-card/50 transition-colors`}>
-                        <td className="px-1 sm:px-2 py-1 sm:py-1.5 pl-4 sm:pl-6" />
+                        <td className="px-0 sm:px-2 py-1 sm:py-1.5 pl-1 sm:pl-6" />
                         <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text">
-                          <span className="truncate block pl-3 sm:pl-4 border-l-2 border-casino-gold/20">
+                          <span className="truncate block pl-1 sm:pl-4 border-l-2 border-casino-gold/20">
                             {player.playerName}
                             {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
                             {player.cost !== undefined && player.cost !== null && (
@@ -629,7 +629,7 @@ export function LiveTeamStandings({
                             )}
                           </span>
                         </td>
-                        <td className="px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm text-center hidden sm:table-cell">
+                        <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-center min-w-0">
                           {player.liveScore?.position ? (
                             <span className={`font-medium ${
                               player.liveScore.positionValue === 1 ? 'text-casino-gold' :
@@ -641,7 +641,7 @@ export function LiveTeamStandings({
                             <span className="text-casino-gray-dark">-</span>
                           )}
                         </td>
-                        <td className="px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm text-center hidden sm:table-cell">
+                        <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-center min-w-0">
                           {player.liveScore ? (
                             <span className={
                               parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
@@ -653,15 +653,15 @@ export function LiveTeamStandings({
                             <span className="text-casino-gray-dark">-</span>
                           )}
                         </td>
-                        <td className="px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm text-center hidden md:table-cell">
+                        <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-center min-w-0">
                           {thruCell}
                         </td>
-                        <td className="px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm text-right hidden sm:table-cell">
+                        <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-right min-w-0">
                           <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
                             {formatCurrency(player.winnings)}
                           </span>
                         </td>
-                        <td className="px-3 sm:px-4 py-1 sm:py-1.5" />
+                        <td className="px-1 sm:px-4 py-1 sm:py-1.5" />
                       </tr>
                     );
                   })}
