@@ -323,11 +323,11 @@ export function LivePersonalLeaderboard({
               <tr className="border-b border-casino-gold/30">
                 <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-6 sm:w-8">#</th>
                 <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
-                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-10 sm:w-12">Pos</th>
-                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-10 sm:w-14">Total</th>
-                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase hidden sm:table-cell w-12 sm:w-14">Today</th>
-                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-14 sm:w-16">Thru</th>
-                <th className="px-1 sm:px-3 py-2 text-right text-xs font-medium text-casino-gray uppercase w-14 sm:w-20">Prize</th>
+                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase w-10 sm:w-12">Pos</th>
+                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase w-12 sm:w-16">Total</th>
+                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase hidden sm:table-cell w-12 sm:w-16">Today</th>
+                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase min-w-16 sm:min-w-18">Thru</th>
+                <th className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase min-w-18 sm:w-20">Prize</th>
               </tr>
             </thead>
             <tbody>
@@ -339,7 +339,7 @@ export function LivePersonalLeaderboard({
                       {player.playerName}
                       {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
                     </td>
-                    <td className="px-1 sm:px-3 py-2">
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
                       {player.liveScore?.position ? (
                         <span className={`font-medium ${
                           player.liveScore.positionValue === 1 ? 'text-casino-gold' :
@@ -352,7 +352,7 @@ export function LivePersonalLeaderboard({
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-1 sm:px-3 py-2">
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
                       {player.liveScore ? (
                         <span className={
                           parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
@@ -365,7 +365,7 @@ export function LivePersonalLeaderboard({
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-1 sm:px-3 py-2 hidden sm:table-cell">
+                    <td className="px-2 sm:px-4 py-2 hidden sm:table-cell whitespace-nowrap">
                       {/* If player hasn't started current round, show dash */}
                       {!player.liveScore?.roundComplete && (!player.liveScore?.thru || player.liveScore?.thru === '-' || player.liveScore?.thru === '0') ? (
                         <span className="text-casino-gray-dark">-</span>
@@ -381,7 +381,7 @@ export function LivePersonalLeaderboard({
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-1 sm:px-3 py-2">
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
                       {(() => {
                         // Helper to get tee time for current display round
                         const getTeeTimeForRound = () => {
@@ -408,7 +408,7 @@ export function LivePersonalLeaderboard({
                         return <span className="text-casino-gray-dark">-</span>;
                       })()}
                     </td>
-                    <td className="px-1 sm:px-3 py-2 text-right">
+                    <td className="px-2 sm:px-4 py-2 text-right whitespace-nowrap">
                       <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
                         {formatCurrency(player.winnings)}
                       </span>

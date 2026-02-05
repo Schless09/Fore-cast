@@ -101,6 +101,24 @@ function getTeeTimeForRound(teeTime: TeeTimeData | undefined, currentRound?: num
   return estTime ? convertESTtoLocal(estTime) : null;
 }
 
+/**
+ * Look up tee time data by player name. Tries exact match, then case-insensitive trimmed match,
+ * so API names (e.g. "Cameron Smith") still find DB keys that may differ slightly.
+ */
+function getTeeTimeDataForPlayer(
+  teeTimeMap: Map<string, TeeTimeData> | undefined,
+  playerName: string
+): TeeTimeData | undefined {
+  if (!teeTimeMap || !playerName?.trim()) return undefined;
+  const exact = teeTimeMap.get(playerName);
+  if (exact) return exact;
+  const normalized = playerName.trim().toLowerCase();
+  for (const [key, data] of teeTimeMap.entries()) {
+    if (key.trim().toLowerCase() === normalized) return data;
+  }
+  return undefined;
+}
+
 export function LiveLeaderboard({
   initialData,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -358,10 +376,10 @@ export function LiveLeaderboard({
           <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
             <th className="px-1 sm:px-3 py-2 w-10 sm:w-14">Pos</th>
             <th className="px-1 sm:px-3 py-2">Golfer</th>
-            <th className="px-1 sm:px-3 py-2 w-12 sm:w-16">Total</th>
-            <th className="px-1 sm:px-3 py-2 w-12 sm:w-16" title="Click score to view scorecard">Today</th>
-            <th className="px-1 sm:px-3 py-2 w-14 sm:w-16" title="Holes completed or tee time">Thru</th>
-            <th className="px-1 sm:px-3 py-2 text-right w-14 sm:w-20">Prize</th>
+            <th className="px-2 sm:px-4 py-2 w-12 sm:w-16">Total</th>
+            <th className="px-2 sm:px-4 py-2 w-12 sm:w-16" title="Click score to view scorecard">Today</th>
+            <th className="px-2 sm:px-4 py-2 min-w-16 sm:min-w-18" title="Holes completed or tee time">Thru</th>
+            <th className="px-2 sm:px-4 py-2 text-right min-w-18 sm:w-20">Prize</th>
           </tr>
         </thead>
         <tbody>
@@ -506,10 +524,10 @@ export function LiveLeaderboard({
                     <span className="text-casino-gray font-normal ml-1">(${playerCost})</span>
                   )}
                 </td>
-                <td className={`px-1 sm:px-3 py-2 font-semibold text-xs sm:text-sm ${totalClass}`}>
+                <td className={`px-2 sm:px-4 py-2 font-semibold text-xs sm:text-sm whitespace-nowrap ${totalClass}`}>
                   {formatScore(row.total_score)}
                 </td>
-                <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${!row.roundComplete && (row.thru === '-' || row.thru === '0' || row.thru === 0 || !row.thru) ? 'text-casino-gray-dark' : todayClass}`}>
+                <td className={`px-2 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap ${!row.roundComplete && (row.thru === '-' || row.thru === '0' || row.thru === 0 || !row.thru) ? 'text-casino-gray-dark' : todayClass}`}>
                   {/* If player hasn't started current round, show dash */}
                   {!row.roundComplete && (row.thru === '-' || row.thru === '0' || row.thru === 0 || !row.thru) ? (
                     <span>-</span>
@@ -525,24 +543,26 @@ export function LiveLeaderboard({
                     formatScore(row.today_score)
                   )}
                 </td>
-                <td className="px-1 sm:px-3 py-2 text-xs sm:text-sm">
-                  {/* If player missed the cut or was DQ'd, show dash */}
-                  {!row.position ? (
-                    <span className="text-casino-gray-dark">-</span>
-                  ) : row.roundComplete || row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18' ? (
+                <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap">
+                  {/* Same order as personal leaderboard: finished → on course → hasn't started (tee time) → dash */}
+                  {row.roundComplete || row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18' ? (
                     /* Player finished current round - show F or F* */
                     <span className="text-casino-green font-medium">{row.thru === 18 || row.thru === '18' ? 'F' : row.thru}</span>
                   ) : row.thru && row.thru !== '-' && row.thru !== '0' && row.thru !== 0 ? (
                     /* Player is on course - show holes completed */
                     <span className="text-casino-blue">{row.thru}</span>
-                  ) : getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound) ? (
-                    /* Player hasn't started - show tee time */
-                    <span className="text-casino-gray">{getTeeTimeForRound(teeTimeMap?.get(row.name), currentRound)}</span>
-                  ) : (
+                  ) : (() => {
+                    const teeTimeData = getTeeTimeDataForPlayer(teeTimeMap, row.name);
+                    const teeTimeStr = getTeeTimeForRound(teeTimeData, currentRound);
+                    return teeTimeStr ? (
+                      /* Player hasn't started - show tee time (same as personal leaderboard / weekly standings) */
+                      <span className="text-casino-gray">{teeTimeStr}</span>
+                    ) : null;
+                  })() ?? (
                     <span className="text-casino-gray-dark">-</span>
                   )}
                 </td>
-                <td className="px-1 sm:px-3 py-2 text-right text-xs sm:text-sm text-casino-gold">
+                <td className="px-2 sm:px-4 py-2 text-right text-xs sm:text-sm text-casino-gold whitespace-nowrap">
                   {formatCurrency(prizeAmount || 0)}
                 </td>
               </tr>

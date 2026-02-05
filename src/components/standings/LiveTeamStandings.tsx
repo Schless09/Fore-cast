@@ -619,9 +619,20 @@ export function LiveTeamStandings({
                     })();
                     return (
                       <tr key={idx} className={`border-b border-casino-gold/10 ${detailBg} hover:bg-casino-card/50 transition-colors`}>
-                        <td className="px-0 sm:px-2 py-1 sm:py-1.5 pl-1 sm:pl-6" />
-                        <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text">
-                          <span className="truncate block pl-1 sm:pl-4 border-l-2 border-casino-gold/20">
+                        {/* Mobile: one cell spanning Rank+Team, name left-aligned below rank */}
+                        <td colSpan={2} className="sm:hidden px-1 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text">
+                          <span className="truncate block pl-2 border-l-2 border-casino-gold/20">
+                            {player.playerName}
+                            {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
+                            {player.cost !== undefined && player.cost !== null && (
+                              <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
+                            )}
+                          </span>
+                        </td>
+                        {/* Desktop: empty Rank column, then Team column with indented name */}
+                        <td className="hidden sm:table-cell px-0 sm:px-2 py-1 sm:py-1.5 pl-1 sm:pl-6" />
+                        <td className="hidden sm:table-cell px-1 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text">
+                          <span className="truncate block pl-3 sm:pl-4 border-l-2 border-casino-gold/20">
                             {player.playerName}
                             {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
                             {player.cost !== undefined && player.cost !== null && (
@@ -653,7 +664,7 @@ export function LiveTeamStandings({
                             <span className="text-casino-gray-dark">-</span>
                           )}
                         </td>
-                        <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-center min-w-0">
+                        <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-center min-w-0 whitespace-nowrap">
                           {thruCell}
                         </td>
                         <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-right min-w-0">
