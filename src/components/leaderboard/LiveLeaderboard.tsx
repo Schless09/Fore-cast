@@ -101,9 +101,51 @@ function getTeeTimeForRound(teeTime: TeeTimeData | undefined, currentRound?: num
   return estTime ? convertESTtoLocal(estTime) : null;
 }
 
+// Normalize name for matching: trim, lowercase, strip accents, replace ø/ö/å etc. with ASCII
+function normalizeNameForTeeTime(name: string): string {
+  let s = name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '') // remove combining marks (accents)
+    .replace(/\s+/g, ' ');
+  // Replace non-ASCII Latin chars that NFD doesn't decompose (e.g. ø, ö, å)
+  s = s.replace(/ø/g, 'o').replace(/ö/g, 'o').replace(/å/g, 'a').replace(/ä/g, 'a').replace(/æ/g, 'ae').replace(/ß/g, 'ss');
+  return s;
+}
+
+// First-name nickname/alternate forms for tee time lookup (API vs DB)
+const TEE_TIME_FIRST_NAME_ALIASES: Record<string, string[]> = {
+  cam: ['cameron'],
+  cameron: ['cam'],
+  dan: ['daniel'],
+  daniel: ['dan'],
+  johnny: ['john', 'jon'],
+  john: ['johnny', 'jon'],
+  jon: ['john', 'johnny'],
+  matti: ['matt', 'matthias'],
+  matt: ['matthias', 'matti'],
+  matthias: ['matt', 'matti'],
+  nico: ['nicolas'],
+  nicolas: ['nico'],
+  's.t.': ['seung taek', 'seung'],
+  seung: ['s.t.'],
+  'seung taek': ['s.t.'],
+};
+
+function firstNamesMatch(apiFirst: string, dbFirst: string): boolean {
+  if (apiFirst === dbFirst) return true;
+  if (apiFirst.startsWith(dbFirst) || dbFirst.startsWith(apiFirst)) return true;
+  const apiAliases = TEE_TIME_FIRST_NAME_ALIASES[apiFirst];
+  const dbAliases = TEE_TIME_FIRST_NAME_ALIASES[dbFirst];
+  if (apiAliases?.includes(dbFirst)) return true;
+  if (dbAliases?.includes(apiFirst)) return true;
+  return false;
+}
+
 /**
- * Look up tee time data by player name. Tries exact match, then case-insensitive trimmed match,
- * so API names (e.g. "Cameron Smith") still find DB keys that may differ slightly.
+ * Look up tee time data by player name. Tries exact match, accent-normalized match,
+ * then last-name + first-name (with nickname) match so API names find DB keys.
  */
 function getTeeTimeDataForPlayer(
   teeTimeMap: Map<string, TeeTimeData> | undefined,
@@ -112,9 +154,21 @@ function getTeeTimeDataForPlayer(
   if (!teeTimeMap || !playerName?.trim()) return undefined;
   const exact = teeTimeMap.get(playerName);
   if (exact) return exact;
-  const normalized = playerName.trim().toLowerCase();
+  const normalized = normalizeNameForTeeTime(playerName);
   for (const [key, data] of teeTimeMap.entries()) {
-    if (key.trim().toLowerCase() === normalized) return data;
+    if (normalizeNameForTeeTime(key) === normalized) return data;
+  }
+  const parts = normalized.split(/\s+/);
+  if (parts.length >= 2) {
+    const apiFirst = parts[0];
+    const apiLast = parts[parts.length - 1];
+    for (const [key, data] of teeTimeMap.entries()) {
+      const keyNorm = normalizeNameForTeeTime(key);
+      const keyParts = keyNorm.split(/\s+/);
+      if (keyParts.length >= 2 && keyParts[keyParts.length - 1] === apiLast && firstNamesMatch(apiFirst, keyParts[0])) {
+        return data;
+      }
+    }
   }
   return undefined;
 }
