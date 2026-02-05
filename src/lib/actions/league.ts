@@ -3,6 +3,12 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { createServiceClient } from '@/lib/supabase/service';
 
+// Type for joined league data from Supabase relations
+interface JoinedLeague {
+  id: string;
+  name: string;
+}
+
 async function getProfileForClerkUser() {
   const { userId } = await auth();
   
@@ -18,7 +24,7 @@ async function getProfileForClerkUser() {
   const supabase = createServiceClient();
   
   // Try to find existing profile by clerk_id
-  const { data: existingProfile, error: fetchError } = await supabase
+  const { data: existingProfile } = await supabase
     .from('profiles')
     .select('*')
     .eq('clerk_id', userId)
@@ -211,14 +217,14 @@ export async function checkUserLeague() {
   }
 
   const activeLeague = memberships.find(
-    m => (m.leagues as any)?.id === profile.active_league_id
+    m => (m.leagues as unknown as JoinedLeague | null)?.id === profile.active_league_id
   );
 
   return { 
     isAuthenticated: true,
     hasLeague: true, 
-    leagueName: (activeLeague?.leagues as any)?.name || (memberships[0].leagues as any)?.name,
-    leagues: memberships.map(m => (m.leagues as any))
+    leagueName: (activeLeague?.leagues as unknown as JoinedLeague | null)?.name || (memberships[0].leagues as unknown as JoinedLeague | null)?.name,
+    leagues: memberships.map(m => m.leagues as unknown as JoinedLeague | null)
   };
 }
 
@@ -240,8 +246,8 @@ export async function getUserLeagues() {
 
   return {
     leagues: memberships?.map(m => ({
-      id: (m.leagues as any)?.id,
-      name: (m.leagues as any)?.name,
+      id: (m.leagues as unknown as JoinedLeague | null)?.id,
+      name: (m.leagues as unknown as JoinedLeague | null)?.name,
       joined_at: m.joined_at
     })) || [],
     activeLeagueId: profile.active_league_id || null
@@ -625,7 +631,7 @@ export async function acceptLeagueInvite(inviteCode: string) {
     return { 
       success: true, 
       message: 'You are already a member of this league',
-      leagueName: (invite.leagues as any)?.name
+      leagueName: (invite.leagues as unknown as JoinedLeague | null)?.name
     };
   }
 
@@ -657,6 +663,6 @@ export async function acceptLeagueInvite(inviteCode: string) {
   return { 
     success: true, 
     message: 'Successfully joined league!',
-    leagueName: (invite.leagues as any)?.name
+    leagueName: (invite.leagues as unknown as JoinedLeague | null)?.name
   };
 }
