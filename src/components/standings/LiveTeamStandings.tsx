@@ -86,6 +86,7 @@ export function LiveTeamStandings({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [expandedRosterIds, setExpandedRosterIds] = useState<Set<string>>(new Set());
   const hasInitialLoaded = useRef(false);
+  const hasSetDefaultUserExpand = useRef(false);
 
   // Toggle a single roster expansion
   const toggleRoster = (rosterId: string) => {
@@ -422,6 +423,16 @@ export function LiveTeamStandings({
       fetchLiveScores();
     }
   }, [fetchRosters, fetchLiveScores]);
+
+  // Default to user's row expanded when standings first load
+  useEffect(() => {
+    if (hasSetDefaultUserExpand.current) return;
+    if (!rosters.length || !currentUserId) return;
+    const userRoster = rosters.find((r) => r.user_id === currentUserId);
+    if (!userRoster) return;
+    hasSetDefaultUserExpand.current = true;
+    setExpandedRosterIds((prev) => new Set(prev).add(userRoster.id));
+  }, [rosters, currentUserId]);
 
   // Polling interval (skip for completed tournaments)
   useEffect(() => {
