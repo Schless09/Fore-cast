@@ -153,7 +153,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      leagueName: newLeague.name 
+      leagueName: newLeague.name,
+      leagueId: newLeague.id
     });
 
   } catch (error) {

@@ -381,6 +381,119 @@ export async function createLeagueInvite(leagueId: string) {
   };
 }
 
+// Get league settings (money board configuration)
+export async function getLeagueSettings(leagueId: string) {
+  const { profile, error: authError } = await getProfileForClerkUser();
+  
+  if (authError || !profile) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  const supabase = createServiceClient();
+
+  // Verify user is a member of this league
+  const { data: membership } = await supabase
+    .from('league_members')
+    .select('id')
+    .eq('user_id', profile.id)
+    .eq('league_id', leagueId)
+    .single();
+
+  if (!membership) {
+    return { success: false, error: 'Not a member of this league' };
+  }
+
+  // Get league settings
+  const { data: league, error } = await supabase
+    .from('leagues')
+    .select(`
+      id,
+      name,
+      google_sheet_url,
+      google_sheet_embed_url,
+      buy_in_amount,
+      venmo_username,
+      venmo_qr_image_path,
+      payment_instructions,
+      payout_description,
+      created_by
+    `)
+    .eq('id', leagueId)
+    .single();
+
+  if (error || !league) {
+    return { success: false, error: 'League not found' };
+  }
+
+  // Check if user is commissioner
+  const isCommissioner = league.created_by === profile.id;
+
+  return { 
+    success: true, 
+    settings: league,
+    isCommissioner
+  };
+}
+
+// Update league money board settings (commissioner only)
+export async function updateLeagueSettings(
+  leagueId: string,
+  settings: {
+    google_sheet_url?: string | null;
+    google_sheet_embed_url?: string | null;
+    buy_in_amount?: number | null;
+    venmo_username?: string | null;
+    venmo_qr_image_path?: string | null;
+    payment_instructions?: string | null;
+    payout_description?: string | null;
+  }
+) {
+  const { profile, error: authError } = await getProfileForClerkUser();
+  
+  if (authError || !profile) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  const supabase = createServiceClient();
+
+  // Verify user is commissioner (created_by)
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('id, created_by')
+    .eq('id', leagueId)
+    .single();
+
+  if (!league) {
+    return { success: false, error: 'League not found' };
+  }
+
+  if (league.created_by !== profile.id) {
+    return { success: false, error: 'Only the commissioner can update league settings' };
+  }
+
+  // Update settings
+  const { error: updateError } = await supabase
+    .from('leagues')
+    .update({
+      google_sheet_url: settings.google_sheet_url,
+      google_sheet_embed_url: settings.google_sheet_embed_url,
+      buy_in_amount: settings.buy_in_amount,
+      venmo_username: settings.venmo_username,
+      venmo_qr_image_path: settings.venmo_qr_image_path,
+      payment_instructions: settings.payment_instructions,
+      payout_description: settings.payout_description,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', leagueId);
+
+  if (updateError) {
+    console.error('Error updating league settings:', updateError);
+    return { success: false, error: 'Failed to update settings' };
+  }
+
+  return { success: true };
+}
+
 // Accept an invite and join the league
 export async function acceptLeagueInvite(inviteCode: string) {
   const { profile, error: authError } = await getProfileForClerkUser();

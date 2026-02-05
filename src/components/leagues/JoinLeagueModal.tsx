@@ -44,8 +44,14 @@ export function JoinLeagueModal({ onClose, canClose = false }: JoinLeagueModalPr
         return;
       }
 
-      // Success! Hard redirect to ensure fresh data
-      window.location.href = '/the-money-board';
+      // Success! Redirect based on action
+      if (mode === 'create' && result.leagueId) {
+        // New commissioners go to settings to configure their league
+        window.location.href = `/leagues/${result.leagueId}/settings?welcome=true`;
+      } else {
+        // Joining a league goes to the money board
+        window.location.href = '/the-money-board';
+      }
     } catch (err) {
       console.error('Error in handleSubmit:', err);
       setError('An unexpected error occurred. Please try again.');

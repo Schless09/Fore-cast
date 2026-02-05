@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
+import Image from 'next/image';
+import { getLeagueSettings, updateLeagueSettings } from '@/lib/actions/league';
+import { createClient } from '@/lib/supabase/client';
 
 interface Tournament {
   id: string;
@@ -33,8 +36,9 @@ interface Member {
   is_commissioner: boolean;
 }
 
-export default function LeagueSettingsPage({ params }: { params: Promise<{ id: string }> }) {
+export default function LeagueSettingsPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ welcome?: string }> }) {
   const [leagueId, setLeagueId] = useState<string | null>(null);
+  const [isWelcome, setIsWelcome] = useState(false);
   const [league, setLeague] = useState<LeagueData | null>(null);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -47,11 +51,26 @@ export default function LeagueSettingsPage({ params }: { params: Promise<{ id: s
   const [editSegmentName, setEditSegmentName] = useState('');
   const [members, setMembers] = useState<Member[]>([]);
   const [removingMember, setRemovingMember] = useState<string | null>(null);
+  
+  // Money Board settings state
+  const [moneyBoardSettings, setMoneyBoardSettings] = useState({
+    google_sheet_url: '',
+    google_sheet_embed_url: '',
+    buy_in_amount: '',
+    venmo_username: '',
+    venmo_qr_image_path: '',
+    payment_instructions: '',
+    payout_description: '',
+  });
+  const [savingMoneyBoard, setSavingMoneyBoard] = useState(false);
+  const [moneyBoardSaved, setMoneyBoardSaved] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Resolve params
   useEffect(() => {
     params.then(p => setLeagueId(p.id));
-  }, [params]);
+    searchParams.then(sp => setIsWelcome(sp.welcome === 'true'));
+  }, [params, searchParams]);
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -79,6 +98,22 @@ export default function LeagueSettingsPage({ params }: { params: Promise<{ id: s
 
       if (membersData.success) {
         setMembers(membersData.members);
+      }
+
+      // Fetch money board settings
+      if (tournamentsData.isCommissioner) {
+        const settingsResult = await getLeagueSettings(leagueId);
+        if (settingsResult.success && settingsResult.settings) {
+          setMoneyBoardSettings({
+            google_sheet_url: settingsResult.settings.google_sheet_url || '',
+            google_sheet_embed_url: settingsResult.settings.google_sheet_embed_url || '',
+            buy_in_amount: settingsResult.settings.buy_in_amount?.toString() || '',
+            venmo_username: settingsResult.settings.venmo_username || '',
+            venmo_qr_image_path: settingsResult.settings.venmo_qr_image_path || '',
+            payment_instructions: settingsResult.settings.payment_instructions || '',
+            payout_description: settingsResult.settings.payout_description || '',
+          });
+        }
       }
 
       if (!tournamentsData.isCommissioner) {
@@ -219,6 +254,94 @@ export default function LeagueSettingsPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  // Save money board settings
+  const saveMoneyBoardSettings = async () => {
+    if (!leagueId) return;
+    
+    setSavingMoneyBoard(true);
+    setMoneyBoardSaved(false);
+    
+    try {
+      const result = await updateLeagueSettings(leagueId, {
+        google_sheet_url: moneyBoardSettings.google_sheet_url || null,
+        google_sheet_embed_url: moneyBoardSettings.google_sheet_embed_url || null,
+        buy_in_amount: moneyBoardSettings.buy_in_amount ? parseInt(moneyBoardSettings.buy_in_amount) : null,
+        venmo_username: moneyBoardSettings.venmo_username || null,
+        venmo_qr_image_path: moneyBoardSettings.venmo_qr_image_path || null,
+        payment_instructions: moneyBoardSettings.payment_instructions || null,
+        payout_description: moneyBoardSettings.payout_description || null,
+      });
+      
+      if (!result.success) {
+        alert(result.error || 'Failed to save settings');
+        return;
+      }
+      
+      setMoneyBoardSaved(true);
+      setTimeout(() => setMoneyBoardSaved(false), 3000);
+    } catch (err) {
+      console.error('Error saving money board settings:', err);
+      alert('Failed to save settings');
+    } finally {
+      setSavingMoneyBoard(false);
+    }
+  };
+
+  // Upload Venmo QR code image
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !leagueId) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+    
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image must be less than 2MB');
+      return;
+    }
+    
+    setUploadingImage(true);
+    
+    try {
+      const supabase = createClient();
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${leagueId}/venmo-qr.${fileExt}`;
+      
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('league-assets')
+        .upload(filePath, file, { 
+          upsert: true,
+          contentType: file.type 
+        });
+      
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        alert('Failed to upload image. Make sure the league-assets bucket exists.');
+        return;
+      }
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('league-assets')
+        .getPublicUrl(filePath);
+      
+      setMoneyBoardSettings(prev => ({
+        ...prev,
+        venmo_qr_image_path: publicUrl
+      }));
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      alert('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   // Get max segment number for adding new segments
   const maxSegmentNumber = Math.max(0, ...segments.map(s => s.number));
   const nextSegmentNumber = maxSegmentNumber + 1;
@@ -263,6 +386,38 @@ export default function LeagueSettingsPage({ params }: { params: Promise<{ id: s
           Manage league members and configure tournament settings.
         </p>
       </div>
+
+      {/* Welcome Banner for New Commissioners */}
+      {isWelcome && (
+        <Card className="bg-casino-green/10 border-casino-green/30 mb-6">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-4">
+              <span className="text-3xl">🎉</span>
+              <div>
+                <h2 className="text-lg font-bold text-casino-green mb-1">
+                  Welcome, Commissioner!
+                </h2>
+                <p className="text-sm text-casino-gray mb-3">
+                  Your league has been created. Here are a few things to set up:
+                </p>
+                <ul className="text-sm text-casino-gray space-y-1">
+                  <li>• <strong className="text-casino-text">Invite members</strong> - Share an invite link from the Leagues page</li>
+                  <li>• <strong className="text-casino-text">Configure segments</strong> - Set up 1st Half, 2nd Half, etc.</li>
+                  <li>• <strong className="text-casino-text">Set up Money Board</strong> - Add payment info and payout structure below</li>
+                </ul>
+                <Button
+                  onClick={() => setIsWelcome(false)}
+                  variant="ghost"
+                  size="sm"
+                  className="mt-3 text-casino-gray hover:text-casino-text"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* League Members */}
       <Card className="bg-casino-card border-casino-gold/20 mb-6">
@@ -541,6 +696,175 @@ export default function LeagueSettingsPage({ params }: { params: Promise<{ id: s
                 ))}
               </tbody>
             </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Money Board Settings */}
+      <Card className="bg-casino-card border-casino-gold/20 mt-6">
+        <CardHeader>
+          <CardTitle className="text-casino-gold">💰 Money Board Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-casino-gray mb-6">
+            Configure the payment and payout information displayed on your league&apos;s Money Board page.
+          </p>
+          
+          <div className="space-y-6">
+            {/* Google Sheet URLs */}
+            <div className="space-y-4">
+              <h3 className="text-white font-medium">Google Sheet</h3>
+              <div>
+                <label className="block text-sm text-casino-gray mb-1">
+                  Google Sheet URL (for &quot;Open in Sheets&quot; link)
+                </label>
+                <input
+                  type="url"
+                  value={moneyBoardSettings.google_sheet_url}
+                  onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, google_sheet_url: e.target.value }))}
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                  className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-casino-gray mb-1">
+                  Embed URL (for iframe - usually ends in /pubhtml)
+                </label>
+                <input
+                  type="url"
+                  value={moneyBoardSettings.google_sheet_embed_url}
+                  onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, google_sheet_embed_url: e.target.value }))}
+                  placeholder="https://docs.google.com/spreadsheets/d/e/.../pubhtml"
+                  className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold"
+                />
+                <p className="text-xs text-casino-gray mt-1">
+                  Tip: In Google Sheets, go to File → Share → Publish to web → Embed tab to get this URL.
+                </p>
+              </div>
+            </div>
+
+            {/* Payment Info */}
+            <div className="space-y-4 pt-4 border-t border-casino-gold/20">
+              <h3 className="text-white font-medium">Payment Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-casino-gray mb-1">
+                    Season Buy-In Amount ($)
+                  </label>
+                  <input
+                    type="number"
+                    value={moneyBoardSettings.buy_in_amount}
+                    onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, buy_in_amount: e.target.value }))}
+                    placeholder="100"
+                    min="0"
+                    className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-casino-gray mb-1">
+                    Venmo Username
+                  </label>
+                  <input
+                    type="text"
+                    value={moneyBoardSettings.venmo_username}
+                    onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, venmo_username: e.target.value }))}
+                    placeholder="@Your-Name"
+                    className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold"
+                  />
+                </div>
+              </div>
+              
+              {/* Venmo QR Code Upload */}
+              <div>
+                <label className="block text-sm text-casino-gray mb-2">
+                  Venmo QR Code Image
+                </label>
+                <div className="flex items-start gap-4">
+                  {moneyBoardSettings.venmo_qr_image_path ? (
+                    <div className="relative">
+                      <Image
+                        src={moneyBoardSettings.venmo_qr_image_path}
+                        alt="Venmo QR Code"
+                        width={100}
+                        height={100}
+                        className="rounded border border-casino-gold/20"
+                      />
+                      <button
+                        onClick={() => setMoneyBoardSettings(prev => ({ ...prev, venmo_qr_image_path: '' }))}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-casino-red rounded-full text-white text-xs flex items-center justify-center hover:bg-casino-red/80"
+                        title="Remove image"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-[100px] h-[100px] border-2 border-dashed border-casino-gold/30 rounded flex items-center justify-center text-casino-gray text-xs text-center">
+                      No image
+                    </div>
+                  )}
+                  <div>
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 bg-casino-elevated hover:bg-casino-gold/20 border border-casino-gold/30 rounded text-sm text-casino-text transition-colors">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={uploadingImage}
+                        className="hidden"
+                      />
+                      {uploadingImage ? 'Uploading...' : 'Upload QR Code'}
+                    </label>
+                    <p className="text-xs text-casino-gray mt-1">Max 2MB, JPG/PNG</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Instructions */}
+              <div>
+                <label className="block text-sm text-casino-gray mb-1">
+                  Payment Instructions (optional)
+                </label>
+                <textarea
+                  value={moneyBoardSettings.payment_instructions}
+                  onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, payment_instructions: e.target.value }))}
+                  placeholder="Payment due before the start of the first tournament..."
+                  rows={2}
+                  className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Payout Description */}
+            <div className="pt-4 border-t border-casino-gold/20">
+              <h3 className="text-white font-medium mb-4">Payout Structure</h3>
+              <div>
+                <label className="block text-sm text-casino-gray mb-1">
+                  Payout Description
+                </label>
+                <textarea
+                  value={moneyBoardSettings.payout_description}
+                  onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, payout_description: e.target.value }))}
+                  placeholder="1st: 45%, 2nd: 30%, 3rd: 15%, 4th: 10%"
+                  rows={3}
+                  className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold resize-none"
+                />
+                <p className="text-xs text-casino-gray mt-1">
+                  Describe how winnings are distributed (e.g., &quot;1st: 45%, 2nd: 30%, 3rd: 15%, 4th: 10%&quot;)
+                </p>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex items-center gap-4 pt-4">
+              <Button
+                onClick={saveMoneyBoardSettings}
+                disabled={savingMoneyBoard}
+              >
+                {savingMoneyBoard ? 'Saving...' : 'Save Money Board Settings'}
+              </Button>
+              {moneyBoardSaved && (
+                <span className="text-casino-green text-sm">✓ Settings saved!</span>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
