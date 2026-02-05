@@ -77,7 +77,7 @@ export default async function WeeklyStandingsByTournamentPage({
   }
 
   // Run remaining queries in parallel for faster page load (skip rosters if tournament not in league)
-  const [prizeDistributionsResult, rostersResult, allTournamentsResult, teeTimeResult] = await Promise.all([
+  const [prizeDistributionsResult, rostersResult, allTournamentsResult, teeTimeResult, leagueProfilesResult] = await Promise.all([
     // Get prize distributions for live calculations
     supabase
       .from('prize_money_distributions')
@@ -115,12 +115,35 @@ export default async function WeeklyStandingsByTournamentPage({
       .select('tee_time_r2, tee_time_r3, tee_time_r4')
       .eq('tournament_id', tournamentId)
       .limit(200),
+    
+    // Get usernames for all league members (for upcoming "Picks In" table)
+    tournamentIncludedInLeague && leagueMemberIds.length > 0
+      ? supabase.from('profiles').select('id, username').in('id', leagueMemberIds)
+      : Promise.resolve({ data: [] as { id: string; username: string | null }[], error: null }),
   ]);
 
   const prizeDistributions = prizeDistributionsResult.data;
   const rosters = rostersResult.data;
   const allTournaments = allTournamentsResult.data;
   const teeTimeData = teeTimeResult.data;
+  const leagueProfiles = leagueProfilesResult.data ?? [];
+
+  // For upcoming tournaments: all league members with "Picks In" / "Not Submitted Yet"
+  const rosterUserIds = new Set((rosters ?? []).map((r: { user_id: string }) => r.user_id));
+  const profileByUserId = new Map(leagueProfiles.map((p) => [p.id, p.username ?? '—']));
+  const upcomingStandingsRows: { user_id: string; username: string; hasRoster: boolean }[] =
+    tournament.status === 'upcoming' && leagueMemberIds.length > 0
+      ? leagueMemberIds
+          .map((userId) => ({
+            user_id: userId,
+            username: profileByUserId.get(userId) ?? '—',
+            hasRoster: rosterUserIds.has(userId),
+          }))
+          .sort((a, b) => {
+            if (a.hasRoster !== b.hasRoster) return a.hasRoster ? -1 : 1;
+            return a.username.localeCompare(b.username);
+          })
+      : [];
 
   if (rostersResult.error) {
     console.error('Error loading rosters:', rostersResult.error);
@@ -387,6 +410,54 @@ export default async function WeeklyStandingsByTournamentPage({
                 leagueMemberIds={leagueMemberIds}
                 displayRound={displayRound}
               />
+            ) : tournament.status === 'upcoming' && upcomingStandingsRows.length > 0 ? (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-casino-gold/30">
+                        <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
+                          Rank
+                        </th>
+                        <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
+                          Team
+                        </th>
+                        <th className="px-1 sm:px-2 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider">
+                          Lineup
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {upcomingStandingsRows.map((row, index) => {
+                        const isUser = row.user_id === profile.id;
+                        return (
+                          <tr
+                            key={row.user_id}
+                            className={`border-b border-casino-gold/10 ${isUser ? 'bg-casino-green/10' : ''}`}
+                          >
+                            <td className="px-1 sm:px-2 py-2 text-casino-text font-medium">
+                              {index + 1}
+                            </td>
+                            <td className="px-1 sm:px-2 py-2">
+                              <span className="text-casino-text font-medium">{row.username}</span>
+                              {isUser && (
+                                <span className="ml-2 text-xs text-casino-green font-medium">You</span>
+                              )}
+                            </td>
+                            <td className="px-1 sm:px-2 py-2 text-right">
+                              {row.hasRoster ? (
+                                <span className="text-casino-green font-medium">Set</span>
+                              ) : (
+                                <span className="text-casino-gray">Not set</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             ) : rosters && rosters.length > 0 ? (
               <>
                 <div className="overflow-x-auto">
@@ -444,24 +515,42 @@ export default async function WeeklyStandingsByTournamentPage({
       )}
 
       {/* User's Rank Summary - Only show when tournament is in league and non-live standings (live has its own) */}
-      {tournamentIncludedInLeague && !useLiveStandings && userRank && (
+      {tournamentIncludedInLeague && !useLiveStandings && (userRank != null || (tournament.status === 'upcoming' && upcomingStandingsRows.length > 0)) && (
         <Card className="mt-6 border-2 border-casino-green/30">
           <CardContent className="pt-6">
             <div className="grid grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <p className="text-xs sm:text-sm text-casino-gray mb-1">Your Rank</p>
                 <p className="text-xl sm:text-2xl font-bold text-casino-gold font-orbitron">
-                  #{userRank} <span className="text-base sm:text-xl text-casino-gray-dark">of {rosters?.length || 0}</span>
+                  #{tournament.status === 'upcoming'
+                    ? (upcomingStandingsRows.findIndex((r) => r.user_id === profile.id) + 1) || '—'
+                    : userRank}{' '}
+                  <span className="text-base sm:text-xl text-casino-gray-dark">
+                    of {tournament.status === 'upcoming' ? upcomingStandingsRows.length : rosters?.length || 0}
+                  </span>
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-xs sm:text-sm text-casino-gray mb-1">Your Winnings</p>
-                <p className="text-xl sm:text-2xl font-bold text-casino-green font-orbitron">
-                  {formatCurrency(
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    rosters?.find((r: any) => r.user_id === profile.id)?.total_winnings || 0
-                  )}
-                </p>
+                {tournament.status === 'upcoming' ? (
+                  <>
+                    <p className="text-xs sm:text-sm text-casino-gray mb-1">Your Status</p>
+                    <p className="text-xl sm:text-2xl font-bold text-casino-green font-orbitron">
+                      {upcomingStandingsRows.find((r) => r.user_id === profile.id)?.hasRoster
+                        ? 'Set'
+                        : 'Not set'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs sm:text-sm text-casino-gray mb-1">Your Winnings</p>
+                    <p className="text-xl sm:text-2xl font-bold text-casino-green font-orbitron">
+                      {formatCurrency(
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        rosters?.find((r: any) => r.user_id === profile.id)?.total_winnings || 0
+                      )}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
