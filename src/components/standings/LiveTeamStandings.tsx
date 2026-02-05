@@ -11,6 +11,8 @@ interface RosterData {
   roster_name: string;
   user_id: string;
   username: string;
+  /** True when league member did not submit a lineup this week */
+  noLineup?: boolean;
   players: Array<{
     playerId: string;
     playerName: string;
@@ -251,7 +253,6 @@ export function LiveTeamStandings({
         };
       });
 
-      // Sort players by winnings (highest first)
       playersWithScores.sort((a, b) => b.winnings - a.winnings);
 
       return {
@@ -259,7 +260,13 @@ export function LiveTeamStandings({
         playersWithScores,
         totalWinnings,
       };
-    }).sort((a, b) => b.totalWinnings - a.totalWinnings);
+    }).sort((a, b) => {
+      if (b.totalWinnings !== a.totalWinnings) return b.totalWinnings - a.totalWinnings;
+      if (a.noLineup && !b.noLineup) return 1;
+      if (!a.noLineup && b.noLineup) return -1;
+      if (a.noLineup && b.noLineup) return a.username.localeCompare(b.username);
+      return 0;
+    });
   }, [rosters, findLiveScore, calculateTiePrizeMoney, isCompleted]);
 
   // Fetch rosters from database
@@ -345,7 +352,6 @@ export function LiveTeamStandings({
           teeTimeR3: rp.tournament_player?.tee_time_r3,
           teeTimeR4: rp.tournament_player?.tee_time_r4,
           cost: rp.tournament_player?.cost,
-          // Final data for completed tournaments
           finalPosition: rp.tournament_player?.position,
           finalIsTied: rp.tournament_player?.is_tied,
           finalScore: rp.tournament_player?.total_score,
@@ -354,6 +360,28 @@ export function LiveTeamStandings({
         })),
       };
     });
+
+    // Include all league members: add placeholders for those who didn't set a lineup
+    if (leagueMemberIds && leagueMemberIds.length > 0) {
+      const hasRosterIds = new Set(transformedRosters.map((r) => r.user_id));
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', leagueMemberIds);
+      const usernameById = new Map((profilesData || []).map((p) => [p.id, p.username ?? '—']));
+      for (const userId of leagueMemberIds) {
+        if (!hasRosterIds.has(userId)) {
+          transformedRosters.push({
+            id: `no-lineup-${userId}`,
+            roster_name: usernameById.get(userId) ?? '—',
+            user_id: userId,
+            username: usernameById.get(userId) ?? '—',
+            noLineup: true,
+            players: [],
+          });
+        }
+      }
+    }
 
     setRosters(transformedRosters);
   }, [tournamentId, userLeagueId, leagueMemberIds]);
@@ -476,18 +504,30 @@ export function LiveTeamStandings({
         </button>
       </div>
 
-      {/* Standings Table */}
+      {/* Standings Table: Rank | Team (name + players below) | Pos | Score | Thru | Win | Winnings (rightmost) */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-casino-gold/30">
-              <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
+              <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider w-12 sm:w-14">
                 Rank
               </th>
               <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
                 Team
               </th>
-              <th className="px-1 sm:px-2 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider">
+              <th className="px-3 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider hidden sm:table-cell min-w-14">
+                Pos
+              </th>
+              <th className="px-3 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider hidden sm:table-cell min-w-16">
+                Score
+              </th>
+              <th className="px-3 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider hidden md:table-cell min-w-18">
+                Thru
+              </th>
+              <th className="px-3 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider hidden sm:table-cell min-w-20">
+                $
+              </th>
+              <th className="px-3 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider min-w-22 sm:min-w-24">
                 Winnings
               </th>
             </tr>
@@ -495,35 +535,36 @@ export function LiveTeamStandings({
           <tbody>
             {rostersWithLiveWinnings.map((roster, index) => {
               const isUserRoster = roster.user_id === currentUserId;
+              const isNoLineup = roster.noLineup === true;
               const isExpanded = expandedRosterIds.has(roster.id);
               const rank = index + 1;
+              const rowBg = isUserRoster ? 'bg-casino-green/10 hover:bg-casino-green/20' : 'hover:bg-casino-card/50';
+              const detailBg = isUserRoster ? 'bg-casino-green/5' : 'bg-casino-elevated';
 
               return (
                 <Fragment key={roster.id}>
                   <tr
-                    className={`border-b border-casino-gold/20 transition-colors cursor-pointer ${
-                      isUserRoster
-                        ? 'bg-casino-green/10 hover:bg-casino-green/20'
-                        : 'hover:bg-casino-card/50'
-                    }`}
-                    onClick={() => toggleRoster(roster.id)}
+                    className={`border-b border-casino-gold/20 transition-colors ${!isNoLineup ? 'cursor-pointer' : ''} ${rowBg}`}
+                    onClick={() => !isNoLineup && toggleRoster(roster.id)}
                   >
                     <td className="px-1 sm:px-2 py-1.5">
                       <div className="flex items-center gap-1 sm:gap-2">
-                        <button className="p-0.5 hover:bg-casino-gold/20 rounded transition-colors">
-                          <svg
-                            className={`w-3 h-3 sm:w-4 sm:h-4 text-casino-gold transition-transform ${
-                              isExpanded ? 'rotate-180' : ''
-                            }`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
+                        {!isNoLineup ? (
+                          <button className="p-0.5 hover:bg-casino-gold/20 rounded transition-colors">
+                            <svg
+                              className={`w-3 h-3 sm:w-4 sm:h-4 text-casino-gold transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <span className="w-3 sm:w-4 inline-block" />
+                        )}
                         <span className="text-xs sm:text-sm font-medium text-casino-text">{rank}</span>
-                        {rank === 1 && <span className="text-sm sm:text-base">🏆</span>}
+                        {rank === 1 && !isNoLineup && <span className="text-sm sm:text-base">🏆</span>}
                         {isUserRoster && (
                           <span className="px-1 sm:px-1.5 py-0.5 bg-casino-green/30 text-casino-green border border-casino-green/50 rounded text-xs font-medium">
                             You
@@ -534,111 +575,85 @@ export function LiveTeamStandings({
                     <td className="px-1 sm:px-2 py-1.5">
                       <span className="font-medium text-casino-text text-xs sm:text-sm">{roster.roster_name}</span>
                     </td>
-                    <td className="px-1 sm:px-2 py-1.5 text-right">
-                      <span className={`font-semibold text-xs sm:text-sm ${roster.totalWinnings > 0 ? 'text-casino-green' : 'text-casino-gray-dark'}`}>
-                        {formatCurrency(roster.totalWinnings)}
-                      </span>
+                    <td colSpan={4} className="py-1.5 hidden sm:table-cell" />
+                    <td className="px-3 sm:px-4 py-1.5 text-right">
+                      {isNoLineup ? (
+                        <span className="text-casino-gray text-xs sm:text-sm">No lineup</span>
+                      ) : (
+                        <span className={`font-semibold text-xs sm:text-sm ${roster.totalWinnings > 0 ? 'text-casino-green' : 'text-casino-gray-dark'}`}>
+                          {formatCurrency(roster.totalWinnings)}
+                        </span>
+                      )}
                     </td>
                   </tr>
 
-                  {/* Expanded Player Details */}
-                  {isExpanded && (
-                    <tr className={isUserRoster ? 'bg-casino-green/5' : 'bg-casino-elevated'}>
-                      <td colSpan={3} className="px-1 sm:px-2 py-2">
-                        <div className="pl-2 sm:pl-6">
-                          <h4 className="text-xs font-semibold text-casino-gold uppercase mb-1.5">
-                            Team Roster ({roster.playersWithScores.length} players)
-                          </h4>
-                          <div className="overflow-x-auto -mx-1 sm:mx-0">
-                            <table className="min-w-full text-xs sm:text-sm">
-                              <thead className="bg-casino-card border-b border-casino-gold/20">
-                                <tr>
-                                  <th className="px-1 sm:px-2 py-1 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
-                                  <th className="px-1 sm:px-2 py-1 text-center text-xs font-medium text-casino-gray uppercase">Pos</th>
-                                  <th className="px-1 sm:px-2 py-1 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Score</th>
-                                  <th className="px-1 sm:px-2 py-1 text-center text-xs font-medium text-casino-gray uppercase hidden md:table-cell">Thru</th>
-                                  <th className="px-1 sm:px-2 py-1 text-right text-xs font-medium text-casino-gray uppercase">Win</th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-casino-bg divide-y divide-casino-gold/10">
-                                {roster.playersWithScores.map((player, idx) => (
-                                  <tr key={idx} className="hover:bg-casino-card/50 transition-colors">
-                                    <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-casino-text">
-                                      <span className="truncate">
-                                        {player.playerName}
-                                        {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
-                                        {player.cost !== undefined && player.cost !== null && (
-                                          <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
-                                        )}
-                                      </span>
-                                    </td>
-                                    <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center">
-                                      {player.liveScore?.position ? (
-                                        <span className={`font-medium ${
-                                          player.liveScore.positionValue === 1 ? 'text-casino-gold' :
-                                          (player.liveScore.positionValue || 999) <= 10 ? 'text-casino-green' :
-                                          'text-casino-text'
-                                        }`}>
-                                          {player.liveScore.position}
-                                        </span>
-                                      ) : (
-                                        <span className="text-casino-gray-dark">-</span>
-                                      )}
-                                    </td>
-                                    <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center hidden sm:table-cell">
-                                      {player.liveScore ? (
-                                        <span className={
-                                          parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
-                                          parseScore(player.liveScore.total) > 0 ? 'text-casino-red' :
-                                          'text-casino-gray'
-                                        }>
-                                          {player.liveScore.total}
-                                        </span>
-                                      ) : (
-                                        <span className="text-casino-gray-dark">-</span>
-                                      )}
-                                    </td>
-                                    <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center hidden md:table-cell">
-                                      {(() => {
-                                        // Helper to get tee time for current display round
-                                        const getTeeTimeForRound = () => {
-                                          if (displayRound === 1) return player.teeTimeR1;
-                                          if (displayRound === 2) return player.teeTimeR2;
-                                          if (displayRound === 3) return player.teeTimeR3;
-                                          if (displayRound === 4) return player.teeTimeR4;
-                                          return player.teeTimeR1;
-                                        };
-                                        const teeTime = getTeeTimeForRound();
-                                        
-                                        // Player finished current round - show F or F*
-                                        if (player.liveScore?.roundComplete || player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') {
-                                          return <span className="text-casino-green font-medium">{player.liveScore?.thru === '18' ? 'F' : player.liveScore?.thru}</span>;
-                                        }
-                                        // Player is on course
-                                        if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
-                                          return <span className="text-casino-blue">{player.liveScore.thru}</span>;
-                                        }
-                                        // Player hasn't started, show tee time
-                                        if (teeTime) {
-                                          return <span className="text-casino-gray">{convertESTtoLocal(teeTime)}</span>;
-                                        }
-                                        return <span className="text-casino-gray-dark">-</span>;
-                                      })()}
-                                    </td>
-                                    <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-right">
-                                      <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
-                                        {formatCurrency(player.winnings)}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
+                  {isExpanded && !isNoLineup && roster.playersWithScores.map((player, idx) => {
+                    const getTeeTimeForRound = () => {
+                      if (displayRound === 1) return player.teeTimeR1;
+                      if (displayRound === 2) return player.teeTimeR2;
+                      if (displayRound === 3) return player.teeTimeR3;
+                      if (displayRound === 4) return player.teeTimeR4;
+                      return player.teeTimeR1;
+                    };
+                    const teeTime = getTeeTimeForRound();
+                    const thruCell = (() => {
+                      if (player.liveScore?.roundComplete || player.liveScore?.thru === 'F' || player.liveScore?.thru === 'F*') {
+                        return <span className="text-casino-green font-medium">{player.liveScore?.thru === '18' ? 'F' : player.liveScore?.thru}</span>;
+                      }
+                      if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
+                        return <span className="text-casino-blue">{player.liveScore.thru}</span>;
+                      }
+                      if (teeTime) return <span className="text-casino-gray">{convertESTtoLocal(teeTime)}</span>;
+                      return <span className="text-casino-gray-dark">-</span>;
+                    })();
+                    return (
+                      <tr key={idx} className={`border-b border-casino-gold/10 ${detailBg} hover:bg-casino-card/50 transition-colors`}>
+                        <td className="px-1 sm:px-2 py-1 sm:py-1.5 pl-4 sm:pl-6" />
+                        <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text">
+                          <span className="truncate block pl-3 sm:pl-4 border-l-2 border-casino-gold/20">
+                            {player.playerName}
+                            {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
+                            {player.cost !== undefined && player.cost !== null && (
+                              <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm text-center hidden sm:table-cell">
+                          {player.liveScore?.position ? (
+                            <span className={`font-medium ${
+                              player.liveScore.positionValue === 1 ? 'text-casino-gold' :
+                              (player.liveScore.positionValue || 999) <= 10 ? 'text-casino-green' : 'text-casino-text'
+                            }`}>
+                              {player.liveScore.position}
+                            </span>
+                          ) : (
+                            <span className="text-casino-gray-dark">-</span>
+                          )}
+                        </td>
+                        <td className="px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm text-center hidden sm:table-cell">
+                          {player.liveScore ? (
+                            <span className={
+                              parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
+                              parseScore(player.liveScore.total) > 0 ? 'text-casino-red' : 'text-casino-gray'
+                            }>
+                              {player.liveScore.total}
+                            </span>
+                          ) : (
+                            <span className="text-casino-gray-dark">-</span>
+                          )}
+                        </td>
+                        <td className="px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm text-center hidden md:table-cell">
+                          {thruCell}
+                        </td>
+                        <td className="px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm text-right hidden sm:table-cell">
+                          <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
+                            {formatCurrency(player.winnings)}
+                          </span>
+                        </td>
+                        <td className="px-3 sm:px-4 py-1 sm:py-1.5" />
+                      </tr>
+                    );
+                  })}
                 </Fragment>
               );
             })}
@@ -659,7 +674,7 @@ export function LiveTeamStandings({
             <div className="text-right">
               <p className="text-xs sm:text-sm text-casino-gray mb-1">Your Winnings</p>
               <p className="text-xl sm:text-2xl font-bold text-casino-green font-orbitron">
-                {formatCurrency(userRoster.totalWinnings)}
+                {userRoster.noLineup ? 'No lineup' : formatCurrency(userRoster.totalWinnings)}
               </p>
             </div>
           </div>
