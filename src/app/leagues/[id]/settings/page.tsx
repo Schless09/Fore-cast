@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getLeagueSettings, updateLeagueSettings } from '@/lib/actions/league';
-import { createClient } from '@/lib/supabase/client';
+import { getLeagueSettings, updateLeagueSettings, uploadVenmoQRCode } from '@/lib/actions/league';
 
 interface Tournament {
   id: string;
@@ -292,47 +291,22 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
     const file = e.target.files?.[0];
     if (!file || !leagueId) return;
     
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
-      return;
-    }
-    
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Image must be less than 2MB');
-      return;
-    }
-    
     setUploadingImage(true);
     
     try {
-      const supabase = createClient();
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${leagueId}/venmo-qr.${fileExt}`;
+      const formData = new FormData();
+      formData.append('file', file);
       
-      // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from('league-assets')
-        .upload(filePath, file, { 
-          upsert: true,
-          contentType: file.type 
-        });
+      const result = await uploadVenmoQRCode(leagueId, formData);
       
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        alert('Failed to upload image. Make sure the league-assets bucket exists.');
+      if (!result.success) {
+        alert(result.error || 'Failed to upload image');
         return;
       }
       
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('league-assets')
-        .getPublicUrl(filePath);
-      
       setMoneyBoardSettings(prev => ({
         ...prev,
-        venmo_qr_image_path: publicUrl
+        venmo_qr_image_path: result.publicUrl || ''
       }));
     } catch (err) {
       console.error('Error uploading image:', err);

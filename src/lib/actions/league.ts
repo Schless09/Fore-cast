@@ -494,6 +494,74 @@ export async function updateLeagueSettings(
   return { success: true };
 }
 
+// Upload Venmo QR code image (commissioner only)
+export async function uploadVenmoQRCode(leagueId: string, formData: FormData) {
+  const { profile, error: authError } = await getProfileForClerkUser();
+  
+  if (authError || !profile) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  const supabase = createServiceClient();
+
+  // Verify user is commissioner
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('id, created_by')
+    .eq('id', leagueId)
+    .single();
+
+  if (!league) {
+    return { success: false, error: 'League not found' };
+  }
+
+  if (league.created_by !== profile.id) {
+    return { success: false, error: 'Only the commissioner can upload images' };
+  }
+
+  const file = formData.get('file') as File;
+  if (!file) {
+    return { success: false, error: 'No file provided' };
+  }
+
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    return { success: false, error: 'Please upload an image file' };
+  }
+
+  // Validate file size (max 2MB)
+  if (file.size > 2 * 1024 * 1024) {
+    return { success: false, error: 'Image must be less than 2MB' };
+  }
+
+  const fileExt = file.name.split('.').pop();
+  const filePath = `${leagueId}/venmo-qr.${fileExt}`;
+
+  // Convert File to Buffer for server-side upload
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  // Upload to storage using service client
+  const { error: uploadError } = await supabase.storage
+    .from('league-assets')
+    .upload(filePath, buffer, {
+      upsert: true,
+      contentType: file.type,
+    });
+
+  if (uploadError) {
+    console.error('Upload error:', uploadError);
+    return { success: false, error: 'Failed to upload image' };
+  }
+
+  // Get public URL
+  const { data: { publicUrl } } = supabase.storage
+    .from('league-assets')
+    .getPublicUrl(filePath);
+
+  return { success: true, publicUrl };
+}
+
 // Accept an invite and join the league
 export async function acceptLeagueInvite(inviteCode: string) {
   const { profile, error: authError } = await getProfileForClerkUser();
