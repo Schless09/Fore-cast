@@ -7,8 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 
 interface RosterPlayer {
+  player_cost?: number | null;
   tournament_player?: {
     cost?: number;
+    pga_player_id?: string;
     pga_player?: {
       name?: string;
       country?: string;
@@ -94,10 +96,10 @@ export function RosterSection({
               {existingRoster.roster_players?.length || 0} Players Selected
             </div>
             {[...(existingRoster.roster_players || [])]
-              .sort((a, b) => (b.tournament_player?.cost || 0) - (a.tournament_player?.cost || 0))
+              .sort((a, b) => (b.player_cost ?? b.tournament_player?.cost ?? 0) - (a.player_cost ?? a.tournament_player?.cost ?? 0))
               .map((rp, index) => {
               const player = rp.tournament_player?.pga_player;
-              const cost = rp.tournament_player?.cost || 0;
+              const cost = rp.player_cost ?? rp.tournament_player?.cost ?? 0;
               return (
                 <div
                   key={index}
@@ -151,6 +153,11 @@ export function RosterSection({
           id: existingRoster.id,
           rosterName: existingRoster.roster_name,
           playerIds: existingRoster.playerIds,
+          costByPgaPlayerId: (existingRoster.roster_players || []).reduce<Record<string, number>>((acc, rp) => {
+            const pid = rp.tournament_player?.pga_player_id;
+            if (pid) acc[pid] = rp.player_cost ?? rp.tournament_player?.cost ?? 0.2;
+            return acc;
+          }, {}),
         }}
         onSave={handleSave}
         tournamentStatus={tournamentStatus}

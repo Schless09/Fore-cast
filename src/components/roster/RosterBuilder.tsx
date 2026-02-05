@@ -17,6 +17,8 @@ interface RosterBuilderProps {
     id: string;
     rosterName: string;
     playerIds: string[];
+    /** Stored cost per pga_player_id so roster total doesn't change after admin updates costs */
+    costByPgaPlayerId?: Record<string, number>;
   };
   onSave?: () => void;
   tournamentStatus?: 'upcoming' | 'active' | 'completed';
@@ -109,12 +111,8 @@ export function RosterBuilder({
         );
         if (!player) return prev;
 
-        const currentCosts = prev.map((id) => {
-          const tp = tournamentPlayers.find((t) => t.pga_player_id === id);
-          return tp?.cost || 0.20;
-        });
-
-        const newCosts = [...currentCosts, player.cost || 0.20];
+        const currentCosts = prev.map((id) => getCostForPlayer(id));
+        const newCosts = [...currentCosts, getCostForPlayer(playerId)];
         const validation = validateRoster(
           newCosts,
           BUDGET_LIMIT,
@@ -132,13 +130,15 @@ export function RosterBuilder({
     });
   }
 
+  function getCostForPlayer(pgaPlayerId: string): number {
+    const stored = existingRoster?.costByPgaPlayerId?.[pgaPlayerId];
+    if (stored !== undefined && stored !== null) return stored;
+    const tp = tournamentPlayers.find((t) => t.pga_player_id === pgaPlayerId);
+    return tp?.cost ?? 0.20;
+  }
+
   function getBudgetSpent(): number {
-    return calculateRosterCost(
-      selectedPlayerIds.map((id) => {
-        const tp = tournamentPlayers.find((t) => t.pga_player_id === id);
-        return tp?.cost || 0.20;
-      })
-    );
+    return calculateRosterCost(selectedPlayerIds.map(getCostForPlayer));
   }
 
   async function handleSave() {
@@ -159,10 +159,7 @@ export function RosterBuilder({
       return;
     }
 
-    const playerCosts = selectedPlayerIds.map((id) => {
-      const tp = tournamentPlayers.find((t) => t.pga_player_id === id);
-      return tp?.cost || 0.20;
-    });
+    const playerCosts = selectedPlayerIds.map((id) => getCostForPlayer(id));
 
     const validation = validateRoster(playerCosts, BUDGET_LIMIT, MAX_PLAYERS);
     if (!validation.valid) {
@@ -241,19 +238,19 @@ export function RosterBuilder({
       throw rosterError;
     }
 
-    // Get tournament_player_ids for selected players
+    // Get tournament_player ids and costs (freeze cost at save time)
     const { data: tournamentPlayersData, error: tpError } = await supabase
       .from('tournament_players')
-      .select('id, pga_player_id')
+      .select('id, pga_player_id, cost')
       .eq('tournament_id', tournamentId)
       .in('pga_player_id', selectedPlayerIds);
 
     if (tpError) throw tpError;
 
-    // Add players to roster
     const rosterPlayers = tournamentPlayersData!.map((tp) => ({
       roster_id: roster.id,
       tournament_player_id: tp.id,
+      player_cost: tp.cost ?? 0.2,
     }));
 
     const { error: rpError } = await supabase
@@ -261,7 +258,6 @@ export function RosterBuilder({
       .insert(rosterPlayers);
 
     if (rpError) throw rpError;
-    
     return roster.id;
   }
 
@@ -287,19 +283,18 @@ export function RosterBuilder({
 
     if (deleteError) throw deleteError;
 
-    // Get tournament_player_ids for selected players
     const { data: tournamentPlayersData, error: tpError } = await supabase
       .from('tournament_players')
-      .select('id, pga_player_id')
+      .select('id, pga_player_id, cost')
       .eq('tournament_id', tournamentId)
       .in('pga_player_id', selectedPlayerIds);
 
     if (tpError) throw tpError;
 
-    // Add new players to roster
     const rosterPlayers = tournamentPlayersData!.map((tp) => ({
       roster_id: rosterId,
       tournament_player_id: tp.id,
+      player_cost: tp.cost ?? 0.2,
     }));
 
     const { error: rpError } = await supabase
