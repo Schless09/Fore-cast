@@ -256,8 +256,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     }
   }
 
-  // Calculate display round - switch to next round 5 hours before first tee time
-  // Handle MongoDB extended JSON format {$numberInt: "1"} that may come from RapidAPI
+  // Calculate display round - switch to next round 5 hours before first tee time of that round
+  // R2/R3/R4 tee times are time-of-day only; use round date (start_date + 1/2/3 days) so we don't advance on Thursday when R2 is Friday
   const rawRound = tournament.current_round as unknown;
   let displayRound = typeof rawRound === 'object' && rawRound !== null && '$numberInt' in rawRound
     ? parseInt((rawRound as { $numberInt: string }).$numberInt, 10) 
@@ -274,51 +274,55 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       return hours * 60 + minutes;
     };
 
-    // Get current time in EST
     const now = new Date();
-    const estFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-    const parts = estFormatter.formatToParts(now);
-    const estHours = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
-    const estMinutes = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
-    const currentMinutes = estHours * 60 + estMinutes;
+    const [startYear, startMonth, startDay] = (tournament.start_date as string).split('-').map(Number);
 
-    // Helper to find earliest tee time and check if we should advance to that round
     interface TeeTimeRow {
       tee_time_r2: string | null;
       tee_time_r3: string | null;
       tee_time_r4: string | null;
     }
-    
     const findEarliestTeeTime = (teeTimes: (string | null)[]): string | null => {
       const validTimes = teeTimes.filter((t): t is string => t !== null);
       if (validTimes.length === 0) return null;
       return validTimes.sort((a, b) => parseTime(a) - parseTime(b))[0];
     };
 
-    const shouldAdvanceToRound = (earliestTeeTime: string | null): boolean => {
-      if (!earliestTeeTime) return false;
-      const teeTimeMinutes = parseTime(earliestTeeTime);
-      const hoursUntil = (teeTimeMinutes - currentMinutes) / 60;
+    // Build full EST datetime for a round's first tee time (R2 = start_date+1, etc.)
+    const roundFirstTeeDate = (dayOffset: number, timeStr: string | null): Date | null => {
+      if (!timeStr) return null;
+      const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!match) return null;
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const period = match[3].toUpperCase();
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      const day = startDay + dayOffset;
+      const month = String(startMonth).padStart(2, '0');
+      const dayPadded = String(day).padStart(2, '0');
+      const estStr = `${startYear}-${month}-${dayPadded}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00-05:00`;
+      return new Date(estStr);
+    };
+
+    const shouldAdvanceToRound = (roundDayOffset: number, earliestTeeTime: string | null): boolean => {
+      const target = roundFirstTeeDate(roundDayOffset, earliestTeeTime);
+      if (!target) return false;
+      const hoursUntil = (target.getTime() - now.getTime()) / (1000 * 60 * 60);
       return hoursUntil <= 5 && hoursUntil > -2;
     };
 
-    // Check each round transition
     if (displayRound === 1) {
       const earliestR2 = findEarliestTeeTime(teeTimeData.map((t) => (t as unknown as TeeTimeRow).tee_time_r2));
-      if (shouldAdvanceToRound(earliestR2)) displayRound = 2;
+      if (shouldAdvanceToRound(1, earliestR2)) displayRound = 2;
     }
     if (displayRound === 2) {
       const earliestR3 = findEarliestTeeTime(teeTimeData.map((t) => (t as unknown as TeeTimeRow).tee_time_r3));
-      if (shouldAdvanceToRound(earliestR3)) displayRound = 3;
+      if (shouldAdvanceToRound(2, earliestR3)) displayRound = 3;
     }
     if (displayRound === 3) {
       const earliestR4 = findEarliestTeeTime(teeTimeData.map((t) => (t as unknown as TeeTimeRow).tee_time_r4));
-      if (shouldAdvanceToRound(earliestR4)) displayRound = 4;
+      if (shouldAdvanceToRound(3, earliestR4)) displayRound = 4;
     }
   }
 
