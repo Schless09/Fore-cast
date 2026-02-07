@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/sync-rankings",
       "schedule": "0 17 * * 1"
-    },
-    {
-      "path": "/api/cron/sync-tee-times",
-      "schedule": "0 6 * * 6,0"
     }
   ]
 }

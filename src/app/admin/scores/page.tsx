@@ -61,39 +61,22 @@ export default function AdminScoresPage() {
 
 
   const handleSyncFromRapidAPI = async () => {
-    if (!selectedTournament) {
-      setError('Please select a tournament');
-      return;
-    }
-
-    if (!selectedTournament.rapidapi_tourn_id) {
-      setError(`No RapidAPI Event ID found for ${selectedTournament.name}. Please update the tournament in the database.`);
-      return;
-    }
-
     setIsUpdating(true);
     setError(null);
     setMessage(null);
 
     try {
-      const response = await fetch('/api/scores/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tournamentId: selectedTournament.id,
-          liveGolfAPITournamentId: selectedTournament.rapidapi_tourn_id,
-        }),
-      });
-
+      const response = await fetch('/api/scores/auto-sync?force=true');
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to sync scores from RapidAPI');
+        throw new Error(result.error || 'Failed to sync scores');
       }
 
-      setMessage(`✅ ${result.message || 'Scores synced successfully from RapidAPI!'} Updated ${result.updatedCount || 0} players.`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to sync scores from RapidAPI');
+      setMessage(`✅ ${result.message || 'Scores synced successfully!'}`);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to sync scores';
+      setError(errorMsg);
     } finally {
       setIsUpdating(false);
     }
@@ -244,10 +227,9 @@ export default function AdminScoresPage() {
             <Button
               onClick={handleSyncFromRapidAPI}
               isLoading={isUpdating}
-              disabled={!selectedTournament || !selectedTournament.rapidapi_tourn_id}
               className="flex-1"
             >
-              🔄 Sync Scores from RapidAPI
+              🔄 Force Sync Scores
             </Button>
             <Button
               variant="outline"
@@ -282,8 +264,8 @@ export default function AdminScoresPage() {
             </li>
           </ul>
           <p className="text-xs text-gray-600 mt-4">
-            <strong>Note:</strong> For real-time updates during tournaments, set up a cron job to call{' '}
-            <code className="bg-gray-200 px-1 rounded text-xs">/api/scores/sync</code> periodically.
+            <strong>Note:</strong> Scores auto-sync every 15 minutes during tournament days (Thu-Sun) via the cron job.
+            Tee times are synced automatically from RapidAPI.
           </p>
         </CardContent>
       </Card>

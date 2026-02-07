@@ -28,7 +28,6 @@ export default clerkMiddleware(async (auth, req) => {
   // Score endpoints that require admin access (exclude /api/scores/live which is read-only)
   const isProtectedScoreEndpoint = 
     pathname === '/api/scores/update' ||
-    pathname === '/api/scores/sync' ||
     pathname === '/api/scores/calculate' ||
     pathname === '/api/scores/calculate-winnings';
   
