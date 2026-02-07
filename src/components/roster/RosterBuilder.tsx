@@ -262,46 +262,21 @@ export function RosterBuilder({
   }
 
   async function updateRoster(rosterId: string, budgetSpent: number) {
-    const supabase = createClient();
-
-    // Update roster name and budget (use username as roster name)
-    const { error: rosterError } = await supabase
-      .from('user_rosters')
-      .update({
+    // Use server API for roster updates (supports co-manager authorization)
+    const response = await fetch(`/api/rosters/${rosterId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         roster_name: username,
         budget_spent: budgetSpent,
-      })
-      .eq('id', rosterId);
+        player_ids: selectedPlayerIds,
+      }),
+    });
 
-    if (rosterError) throw rosterError;
-
-    // Remove existing roster players
-    const { error: deleteError } = await supabase
-      .from('roster_players')
-      .delete()
-      .eq('roster_id', rosterId);
-
-    if (deleteError) throw deleteError;
-
-    const { data: tournamentPlayersData, error: tpError } = await supabase
-      .from('tournament_players')
-      .select('id, pga_player_id, cost')
-      .eq('tournament_id', tournamentId)
-      .in('pga_player_id', selectedPlayerIds);
-
-    if (tpError) throw tpError;
-
-    const rosterPlayers = tournamentPlayersData!.map((tp) => ({
-      roster_id: rosterId,
-      tournament_player_id: tp.id,
-      player_cost: tp.cost ?? 0.2,
-    }));
-
-    const { error: rpError } = await supabase
-      .from('roster_players')
-      .insert(rosterPlayers);
-
-    if (rpError) throw rpError;
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to update roster');
+    }
   }
 
   if (isLoading) {

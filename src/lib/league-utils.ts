@@ -1,6 +1,58 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
+ * Check if a user can edit a specific roster.
+ * Returns true if the user is the roster owner OR a co-member of the owner's team in the given league.
+ */
+export async function canEditRoster(
+  supabase: SupabaseClient,
+  leagueId: string | null,
+  rosterOwnerId: string,
+  currentUserId: string
+): Promise<boolean> {
+  // Owner can always edit their own roster
+  if (currentUserId === rosterOwnerId) return true;
+
+  // Must be in a league context for co-member check
+  if (!leagueId) return false;
+
+  const { data } = await supabase
+    .from('team_co_members')
+    .select('id')
+    .eq('league_id', leagueId)
+    .eq('owner_id', rosterOwnerId)
+    .eq('co_member_id', currentUserId)
+    .maybeSingle();
+
+  return !!data;
+}
+
+/**
+ * Get the team owner info if the current user is a co-member in the given league.
+ * Returns null if the user is not a co-member.
+ */
+export async function getCoMemberOwner(
+  supabase: SupabaseClient,
+  leagueId: string,
+  currentUserId: string
+): Promise<{ ownerId: string; ownerUsername: string } | null> {
+  const { data } = await supabase
+    .from('team_co_members')
+    .select('owner_id, profiles!team_co_members_owner_id_fkey(username)')
+    .eq('league_id', leagueId)
+    .eq('co_member_id', currentUserId)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  const ownerProfile = data.profiles as unknown as { username: string } | null;
+  return {
+    ownerId: data.owner_id,
+    ownerUsername: ownerProfile?.username || 'Unknown',
+  };
+}
+
+/**
  * A league is "included in season standings" if it has at least one tournament
  * that is not excluded. Leagues with no league_tournaments config are included by default.
  */

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
-import { isTournamentIncludedInLeague, filterTournamentsIncludedInLeague } from '@/lib/league-utils';
+import { isTournamentIncludedInLeague, filterTournamentsIncludedInLeague, getCoMemberOwner } from '@/lib/league-utils';
 import { RosterSection } from '@/components/roster/RosterSection';
 import { PersonalLeaderboard } from '@/components/leaderboard/PersonalLeaderboard';
 import { LivePersonalLeaderboard } from '@/components/leaderboard/LivePersonalLeaderboard';
@@ -105,8 +105,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     );
   }
 
+  // Check if the current user is a co-manager of someone's team in this league
+  let coMemberOwner: { ownerId: string; ownerUsername: string } | null = null;
+  if (profile.active_league_id) {
+    coMemberOwner = await getCoMemberOwner(supabase, profile.active_league_id, profile.id);
+  }
+
   // Run remaining queries in parallel for faster page load
-  const [allTournamentsResult, existingRosterResult, teeTimeResult] = await Promise.all([
+  const [allTournamentsResult, existingRosterResult, coMemberRosterResult, teeTimeResult] = await Promise.all([
     // Get all tournaments for selector
     supabase
       .from('tournaments')
@@ -130,6 +136,25 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       .eq('tournament_id', id)
       .maybeSingle(),
     
+    // If user is a co-manager, also fetch the owner's roster for this tournament
+    coMemberOwner
+      ? supabase
+          .from('user_rosters')
+          .select(`
+            *,
+            roster_players(
+              *,
+              tournament_player:tournament_players(
+                *,
+                pga_player:pga_players(*)
+              )
+            )
+          `)
+          .eq('user_id', coMemberOwner.ownerId)
+          .eq('tournament_id', id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    
     // Get tee times for all players (for countdown and leaderboard display)
     supabase
       .from('tournament_players')
@@ -139,7 +164,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   ]);
 
   const allTournaments = allTournamentsResult.data;
-  const existingRoster = existingRosterResult.data;
+  // Use user's own roster if they have one, otherwise use the co-managed roster
+  const existingRoster = existingRosterResult.data || coMemberRosterResult.data;
+  const isViewingCoMemberRoster = !existingRosterResult.data && !!coMemberRosterResult.data;
   const teeTimeData = teeTimeResult.data;
 
   const tournamentIncluded = await isTournamentIncludedInLeague(
@@ -794,6 +821,13 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           </div>
         </CardHeader>
       </Card>
+
+      {/* Co-member notice */}
+      {isViewingCoMemberRoster && coMemberOwner && (
+        <div className="mb-4 p-3 bg-casino-gold/10 border border-casino-gold/30 rounded-lg text-sm text-casino-gold">
+          You&apos;re managing <strong>{coMemberOwner.ownerUsername}&apos;s</strong> team
+        </div>
+      )}
 
       {/* Lineup Countdown - shows for upcoming tournaments */}
       {tournament.status === 'upcoming' && (

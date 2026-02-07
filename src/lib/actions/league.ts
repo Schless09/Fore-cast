@@ -201,7 +201,7 @@ export async function checkUserLeague() {
   const { profile, error: authError } = await getProfileForClerkUser();
   
   if (authError || !profile) {
-    return { isAuthenticated: false, hasLeague: false, leagueName: null, leagues: [] };
+    return { isAuthenticated: false, hasLeague: false, leagueName: null, leagues: [], isCoMember: false };
   }
 
   const supabase = createServiceClient();
@@ -212,20 +212,40 @@ export async function checkUserLeague() {
     .select('league_id, leagues(id, name)')
     .eq('user_id', profile.id);
 
-  if (!memberships || memberships.length === 0) {
-    return { isAuthenticated: true, hasLeague: false, leagueName: null, leagues: [] };
+  if (memberships && memberships.length > 0) {
+    const activeLeague = memberships.find(
+      m => (m.leagues as unknown as JoinedLeague | null)?.id === profile.active_league_id
+    );
+
+    return { 
+      isAuthenticated: true,
+      hasLeague: true, 
+      leagueName: (activeLeague?.leagues as unknown as JoinedLeague | null)?.name || (memberships[0].leagues as unknown as JoinedLeague | null)?.name,
+      leagues: memberships.map(m => m.leagues as unknown as JoinedLeague | null),
+      isCoMember: false,
+    };
   }
 
-  const activeLeague = memberships.find(
-    m => (m.leagues as unknown as JoinedLeague | null)?.id === profile.active_league_id
-  );
+  // Not a league member - check if they're a co-manager of someone's team
+  const { data: coMembership } = await supabase
+    .from('team_co_members')
+    .select('league_id, leagues:league_id(id, name)')
+    .eq('co_member_id', profile.id)
+    .limit(1)
+    .maybeSingle();
 
-  return { 
-    isAuthenticated: true,
-    hasLeague: true, 
-    leagueName: (activeLeague?.leagues as unknown as JoinedLeague | null)?.name || (memberships[0].leagues as unknown as JoinedLeague | null)?.name,
-    leagues: memberships.map(m => m.leagues as unknown as JoinedLeague | null)
-  };
+  if (coMembership) {
+    const league = coMembership.leagues as unknown as JoinedLeague | null;
+    return {
+      isAuthenticated: true,
+      hasLeague: true,
+      leagueName: league?.name || null,
+      leagues: league ? [league] : [],
+      isCoMember: true,
+    };
+  }
+
+  return { isAuthenticated: true, hasLeague: false, leagueName: null, leagues: [], isCoMember: false };
 }
 
 export async function getUserLeagues() {
@@ -566,6 +586,278 @@ export async function uploadVenmoQRCode(leagueId: string, formData: FormData) {
     .getPublicUrl(filePath);
 
   return { success: true, publicUrl };
+}
+
+// =========================================
+// Team Co-Manager Actions
+// =========================================
+
+// Create a team invite link (owner generates this to share with a co-manager)
+export async function createTeamInvite(leagueId: string) {
+  const { profile, error: authError } = await getProfileForClerkUser();
+  
+  if (authError || !profile) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  const supabase = createServiceClient();
+
+  // Verify user is a league member (team owner)
+  const { data: membership } = await supabase
+    .from('league_members')
+    .select('id')
+    .eq('user_id', profile.id)
+    .eq('league_id', leagueId)
+    .single();
+
+  if (!membership) {
+    return { success: false, error: 'You must be a league member to create a team invite' };
+  }
+
+  // Generate a unique invite code
+  const { data: codeResult, error: codeError } = await supabase
+    .rpc('generate_invite_code');
+
+  if (codeError || !codeResult) {
+    return { success: false, error: 'Failed to generate invite code' };
+  }
+
+  // Create the team invite
+  const { data: invite, error: inviteError } = await supabase
+    .from('team_invites')
+    .insert({
+      league_id: leagueId,
+      owner_id: profile.id,
+      invite_code: codeResult,
+    })
+    .select('id, invite_code')
+    .single();
+
+  if (inviteError || !invite) {
+    return { success: false, error: 'Failed to create team invite' };
+  }
+
+  return {
+    success: true,
+    inviteCode: invite.invite_code,
+    inviteUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/team-invite/${invite.invite_code}`,
+  };
+}
+
+// Accept a team invite and become a co-manager
+export async function acceptTeamInvite(inviteCode: string) {
+  const { profile, error: authError } = await getProfileForClerkUser();
+
+  if (authError || !profile) {
+    return { success: false, error: 'Not authenticated', requiresAuth: true };
+  }
+
+  const supabase = createServiceClient();
+
+  // Get invite details
+  const { data: invite, error: inviteError } = await supabase
+    .from('team_invites')
+    .select(`
+      id,
+      league_id,
+      owner_id,
+      max_uses,
+      current_uses,
+      is_active,
+      expires_at
+    `)
+    .eq('invite_code', inviteCode)
+    .single();
+
+  if (inviteError || !invite) {
+    return { success: false, error: 'Invalid invite code' };
+  }
+
+  // Validate invite
+  if (!invite.is_active) {
+    return { success: false, error: 'This invite is no longer active' };
+  }
+
+  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+    return { success: false, error: 'This invite has expired' };
+  }
+
+  if (invite.max_uses && invite.current_uses >= invite.max_uses) {
+    return { success: false, error: 'This invite has reached its maximum uses' };
+  }
+
+  // Can't be a co-manager of your own team
+  if (invite.owner_id === profile.id) {
+    return { success: false, error: 'You cannot be a co-manager of your own team' };
+  }
+
+  // Check if already a co-manager
+  const { data: existingCoMember } = await supabase
+    .from('team_co_members')
+    .select('id')
+    .eq('league_id', invite.league_id)
+    .eq('owner_id', invite.owner_id)
+    .eq('co_member_id', profile.id)
+    .maybeSingle();
+
+  if (existingCoMember) {
+    // Already a co-manager, just update their active league
+    await supabase
+      .from('profiles')
+      .update({ active_league_id: invite.league_id })
+      .eq('id', profile.id);
+
+    return {
+      success: true,
+      message: 'You are already a co-manager of this team',
+      leagueId: invite.league_id,
+    };
+  }
+
+  // Add as co-manager
+  const { error: insertError } = await supabase
+    .from('team_co_members')
+    .insert({
+      league_id: invite.league_id,
+      owner_id: invite.owner_id,
+      co_member_id: profile.id,
+    });
+
+  if (insertError) {
+    console.error('Error adding co-manager:', insertError);
+    return { success: false, error: 'Failed to join team' };
+  }
+
+  // Set the co-manager's active league to the owner's league
+  await supabase
+    .from('profiles')
+    .update({ active_league_id: invite.league_id })
+    .eq('id', profile.id);
+
+  // Increment invite usage count
+  await supabase
+    .from('team_invites')
+    .update({ current_uses: invite.current_uses + 1 })
+    .eq('id', invite.id);
+
+  // Get owner username for display
+  const { data: ownerProfile } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', invite.owner_id)
+    .single();
+
+  return {
+    success: true,
+    message: `You are now a co-manager of ${ownerProfile?.username || 'the team'}'s team!`,
+    leagueId: invite.league_id,
+    ownerUsername: ownerProfile?.username || null,
+  };
+}
+
+// Get co-managers for the current user's team in a league
+export async function getTeamCoMembers(leagueId: string) {
+  const { profile, error: authError } = await getProfileForClerkUser();
+
+  if (authError || !profile) {
+    return { success: false, error: 'Not authenticated', coMembers: [] };
+  }
+
+  const supabase = createServiceClient();
+
+  const { data: coMembers, error } = await supabase
+    .from('team_co_members')
+    .select(`
+      id,
+      co_member_id,
+      created_at,
+      profiles!team_co_members_co_member_id_fkey(id, username, email)
+    `)
+    .eq('league_id', leagueId)
+    .eq('owner_id', profile.id);
+
+  if (error) {
+    console.error('Error fetching co-managers:', error);
+    return { success: false, error: 'Failed to load co-managers', coMembers: [] };
+  }
+
+  return {
+    success: true,
+    coMembers: (coMembers || []).map((cm) => {
+      const p = cm.profiles as unknown as { id: string; username: string; email: string } | null;
+      return {
+        id: cm.id,
+        co_member_id: cm.co_member_id,
+        username: p?.username || 'Unknown',
+        email: p?.email || '',
+        created_at: cm.created_at,
+      };
+    }),
+  };
+}
+
+// Remove a co-manager from the current user's team
+export async function removeTeamCoMember(leagueId: string, coMemberId: string) {
+  const { profile, error: authError } = await getProfileForClerkUser();
+
+  if (authError || !profile) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  const supabase = createServiceClient();
+
+  const { error: deleteError } = await supabase
+    .from('team_co_members')
+    .delete()
+    .eq('league_id', leagueId)
+    .eq('owner_id', profile.id)
+    .eq('co_member_id', coMemberId);
+
+  if (deleteError) {
+    console.error('Error removing co-manager:', deleteError);
+    return { success: false, error: 'Failed to remove co-manager' };
+  }
+
+  return { success: true };
+}
+
+// Check if the current user is a co-manager of someone's team in a league
+export async function getCoMembershipInfo() {
+  const { profile, error: authError } = await getProfileForClerkUser();
+
+  if (authError || !profile) {
+    return null;
+  }
+
+  if (!profile.active_league_id) {
+    return null;
+  }
+
+  const supabase = createServiceClient();
+
+  const { data: coMembership } = await supabase
+    .from('team_co_members')
+    .select(`
+      id,
+      league_id,
+      owner_id,
+      profiles!team_co_members_owner_id_fkey(id, username)
+    `)
+    .eq('league_id', profile.active_league_id)
+    .eq('co_member_id', profile.id)
+    .maybeSingle();
+
+  if (!coMembership) {
+    return null;
+  }
+
+  const ownerProfile = coMembership.profiles as unknown as { id: string; username: string } | null;
+
+  return {
+    leagueId: coMembership.league_id,
+    ownerId: coMembership.owner_id,
+    ownerUsername: ownerProfile?.username || 'Unknown',
+  };
 }
 
 // Accept an invite and join the league

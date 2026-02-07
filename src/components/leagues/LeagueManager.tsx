@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { JoinLeagueModal } from './JoinLeagueModal';
-import { switchLeague, leaveLeague, createLeagueInvite } from '@/lib/actions/league';
+import { switchLeague, leaveLeague, createLeagueInvite, createTeamInvite, getTeamCoMembers, removeTeamCoMember } from '@/lib/actions/league';
 
 interface League {
   id: string;
@@ -20,12 +20,27 @@ interface LeagueManagerProps {
   initialActiveLeagueId: string | null;
 }
 
+interface CoMember {
+  id: string;
+  co_member_id: string;
+  username: string;
+  email: string;
+}
+
 export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueManagerProps) {
   const [showModal, setShowModal] = useState(false);
   const [activeLeagueId, setActiveLeagueId] = useState(initialActiveLeagueId);
   const [loading, setLoading] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState<string | null>(null);
+  // Co-member state
+  const [teamInviteUrl, setTeamInviteUrl] = useState<string | null>(null);
+  const [showTeamInvite, setShowTeamInvite] = useState<string | null>(null);
+  const [showCoMembers, setShowCoMembers] = useState<string | null>(null);
+  const [coMembers, setCoMembers] = useState<CoMember[]>([]);
+  const [loadingCoMembers, setLoadingCoMembers] = useState(false);
+  const [removingCoMember, setRemovingCoMember] = useState<string | null>(null);
+  const [copiedTeamInvite, setCopiedTeamInvite] = useState(false);
   const router = useRouter();
 
   const handleSwitchLeague = async (leagueId: string) => {
@@ -73,6 +88,72 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueM
       navigator.clipboard.writeText(inviteUrl);
       alert('Invite link copied to clipboard!');
     }
+  };
+
+  const handleToggleCoMembers = async (leagueId: string) => {
+    if (showCoMembers === leagueId) {
+      // Close panel
+      setShowCoMembers(null);
+      setShowTeamInvite(null);
+      setTeamInviteUrl(null);
+      return;
+    }
+
+    // Open panel and fetch co-members
+    setShowCoMembers(leagueId);
+    setShowTeamInvite(null);
+    setTeamInviteUrl(null);
+    setLoadingCoMembers(true);
+
+    const result = await getTeamCoMembers(leagueId);
+    if (result.success) {
+      setCoMembers(result.coMembers);
+    }
+    setLoadingCoMembers(false);
+  };
+
+  const handleGenerateTeamInvite = async (leagueId: string) => {
+    setLoading(`team-${leagueId}`);
+    const result = await createTeamInvite(leagueId);
+
+    if (result.success && result.inviteUrl) {
+      setTeamInviteUrl(result.inviteUrl);
+      setShowTeamInvite(leagueId);
+    } else {
+      alert(result.error || 'Failed to generate team invite link');
+    }
+    setLoading(null);
+  };
+
+  const copyTeamInvite = async () => {
+    if (!teamInviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(teamInviteUrl);
+      setCopiedTeamInvite(true);
+      setTimeout(() => setCopiedTeamInvite(false), 2000);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = teamInviteUrl;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedTeamInvite(true);
+      setTimeout(() => setCopiedTeamInvite(false), 2000);
+    }
+  };
+
+  const handleRemoveCoMember = async (leagueId: string, coMemberId: string, username: string) => {
+    if (!confirm(`Remove ${username} as a co-manager of your team?`)) return;
+
+    setRemovingCoMember(coMemberId);
+    const result = await removeTeamCoMember(leagueId, coMemberId);
+    if (result.success) {
+      setCoMembers((prev) => prev.filter((cm) => cm.co_member_id !== coMemberId));
+    } else {
+      alert(result.error || 'Failed to remove co-manager');
+    }
+    setRemovingCoMember(null);
   };
 
   return (
@@ -155,6 +236,14 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueM
                         >
                           📨 Invite
                         </Button>
+                        <Button
+                          onClick={() => handleToggleCoMembers(league.id)}
+                          variant="outline"
+                          size="sm"
+                          className="text-casino-green border-casino-green/30 hover:bg-casino-green/10"
+                        >
+                          {showCoMembers === league.id ? '✕ Close' : '🤝 Co-Manager'}
+                        </Button>
                         {!isActive && (
                           <Button
                             onClick={() => handleSwitchLeague(league.id)}
@@ -206,6 +295,87 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueM
                         <p className="text-xs text-casino-gray mt-2">
                           Anyone with this link can join your league (if they have an account or create one)
                         </p>
+                      </div>
+                    )}
+
+                    {/* Co-Member Management Panel */}
+                    {showCoMembers === league.id && (
+                      <div className="mt-2 p-4 bg-casino-green/5 border border-casino-green/20 rounded-lg">
+                        <h4 className="text-sm font-medium text-casino-text mb-1">
+                          🤝 Team Co-Managers
+                        </h4>
+                        <p className="text-xs text-casino-gray mb-3">
+                          Co-managers can view and edit your roster. They don&apos;t have their own team.
+                        </p>
+
+                        {/* Current co-members list */}
+                        {loadingCoMembers ? (
+                          <p className="text-xs text-casino-gray">Loading...</p>
+                        ) : coMembers.length > 0 ? (
+                          <div className="space-y-2 mb-3">
+                            {coMembers.map((cm) => (
+                              <div
+                                key={cm.id}
+                                className="flex items-center justify-between p-2 bg-casino-dark rounded"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-casino-text">
+                                    {cm.username}
+                                  </span>
+                                  <span className="text-xs text-casino-gray">
+                                    {cm.email}
+                                  </span>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleRemoveCoMember(league.id, cm.co_member_id, cm.username)}
+                                  disabled={removingCoMember === cm.co_member_id}
+                                  className="text-red-400 hover:text-red-300 text-xs"
+                                >
+                                  {removingCoMember === cm.co_member_id ? '...' : 'Remove'}
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-casino-gray mb-3">
+                            No co-managers yet.
+                          </p>
+                        )}
+
+                        {/* Generate team invite link */}
+                        {showTeamInvite === league.id && teamInviteUrl ? (
+                          <div className="space-y-2">
+                            <label className="text-xs text-casino-gray">
+                              Share this link with your co-manager:
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={teamInviteUrl}
+                                readOnly
+                                className="flex-1 px-3 py-2 bg-casino-dark border border-casino-green/30 rounded text-sm text-casino-text"
+                              />
+                              <Button size="sm" onClick={copyTeamInvite}>
+                                {copiedTeamInvite ? 'Copied!' : 'Copy'}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-casino-gray">
+                              Single-use link. Generate a new one if needed.
+                            </p>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleGenerateTeamInvite(league.id)}
+                            disabled={loading === `team-${league.id}`}
+                            className="text-casino-green border-casino-green/30 hover:bg-casino-green/10"
+                          >
+                            {loading === `team-${league.id}` ? 'Generating...' : 'Generate Invite Link'}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>

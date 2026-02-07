@@ -1,37 +1,63 @@
 'use client';
 
 import { SignUp } from '@clerk/nextjs';
+import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
 function SignUpContent() {
+  const searchParams = useSearchParams();
+  const teamInvite = searchParams.get('team_invite');
+  const teamName = searchParams.get('team');
+  const leagueName = searchParams.get('league');
+
+  const redirectUrl = teamInvite
+    ? `/team-invite/${teamInvite}`
+    : '/the-money-board';
+
   return (
-    <SignUp 
-      routing="hash"
-      afterSignUpUrl="/the-money-board"
-      afterSignInUrl="/the-money-board"
-      appearance={{
-        elements: {
-          rootBox: 'w-full',
-          card: 'bg-casino-card border border-casino-gold/30 shadow-xl',
-          headerTitle: 'text-casino-gold font-orbitron',
-          headerSubtitle: 'text-casino-gray',
-          socialButtonsBlockButton: 'bg-casino-elevated border border-casino-gold/50 text-casino-text hover:bg-casino-card hover:border-casino-gold/70',
-          formFieldLabel: 'text-casino-text',
-          formFieldInput: 'bg-casino-elevated border border-casino-gold/50 text-casino-text focus:border-casino-gold focus:ring-1 focus:ring-casino-gold/50',
-          footerActionLink: 'text-casino-green hover:text-casino-gold',
-          formButtonPrimary: 'bg-casino-gold hover:bg-casino-gold/90 text-black',
-          dividerLine: 'bg-casino-gold/30',
-          dividerText: 'text-casino-gray',
-        },
-        variables: {
-          colorPrimary: '#fbbf24',
-          colorBackground: '#1a1a2e',
-          colorText: '#e5e5e5',
-          colorTextSecondary: '#9ca3af',
-          borderRadius: '0.5rem',
-        },
-      }}
-    />
+    <>
+      {teamInvite && (teamName || leagueName) && (
+        <div className="mb-6 p-4 bg-casino-elevated border border-casino-green/30 rounded-lg text-center">
+          <p className="text-casino-gray text-sm">You&apos;ve been invited to co-manage</p>
+          <p className="text-casino-green font-semibold text-lg">
+            {teamName ? decodeURIComponent(teamName) : 'a team'}
+          </p>
+          {leagueName && (
+            <p className="text-casino-gray text-sm mt-1">
+              in <span className="text-casino-gold">{decodeURIComponent(leagueName)}</span>
+            </p>
+          )}
+          <p className="text-casino-gray text-sm mt-1">Create an account to get started</p>
+        </div>
+      )}
+      <SignUp 
+        routing="hash"
+        afterSignUpUrl={redirectUrl}
+        afterSignInUrl={redirectUrl}
+        appearance={{
+          elements: {
+            rootBox: 'w-full',
+            card: 'bg-casino-card border border-casino-gold/30 shadow-xl',
+            headerTitle: 'text-casino-gold font-orbitron',
+            headerSubtitle: 'text-casino-gray',
+            socialButtonsBlockButton: 'bg-casino-elevated border border-casino-gold/50 text-casino-text hover:bg-casino-card hover:border-casino-gold/70',
+            formFieldLabel: 'text-casino-text',
+            formFieldInput: 'bg-casino-elevated border border-casino-gold/50 text-casino-text focus:border-casino-gold focus:ring-1 focus:ring-casino-gold/50',
+            footerActionLink: 'text-casino-green hover:text-casino-gold',
+            formButtonPrimary: 'bg-casino-gold hover:bg-casino-gold/90 text-black',
+            dividerLine: 'bg-casino-gold/30',
+            dividerText: 'text-casino-gray',
+          },
+          variables: {
+            colorPrimary: '#fbbf24',
+            colorBackground: '#1a1a2e',
+            colorText: '#e5e5e5',
+            colorTextSecondary: '#9ca3af',
+            borderRadius: '0.5rem',
+          },
+        }}
+      />
+    </>
   );
 }
 
