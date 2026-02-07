@@ -19,6 +19,7 @@ interface LeaderboardRow {
   apiPlayerId?: string; // Player ID from RapidAPI for scorecard lookup
   roundComplete?: boolean; // Whether player finished current round
   is_amateur?: boolean; // Amateurs cannot collect prize money
+  teeTime?: string; // Tee time from RapidAPI (e.g., "11:35am")
 }
 
 interface TeeTimeData {
@@ -45,6 +46,7 @@ interface APIScorecard {
   currentRoundScore: string;
   roundComplete?: boolean;
   isAmateur?: boolean;
+  teeTime?: string; // Tee time from RapidAPI (e.g., "11:35am")
 }
 
 interface LiveLeaderboardProps {
@@ -299,6 +301,7 @@ export function LiveLeaderboard({
           apiPlayerId: scorecard.playerId, // Store API player ID for scorecard lookup
           roundComplete: scorecard.roundComplete === true, // Whether player finished current round
           is_amateur: isAmateur,
+          teeTime: scorecard.teeTime, // Carry through RapidAPI tee time
         };
       });
 
@@ -606,10 +609,14 @@ export function LiveLeaderboard({
                     /* Player is on course - show holes completed */
                     <span className="text-casino-blue">{row.thru}</span>
                   ) : (() => {
+                    // Primary: use teeTime directly from RapidAPI cached data
+                    if (row.teeTime) {
+                      return <span className="text-casino-gray">{row.teeTime}</span>;
+                    }
+                    // Fallback: look up from DB tee time map
                     const teeTimeData = getTeeTimeDataForPlayer(teeTimeMap, row.name);
                     const teeTimeStr = getTeeTimeForRound(teeTimeData, currentRound);
                     return teeTimeStr ? (
-                      /* Player hasn't started - show tee time (same as personal leaderboard / weekly standings) */
                       <span className="text-casino-gray">{teeTimeStr}</span>
                     ) : null;
                   })() ?? (

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { shouldPollNow, getPollingDebugInfo } from '@/lib/polling-config';
+import { shouldPollNow } from '@/lib/polling-config';
 
 /**
  * Smart Auto-sync endpoint for Vercel Cron
@@ -10,15 +10,161 @@ import { shouldPollNow, getPollingDebugInfo } from '@/lib/polling-config';
  * - Uses RapidAPI (Live Golf Data) instead of LiveGolfAPI
  * - Stores results in Supabase cache for all users
  * - Logs API calls for monitoring rate limits
+ * - Auto-syncs R1/R2 tee times for upcoming tournaments (1-2 days before)
+ * - Auto-writes current round tee times from leaderboard data
  * 
- * Cron runs every 3 minutes, but we check shouldPollNow() to determine
+ * Cron runs every 4 minutes, but we check shouldPollNow() to determine
  * if we actually make an API call based on tournament schedule.
  */
 
 const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com';
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
 
-// No more mapping needed - rapidapi_tourn_id now stores the RapidAPI tournId directly (e.g., "002", "004")
+// Fuzzy name normalization for matching API names to DB names
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove combining diacritical marks
+    .replace(/ø/g, 'o')
+    .replace(/ö/g, 'o')
+    .replace(/ü/g, 'u')
+    .replace(/é/g, 'e')
+    .replace(/á/g, 'a')
+    .replace(/í/g, 'i')
+    .replace(/å/g, 'a')
+    .replace(/\./g, '')
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Sync R1/R2 tee times from RapidAPI tournament endpoint for upcoming tournaments.
+ * Called automatically when a tournament is 1-2 days away and tee times haven't been set.
+ */
+async function syncPreTournamentTeeTimes(
+  supabase: ReturnType<typeof createServiceClient>,
+  tournament: { id: string; name: string; rapidapi_tourn_id: string; start_date: string }
+): Promise<{ success: boolean; message: string }> {
+  const year = new Date(tournament.start_date).getFullYear().toString();
+  const tournId = tournament.rapidapi_tourn_id;
+
+  try {
+    console.log(`[AUTO-SYNC] 📋 Fetching R1/R2 tee times for ${tournament.name}...`);
+
+    const response = await fetch(
+      `https://${RAPIDAPI_HOST}/tournament?year=${year}&tournId=${tournId}&orgId=1`,
+      {
+        headers: {
+          'X-RapidAPI-Host': RAPIDAPI_HOST,
+          'X-RapidAPI-Key': RAPIDAPI_KEY,
+        },
+        cache: 'no-store',
+      }
+    );
+
+    if (!response.ok) {
+      return { success: false, message: `RapidAPI tournament endpoint returned ${response.status}` };
+    }
+
+    const json = await response.json();
+    const players = json.players || [];
+
+    if (players.length === 0) {
+      return { success: false, message: 'No players in tournament data' };
+    }
+
+    // Get tournament_players with their pga_player names for matching
+    const { data: tournamentPlayers, error: tpError } = await supabase
+      .from('tournament_players')
+      .select('id, pga_player_id, pga_players(name)')
+      .eq('tournament_id', tournament.id);
+
+    if (tpError || !tournamentPlayers) {
+      return { success: false, message: `Failed to fetch tournament players: ${tpError?.message}` };
+    }
+
+    // Build a map of normalized name -> tournament_player ID
+    const nameToIdMap = new Map<string, string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tournamentPlayers.forEach((tp: any) => {
+      const pgaPlayer = Array.isArray(tp.pga_players) ? tp.pga_players[0] : tp.pga_players;
+      const playerName = pgaPlayer?.name;
+      if (playerName) {
+        nameToIdMap.set(normalizeName(playerName), tp.id);
+      }
+    });
+
+    let matchedCount = 0;
+    const unmatchedNames: string[] = [];
+
+    for (const apiPlayer of players) {
+      const fullName = `${apiPlayer.firstName} ${apiPlayer.lastName}`;
+      const normalizedApiName = normalizeName(fullName);
+
+      // Try exact match, then last name match
+      let tpId = nameToIdMap.get(normalizedApiName);
+
+      if (!tpId) {
+        // Try matching by last name only (handles first name variations)
+        const apiLast = normalizeName(apiPlayer.lastName);
+        const apiFirst = normalizeName(apiPlayer.firstName);
+        for (const [dbName, id] of nameToIdMap.entries()) {
+          const dbParts = dbName.split(' ');
+          const dbLast = dbParts[dbParts.length - 1];
+          const dbFirst = dbParts[0];
+          if (dbLast === apiLast && (dbFirst === apiFirst || dbFirst.startsWith(apiFirst) || apiFirst.startsWith(dbFirst))) {
+            tpId = id;
+            break;
+          }
+        }
+      }
+
+      if (!tpId) {
+        unmatchedNames.push(fullName);
+        continue;
+      }
+
+      const teeTimes = apiPlayer.teeTimes || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const r1 = teeTimes.find((t: any) => (t.roundId?.$numberInt || t.roundId) === 1 || (t.roundId?.$numberInt || t.roundId) === '1');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const r2 = teeTimes.find((t: any) => (t.roundId?.$numberInt || t.roundId) === 2 || (t.roundId?.$numberInt || t.roundId) === '2');
+
+      const updateData: Record<string, string | number | null> = {};
+
+      if (r1?.teeTime) {
+        updateData.tee_time_r1 = r1.teeTime;
+        updateData.starting_tee_r1 = r1.startingHole || 1;
+      }
+      if (r2?.teeTime) {
+        updateData.tee_time_r2 = r2.teeTime;
+        updateData.starting_tee_r2 = r2.startingHole || 1;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        const { error } = await supabase
+          .from('tournament_players')
+          .update(updateData)
+          .eq('id', tpId);
+
+        if (!error) matchedCount++;
+      }
+    }
+
+    const msg = `Synced R1/R2 tee times: ${matchedCount}/${players.length} matched`;
+    if (unmatchedNames.length > 0) {
+      console.log(`[AUTO-SYNC] Unmatched players: ${unmatchedNames.join(', ')}`);
+    }
+    console.log(`[AUTO-SYNC] ${msg}`);
+    return { success: true, message: msg };
+
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[AUTO-SYNC] Error syncing tee times for ${tournament.name}:`, msg);
+    return { success: false, message: msg };
+  }
+}
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
@@ -46,20 +192,43 @@ export async function GET(request: NextRequest) {
     console.log(`[AUTO-SYNC] Should poll: ${pollStatus.shouldPoll} - ${pollStatus.reason}`);
 
     // Auto-activate upcoming tournaments that have started
-    // Check for tournaments where first tee time has passed
+    // Also auto-sync R1/R2 tee times for tournaments starting within 2 days
     const { data: upcomingTournaments } = await supabase
       .from('tournaments')
-      .select('id, name, start_date')
+      .select('id, name, start_date, rapidapi_tourn_id')
       .eq('status', 'upcoming');
 
     if (upcomingTournaments && upcomingTournaments.length > 0) {
       for (const tournament of upcomingTournaments) {
-        // Get earliest tee time for this tournament
+        const startDate = new Date(tournament.start_date + 'T00:00:00-05:00'); // EST
+        const daysUntilStart = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+
+        // Auto-sync R1/R2 tee times if tournament starts within 2 days and has a RapidAPI ID
+        if (daysUntilStart <= 2 && daysUntilStart > -1 && tournament.rapidapi_tourn_id) {
+          // Check if R1 tee times already exist (non-null and non-"-")
+          const { data: existingTeeTimes } = await supabase
+            .from('tournament_players')
+            .select('tee_time_r1')
+            .eq('tournament_id', tournament.id)
+            .not('tee_time_r1', 'is', null)
+            .neq('tee_time_r1', '-')
+            .limit(1);
+
+          const hasTeeTimes = existingTeeTimes && existingTeeTimes.length > 0;
+
+          if (!hasTeeTimes) {
+            console.log(`[AUTO-SYNC] 📋 ${tournament.name} starts in ${daysUntilStart.toFixed(1)} days, syncing tee times...`);
+            await syncPreTournamentTeeTimes(supabase, tournament);
+          }
+        }
+
+        // Get earliest tee time for this tournament to determine activation time
         const { data: teeTimeData } = await supabase
           .from('tournament_players')
           .select('tee_time_r1')
           .eq('tournament_id', tournament.id)
           .not('tee_time_r1', 'is', null)
+          .neq('tee_time_r1', '-')
           .limit(200);
 
         // Parse and find earliest tee time (default to 7:00 AM if none set)
@@ -80,7 +249,7 @@ export async function GET(request: NextRequest) {
 
           const teeTimes = teeTimeData
             .map((t: { tee_time_r1: string | null }) => t.tee_time_r1)
-            .filter((t): t is string => t !== null);
+            .filter((t): t is string => t !== null && t !== '-');
 
           if (teeTimes.length > 0) {
             const sorted = teeTimes.sort((a, b) => parseTime(a) - parseTime(b));
@@ -141,8 +310,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // If we shouldn't poll now, just return status
-    if (!pollStatus.shouldPoll) {
+    // Allow force bypass with ?force=true for manual triggering
+    const forceSync = request.nextUrl.searchParams.get('force') === 'true';
+    
+    // If we shouldn't poll now, just return status (unless forced)
+    if (!pollStatus.shouldPoll && !forceSync) {
       return NextResponse.json({
         success: true,
         message: `Skipping sync: ${pollStatus.reason}`,
@@ -306,6 +478,67 @@ export async function GET(request: NextRequest) {
             .update({ current_round: roundId })
             .eq('id', tournament.id);
           console.log(`[AUTO-SYNC] 📍 Updated ${tournament.name} to Round ${roundId}`);
+
+          // When round advances, write tee times from leaderboard data to DB
+          // This handles R3/R4 tee times automatically (and refreshes R1/R2 if needed)
+          if (roundId >= 1 && roundId <= 4) {
+            const teeTimeColumn = `tee_time_r${roundId}`;
+            const startingTeeColumn = `starting_tee_r${roundId}`;
+
+            // Get tournament_players for matching
+            const { data: tpData } = await supabase
+              .from('tournament_players')
+              .select('id, pga_player_id, pga_players(name)')
+              .eq('tournament_id', tournament.id);
+
+            if (tpData && tpData.length > 0) {
+              // Build name -> id map
+              const nameMap = new Map<string, string>();
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              tpData.forEach((tp: any) => {
+                const pgaPlayer = Array.isArray(tp.pga_players) ? tp.pga_players[0] : tp.pga_players;
+                if (pgaPlayer?.name) {
+                  nameMap.set(normalizeName(pgaPlayer.name), tp.id);
+                }
+              });
+
+              let teeTimeUpdates = 0;
+              for (const playerData of transformedData) {
+                if (!playerData.teeTime) continue;
+
+                const normalizedApiName = normalizeName(playerData.player);
+                let tpId = nameMap.get(normalizedApiName);
+
+                // Fuzzy match by last name + first name prefix
+                if (!tpId) {
+                  const apiParts = normalizedApiName.split(' ');
+                  const apiFirst = apiParts[0];
+                  const apiLast = apiParts[apiParts.length - 1];
+                  for (const [dbName, id] of nameMap.entries()) {
+                    const dbParts = dbName.split(' ');
+                    const dbLast = dbParts[dbParts.length - 1];
+                    const dbFirst = dbParts[0];
+                    if (dbLast === apiLast && (dbFirst === apiFirst || dbFirst.startsWith(apiFirst) || apiFirst.startsWith(dbFirst))) {
+                      tpId = id;
+                      break;
+                    }
+                  }
+                }
+
+                if (tpId) {
+                  await supabase
+                    .from('tournament_players')
+                    .update({ [teeTimeColumn]: playerData.teeTime, [startingTeeColumn]: 1 })
+                    .eq('id', tpId);
+                  teeTimeUpdates++;
+                }
+              }
+
+              if (teeTimeUpdates > 0) {
+                console.log(`[AUTO-SYNC] 📋 Wrote ${teeTimeUpdates} R${roundId} tee times to DB for ${tournament.name}`);
+              }
+            }
+          }
         }
 
         // Auto-update tournament status if completed

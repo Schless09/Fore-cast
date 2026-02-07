@@ -40,6 +40,7 @@ interface LiveScore {
   currentRoundScore: string;
   roundComplete?: boolean;
   isAmateur?: boolean;
+  teeTime?: string; // Tee time from RapidAPI (e.g., "11:35am")
 }
 
 interface LiveTeamStandingsProps {
@@ -614,6 +615,8 @@ export function LiveTeamStandings({
                       if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
                         return <span className="text-casino-blue">{player.liveScore.thru}</span>;
                       }
+                      // Primary: RapidAPI tee time, fallback: DB tee time
+                      if (player.liveScore?.teeTime) return <span className="text-casino-gray">{player.liveScore.teeTime}</span>;
                       if (teeTime) return <span className="text-casino-gray">{convertESTtoLocal(teeTime)}</span>;
                       return <span className="text-casino-gray-dark">-</span>;
                     })();
