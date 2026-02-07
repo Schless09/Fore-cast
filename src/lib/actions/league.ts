@@ -821,6 +821,30 @@ export async function removeTeamCoMember(leagueId: string, coMemberId: string) {
   return { success: true };
 }
 
+// Leave a co-manager role (called by the co-manager themselves)
+export async function leaveCoManagerRole(leagueId: string) {
+  const { profile, error: authError } = await getProfileForClerkUser();
+
+  if (authError || !profile) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  const supabase = createServiceClient();
+
+  const { error: deleteError } = await supabase
+    .from('team_co_members')
+    .delete()
+    .eq('league_id', leagueId)
+    .eq('co_member_id', profile.id);
+
+  if (deleteError) {
+    console.error('Error leaving co-manager role:', deleteError);
+    return { success: false, error: 'Failed to leave co-manager role' };
+  }
+
+  return { success: true };
+}
+
 // Check if the current user is a co-manager of someone's team in a league
 export async function getCoMembershipInfo() {
   const { profile, error: authError } = await getProfileForClerkUser();

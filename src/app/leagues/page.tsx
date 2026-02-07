@@ -88,6 +88,32 @@ export default async function LeaguesPage() {
 
   const activeLeagueId = profile?.active_league_id || null;
 
+  // Get teams the user co-manages
+  const { data: coManagedTeams } = await supabase
+    .from('team_co_members')
+    .select(`
+      id,
+      league_id,
+      owner_id,
+      created_at,
+      leagues:league_id(id, name),
+      profiles!team_co_members_owner_id_fkey(id, username)
+    `)
+    .eq('co_member_id', profile?.id);
+
+  const coManagedData = (coManagedTeams || []).map((cm) => {
+    const league = Array.isArray(cm.leagues) ? cm.leagues[0] : cm.leagues;
+    const owner = cm.profiles as unknown as { id: string; username: string } | null;
+    return {
+      id: cm.id,
+      leagueId: league?.id ?? '',
+      leagueName: league?.name ?? '',
+      ownerId: cm.owner_id,
+      ownerUsername: owner?.username ?? 'Unknown',
+      createdAt: cm.created_at,
+    };
+  });
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-8">
@@ -102,6 +128,7 @@ export default async function LeaguesPage() {
       <LeagueManager 
         initialLeagues={leagues} 
         initialActiveLeagueId={activeLeagueId}
+        coManagedTeams={coManagedData}
       />
     </div>
   );

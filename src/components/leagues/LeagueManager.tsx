@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { JoinLeagueModal } from './JoinLeagueModal';
-import { switchLeague, leaveLeague, createLeagueInvite, createTeamInvite, getTeamCoMembers, removeTeamCoMember } from '@/lib/actions/league';
+import { switchLeague, leaveLeague, createLeagueInvite, createTeamInvite, getTeamCoMembers, removeTeamCoMember, leaveCoManagerRole } from '@/lib/actions/league';
 
 interface League {
   id: string;
@@ -15,9 +15,19 @@ interface League {
   is_commissioner?: boolean;
 }
 
+interface CoManagedTeam {
+  id: string;
+  leagueId: string;
+  leagueName: string;
+  ownerId: string;
+  ownerUsername: string;
+  createdAt: string;
+}
+
 interface LeagueManagerProps {
   initialLeagues: League[];
   initialActiveLeagueId: string | null;
+  coManagedTeams?: CoManagedTeam[];
 }
 
 interface CoMember {
@@ -27,7 +37,7 @@ interface CoMember {
   email: string;
 }
 
-export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueManagerProps) {
+export function LeagueManager({ initialLeagues, initialActiveLeagueId, coManagedTeams = [] }: LeagueManagerProps) {
   const [showModal, setShowModal] = useState(false);
   const [activeLeagueId, setActiveLeagueId] = useState(initialActiveLeagueId);
   const [loading, setLoading] = useState<string | null>(null);
@@ -141,6 +151,19 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueM
       setCopiedTeamInvite(true);
       setTimeout(() => setCopiedTeamInvite(false), 2000);
     }
+  };
+
+  const handleLeaveCoManagerRole = async (leagueId: string, ownerUsername: string) => {
+    if (!confirm(`Are you sure you want to stop co-managing ${ownerUsername}'s team?`)) return;
+
+    setLoading(`leave-co-${leagueId}`);
+    const result = await leaveCoManagerRole(leagueId);
+    if (result.success) {
+      router.refresh();
+    } else {
+      alert(result.error || 'Failed to leave co-manager role');
+    }
+    setLoading(null);
   };
 
   const handleRemoveCoMember = async (leagueId: string, coMemberId: string, username: string) => {
@@ -385,6 +408,60 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId }: LeagueM
           )}
         </CardContent>
       </Card>
+
+      {/* Co-Managed Teams */}
+      {coManagedTeams.length > 0 && (
+        <Card className="mb-6 border-casino-green/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span>🤝</span> Teams You Co-Manage
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {coManagedTeams.map((team) => (
+                <div
+                  key={team.id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-lg border-2 border-casino-green/20 bg-casino-green/5 gap-3"
+                >
+                  <div>
+                    <h3 className="font-bold text-casino-text">
+                      {team.leagueName}
+                      <span className="ml-2 text-xs px-2 py-0.5 bg-casino-green/20 text-casino-green rounded-full font-normal">
+                        Co-Manager
+                      </span>
+                    </h3>
+                    <p className="text-sm text-casino-gray mt-1">
+                      Managing <strong className="text-casino-text">{team.ownerUsername}&apos;s</strong> team
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Link href="/tournaments">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-casino-green border-casino-green/30 hover:bg-casino-green/10"
+                      >
+                        View Roster
+                      </Button>
+                    </Link>
+                    <Button
+                      onClick={() => handleLeaveCoManagerRole(team.leagueId, team.ownerUsername)}
+                      disabled={loading === `leave-co-${team.leagueId}`}
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      {loading === `leave-co-${team.leagueId}` ? 'Leaving...' : 'Leave'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Info Card */}
       <Card className="border-casino-blue/30">
