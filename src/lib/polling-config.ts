@@ -31,26 +31,26 @@ export const TOURNAMENT_SCHEDULE: TournamentDay[] = [
   {
     day: 'thursday',
     dayOfWeek: 4,
-    pollIntervalMinutes: 15,
-    description: 'Round 1 - 15 min polling',
+    pollIntervalMinutes: 180,
+    description: 'Round 1 - 3 hour polling',
   },
   {
     day: 'friday',
     dayOfWeek: 5,
-    pollIntervalMinutes: 15,
-    description: 'Round 2 - 15 min polling',
+    pollIntervalMinutes: 180,
+    description: 'Round 2 - 3 hour polling',
   },
   {
     day: 'saturday',
     dayOfWeek: 6,
-    pollIntervalMinutes: 15,
-    description: 'Round 3 - 15 min polling',
+    pollIntervalMinutes: 180,
+    description: 'Round 3 - 3 hour polling',
   },
   {
     day: 'sunday',
     dayOfWeek: 0,
-    pollIntervalMinutes: 15,
-    description: 'Final Round - 15 min polling',
+    pollIntervalMinutes: 180,
+    description: 'Final Round - 3 hour polling',
   },
 ];
 
