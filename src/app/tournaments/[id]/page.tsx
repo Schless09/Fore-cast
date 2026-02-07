@@ -887,6 +887,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             roster_players: existingRosterData.roster_players,
             playerIds: existingRosterData.playerIds,
           } : undefined}
+          coMemberOwnerId={coMemberOwner?.ownerId}
         />
       )}
 

@@ -22,6 +22,8 @@ interface RosterBuilderProps {
   };
   onSave?: () => void;
   tournamentStatus?: 'upcoming' | 'active' | 'completed';
+  /** When set, the roster is created under this user (co-manager creating on behalf of owner) */
+  targetUserId?: string;
 }
 
 const MAX_PLAYERS = 10;
@@ -32,6 +34,7 @@ export function RosterBuilder({
   existingRoster,
   onSave,
   tournamentStatus,
+  targetUserId,
 }: RosterBuilderProps) {
   const router = useRouter();
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
@@ -198,6 +201,9 @@ export function RosterBuilder({
         // Update existing roster
         await updateRoster(existingRoster.id, budgetSpent);
         rosterId = existingRoster.id;
+      } else if (targetUserId) {
+        // Co-manager creating roster on behalf of owner — use server API
+        rosterId = await createRosterViaAPI(budgetSpent, targetUserId);
       } else {
         // Create new roster
         rosterId = await createRoster(profile.id, budgetSpent);
@@ -277,6 +283,26 @@ export function RosterBuilder({
     if (!result.success) {
       throw new Error(result.error || 'Failed to update roster');
     }
+  }
+
+  async function createRosterViaAPI(budgetSpent: number, targetUserId: string): Promise<string> {
+    // Use server API for roster creation on behalf of another user (co-manager flow)
+    const response = await fetch('/api/rosters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tournament_id: tournamentId,
+        budget_spent: budgetSpent,
+        player_ids: selectedPlayerIds,
+        target_user_id: targetUserId,
+      }),
+    });
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create roster');
+    }
+    return result.rosterId;
   }
 
   if (isLoading) {

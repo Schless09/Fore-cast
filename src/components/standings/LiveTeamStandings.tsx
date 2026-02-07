@@ -51,6 +51,8 @@ interface LiveTeamStandingsProps {
     amount: number;
   }>;
   currentUserId: string;
+  /** If the current user is a co-manager, this is the team owner's user ID */
+  coManagedOwnerId?: string;
   tournamentStatus: string;
   userLeagueId?: string;
   /** When provided, filter rosters by league membership (not active_league_id) so multi-league users show in each league's standings */
@@ -74,6 +76,7 @@ export function LiveTeamStandings({
   liveGolfAPITournamentId,
   prizeDistributions,
   currentUserId,
+  coManagedOwnerId,
   tournamentStatus,
   userLeagueId,
   leagueMemberIds,
@@ -426,14 +429,21 @@ export function LiveTeamStandings({
   }, [fetchRosters, fetchLiveScores]);
 
   // Default to user's row expanded when standings first load
+  // For co-managers, expand the team they co-manage
   useEffect(() => {
     if (hasSetDefaultUserExpand.current) return;
     if (!rosters.length || !currentUserId) return;
     const userRoster = rosters.find((r) => r.user_id === currentUserId);
-    if (!userRoster) return;
+    const coManagedRoster = coManagedOwnerId ? rosters.find((r) => r.user_id === coManagedOwnerId) : null;
+    if (!userRoster && !coManagedRoster) return;
     hasSetDefaultUserExpand.current = true;
-    setExpandedRosterIds((prev) => new Set(prev).add(userRoster.id));
-  }, [rosters, currentUserId]);
+    setExpandedRosterIds((prev) => {
+      const next = new Set(prev);
+      if (userRoster) next.add(userRoster.id);
+      if (coManagedRoster) next.add(coManagedRoster.id);
+      return next;
+    });
+  }, [rosters, currentUserId, coManagedOwnerId]);
 
   // Polling interval (skip for completed tournaments)
   useEffect(() => {
@@ -456,36 +466,37 @@ export function LiveTeamStandings({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const userRank = rostersWithLiveWinnings.findIndex((r) => r.user_id === currentUserId) + 1;
-  const userRoster = rostersWithLiveWinnings.find((r) => r.user_id === currentUserId);
+  // For co-managers, show the co-managed team's rank if they don't have their own roster
+  const effectiveUserId = rostersWithLiveWinnings.some((r) => r.user_id === currentUserId)
+    ? currentUserId
+    : coManagedOwnerId || currentUserId;
+  const userRank = rostersWithLiveWinnings.findIndex((r) => r.user_id === effectiveUserId) + 1;
+  const userRoster = rostersWithLiveWinnings.find((r) => r.user_id === effectiveUserId);
 
   return (
     <div>
       {/* Refresh Status Bar */}
-      <div className="mb-4 space-y-2">
-        <div className="flex items-center justify-between p-2 bg-casino-elevated rounded-lg border border-casino-gold/20">
-          <div className="flex items-center gap-2 text-xs text-casino-gray">
+      <div className="mb-3">
+        <div className="flex items-center justify-between text-xs text-casino-gray">
+          <div className="flex items-center gap-2">
             {isCompleted ? (
               <>
-                <span className="text-casino-gold">🏁</span>
-                <span>Final Results</span>
+                <span className="text-casino-gold">🏆</span>
+                <span className="text-casino-gold font-medium">Final</span>
               </>
             ) : isRefreshing ? (
               <>
                 <span className="animate-spin">🔄</span>
-                <span>Refreshing live scores...</span>
+                <span>Updating...</span>
               </>
             ) : syncError ? (
-              <>
-                <span className="text-yellow-500">⚠</span>
-                <span>Retry in {formatCountdown(nextRefreshIn)}</span>
-              </>
+              <span className="text-yellow-500">⚠ Retry in {formatCountdown(nextRefreshIn)}</span>
             ) : (
               <>
                 <span className="text-green-500">●</span>
-                <span>Live updates active</span>
-                <span className="text-casino-gray-dark">|</span>
-                <span>Next refresh in {formatCountdown(nextRefreshIn)}</span>
+                <span>Live</span>
+                <span className="text-casino-gray-dark">•</span>
+                <span>Next update: {formatCountdown(nextRefreshIn)}</span>
               </>
             )}
           </div>
@@ -493,17 +504,12 @@ export function LiveTeamStandings({
             <button
               onClick={fetchLiveScores}
               disabled={isRefreshing}
-              className="text-xs px-3 py-1 bg-casino-gold/20 hover:bg-casino-gold/30 text-casino-gold rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="text-xs px-2 py-0.5 text-casino-gold hover:text-casino-gold/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isRefreshing ? 'Refreshing...' : 'Refresh Now'}
+              {isRefreshing ? '...' : 'Refresh'}
             </button>
           )}
         </div>
-        {syncError && !isCompleted && (
-          <div className="p-2 bg-yellow-900/30 border border-yellow-600/50 rounded-lg text-xs text-yellow-300">
-            ⚠️ {syncError}
-          </div>
-        )}
       </div>
 
       {/* Expand/Collapse Toggle */}
@@ -546,7 +552,7 @@ export function LiveTeamStandings({
           </thead>
           <tbody>
             {rostersWithLiveWinnings.map((roster, index) => {
-              const isUserRoster = roster.user_id === currentUserId;
+              const isUserRoster = roster.user_id === currentUserId || roster.user_id === coManagedOwnerId;
               const isNoLineup = roster.noLineup === true;
               const isExpanded = expandedRosterIds.has(roster.id);
               const rank = index + 1;

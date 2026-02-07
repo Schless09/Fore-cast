@@ -209,6 +209,20 @@ export default async function WeeklyStandingsByTournamentPage({
     }
   }
 
+  // Check if current user is a co-manager of someone's team in this league
+  let coManagedOwnerId: string | undefined;
+  if (userLeagueId) {
+    const { data: coMembership } = await supabase
+      .from('team_co_members')
+      .select('owner_id')
+      .eq('league_id', userLeagueId)
+      .eq('co_member_id', profile.id)
+      .maybeSingle();
+    if (coMembership?.owner_id) {
+      coManagedOwnerId = coMembership.owner_id;
+    }
+  }
+
   // Check if we should use live standings (active or completed tournament with API ID)
   // For completed tournaments, the component will use stored final data instead of polling
   const useLiveStandings = (tournament.status === 'active' || tournament.status === 'completed') && tournament.rapidapi_tourn_id;
@@ -405,6 +419,7 @@ export default async function WeeklyStandingsByTournamentPage({
                   amount: p.amount || 0,
                 }))}
                 currentUserId={profile.id}
+                coManagedOwnerId={coManagedOwnerId}
                 tournamentStatus={tournament.status}
                 userLeagueId={userLeagueId || undefined}
                 leagueMemberIds={leagueMemberIds}

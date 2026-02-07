@@ -29,12 +29,15 @@ interface RosterSectionProps {
     roster_players: RosterPlayer[];
     playerIds: string[];
   };
+  /** When set, the co-manager creates the roster on behalf of this user */
+  coMemberOwnerId?: string;
 }
 
 export function RosterSection({
   tournamentId,
   tournamentStatus,
   existingRoster,
+  coMemberOwnerId,
 }: RosterSectionProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(!existingRoster);
@@ -51,6 +54,7 @@ export function RosterSection({
       <RosterBuilder
         tournamentId={tournamentId}
         tournamentStatus={tournamentStatus}
+        targetUserId={coMemberOwnerId}
       />
     );
   }
@@ -161,6 +165,7 @@ export function RosterSection({
         }}
         onSave={handleSave}
         tournamentStatus={tournamentStatus}
+        targetUserId={coMemberOwnerId}
       />
     </div>
   );
