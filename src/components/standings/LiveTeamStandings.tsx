@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import { convertESTtoLocal } from '@/lib/timezone';
+import { formatShortName } from '@/lib/utils';
 
 interface RosterData {
   id: string;
@@ -530,7 +531,7 @@ export function LiveTeamStandings({
               <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider w-10 sm:w-14">
                 Rank
               </th>
-              <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider">
+              <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider min-w-0 max-w-[28%] sm:max-w-none">
                 Team
               </th>
               <th className="px-1 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider min-w-10 sm:min-w-14">
@@ -590,8 +591,8 @@ export function LiveTeamStandings({
                         )}
                       </div>
                     </td>
-                    <td className="px-1 sm:px-2 py-1.5">
-                      <span className="font-medium text-casino-text text-xs sm:text-sm">{roster.roster_name}</span>
+                    <td className="px-1 sm:px-2 py-1.5 min-w-0 max-w-[28%] sm:max-w-none">
+                      <span className="font-medium text-casino-text text-xs sm:text-sm truncate block">{roster.roster_name}</span>
                     </td>
                     <td colSpan={4} className="py-1.5 px-1 sm:px-4" />
                     <td className="px-1 sm:px-4 py-1.5 text-right">
@@ -628,10 +629,10 @@ export function LiveTeamStandings({
                     })();
                     return (
                       <tr key={idx} className={`border-b border-casino-gold/10 ${detailBg} hover:bg-casino-card/50 transition-colors`}>
-                        {/* Mobile: one cell spanning Rank+Team, name left-aligned below rank */}
-                        <td colSpan={2} className="sm:hidden px-1 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text">
+                        {/* Mobile: one cell spanning Rank+Team, name left-aligned below rank - cap width so $/Winnings fit */}
+                        <td colSpan={2} className="sm:hidden px-1 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text min-w-0 max-w-[35%]">
                           <span className="truncate block pl-2 border-l-2 border-casino-gold/20">
-                            {player.playerName}
+                            {formatShortName(player.playerName)}
                             {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
                             {player.cost !== undefined && player.cost !== null && (
                               <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>

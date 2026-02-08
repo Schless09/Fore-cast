@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
 import { convertESTtoLocal } from '@/lib/timezone';
+import { formatShortName } from '@/lib/utils';
 
 interface ExpandableRosterRowProps {
   roster: any;
@@ -246,7 +247,8 @@ export function ExpandableRosterRow({
                                     </span>
                                   </div>
                                 )}
-                                <span className="truncate">{player?.name || 'Unknown'}</span>
+                                <span className="truncate sm:hidden">{formatShortName(player?.name || 'Unknown')}</span>
+                                <span className="truncate hidden sm:inline">{player?.name || 'Unknown'}</span>
                                 {player?.country && (
                                   <span className="text-xs hidden sm:inline" title={player.country}>
                                     {getFlagEmoji(player.country)}

@@ -48,6 +48,22 @@ export function getScoreColor(score: number | null): string {
   return 'text-casino-red';
 }
 
+/**
+ * First initial + full last name for tight spaces (e.g. mobile).
+ * "Andrew Schuessler" -> "A. Schuessler". Single word unchanged.
+ */
+export function formatShortName(fullName: string): string {
+  const trimmed = (fullName || '').trim();
+  if (!trimmed) return trimmed;
+  const parts = trimmed.split(/\s+/);
+  if (parts.length >= 2) {
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    return `${first.charAt(0).toUpperCase()}. ${last}`;
+  }
+  return trimmed;
+}
+
 export function formatTimestamp(timestamp: number): string {
   const d = new Date(timestamp);
   return new Intl.DateTimeFormat('en-US', {
