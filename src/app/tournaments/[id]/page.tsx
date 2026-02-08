@@ -769,45 +769,19 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       {/* Tournament Header */}
       <Card className="mb-8">
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-start gap-3 flex-wrap">
-                <CardTitle className="text-xl sm:text-2xl flex-1">{tournament.name}</CardTitle>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium capitalize whitespace-nowrap sm:hidden ${
-                    tournament.status === 'upcoming'
-                      ? 'bg-blue-100 text-blue-800'
-                      : tournament.status === 'active'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {tournament.status}
-                </span>
-                <Link href={`/tournaments/${id}/analytics`}>
-                  <Button variant="outline" size="sm" className="shrink-0">
-                    📊 Inside the Field
-                  </Button>
-                </Link>
-              </div>
-              {tournament.course && (
-                <p className="text-gray-600 mt-2 text-sm">📍 {tournament.course}</p>
-              )}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm text-gray-600">
-                <span>
-                  {formatDate(tournament.start_date)} -{' '}
-                  {formatDate(tournament.end_date)}
-                </span>
+          <div className="space-y-3">
+            {/* Top row: Name + Status + Round badge */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardTitle className="text-xl sm:text-2xl">{tournament.name}</CardTitle>
                 {tournament.status === 'active' && (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                  <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-medium whitespace-nowrap">
                     Round {displayRound}/4
                   </span>
                 )}
               </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
               <span
-                className={`hidden sm:block px-4 py-2 rounded-full text-sm font-medium capitalize whitespace-nowrap ${
+                className={`px-3 py-1 rounded-full text-xs font-medium capitalize whitespace-nowrap shrink-0 ${
                   tournament.status === 'upcoming'
                     ? 'bg-blue-100 text-blue-800'
                     : tournament.status === 'active'
@@ -817,6 +791,37 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               >
                 {tournament.status}
               </span>
+            </div>
+
+            {/* Course info */}
+            {tournament.course && (
+              <div className="text-sm text-casino-text">
+                <span className="font-medium">{tournament.course}</span>
+                {tournament.course_par && (
+                  <span className="text-casino-gray ml-1">
+                    &middot; Par {tournament.course_par}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Meta: dates + location */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-casino-gray">
+              <span>
+                {formatDate(tournament.start_date)} - {formatDate(tournament.end_date)}
+              </span>
+              {tournament.course_location && (
+                <span>{tournament.course_location}</span>
+              )}
+            </div>
+
+            {/* Action */}
+            <div>
+              <Link href={`/tournaments/${id}/analytics`}>
+                <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                  Inside the Field
+                </Button>
+              </Link>
             </div>
           </div>
         </CardHeader>

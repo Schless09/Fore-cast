@@ -13,7 +13,16 @@ export function formatScore(score: number | null): string {
 }
 
 export function formatDate(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
+  // For date-only strings like "2026-02-05", parse as local time to avoid
+  // timezone shift (new Date("2026-02-05") parses as UTC midnight, which
+  // shifts back a day in US timezones)
+  let d: Date;
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [y, m, day] = date.split('-').map(Number);
+    d = new Date(y, m - 1, day);
+  } else {
+    d = typeof date === 'string' ? new Date(date) : date;
+  }
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',

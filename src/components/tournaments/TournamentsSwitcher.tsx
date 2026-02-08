@@ -102,9 +102,20 @@ function TournamentCardFeatured({ tournament }: { tournament: Tournament }) {
             {tournament.status}
           </span>
         </CardTitle>
-        <p className="text-sm text-gray-600">
-          {formatDate(tournament.start_date)} - {formatDate(tournament.end_date)}
-        </p>
+        {tournament.course && (
+          <p className="text-sm text-casino-text">
+            <span className="font-medium">{tournament.course}</span>
+            {tournament.course_par && (
+              <span className="text-casino-gray ml-1">&middot; Par {tournament.course_par}</span>
+            )}
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
+          <span>{formatDate(tournament.start_date)} - {formatDate(tournament.end_date)}</span>
+          {tournament.course_location && (
+            <span>{tournament.course_location}</span>
+          )}
+        </div>
         {tournament.status === 'active' && (
           <p className="text-sm text-green-700 font-semibold mt-2">Live now — build or track your roster.</p>
         )}
@@ -142,7 +153,7 @@ function TournamentCardCompact({ tournament }: { tournament: Tournament }) {
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-lg">{tournament.name}</CardTitle>
           <span
-            className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+            className={`px-3 py-1 rounded-full text-xs font-medium capitalize whitespace-nowrap shrink-0 ${
               isUpcoming
                 ? 'bg-blue-100 text-blue-800'
                 : tournament.status === 'active'
@@ -153,9 +164,20 @@ function TournamentCardCompact({ tournament }: { tournament: Tournament }) {
             {tournament.status}
           </span>
         </div>
-        <p className="text-sm text-gray-600">
-          {formatDate(tournament.start_date)} - {formatDate(tournament.end_date)}
-        </p>
+        {tournament.course && (
+          <p className="text-xs text-casino-text">
+            <span className="font-medium">{tournament.course}</span>
+            {tournament.course_par && (
+              <span className="text-casino-gray ml-1">&middot; Par {tournament.course_par}</span>
+            )}
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-gray-600">
+          <span>{formatDate(tournament.start_date)} - {formatDate(tournament.end_date)}</span>
+          {tournament.course_location && (
+            <span>{tournament.course_location}</span>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-2">
         {isUpcoming && mondayMsg && (

@@ -42,6 +42,8 @@ export interface Tournament {
   id: string;
   name: string;
   course: string | null;
+  course_location: string | null;
+  course_par: number | null;
   start_date: string;
   end_date: string;
   current_round: number;

@@ -72,6 +72,48 @@ async function syncPreTournamentTeeTimes(
     const json = await response.json();
     const players = json.players || [];
 
+    // Populate course info from tournament API if missing
+    const courses = json.courses || [];
+    if (courses.length > 0) {
+      const hostCourse = courses.find((c: Record<string, unknown>) => c.host === 'Yes') || courses[0];
+      const location = hostCourse.location as Record<string, string> | undefined;
+      const courseName = hostCourse.courseName as string | undefined;
+      const parTotal = hostCourse.parTotal ? parseInt(String(hostCourse.parTotal), 10) : null;
+      const city = location?.city;
+      const state = location?.state;
+      const country = location?.country;
+
+      // Build location string: "City, State" for USA, "City, Country" for international
+      let courseLocation: string | null = null;
+      if (city) {
+        if (country === 'USA' && state) {
+          courseLocation = `${city}, ${state}`;
+        } else if (country && country !== 'USA') {
+          // Map country codes to names for international courses
+          const countryNames: Record<string, string> = { SCO: 'Scotland', ENG: 'England', CAN: 'Canada', AUS: 'Australia', JPN: 'Japan' };
+          courseLocation = `${city}, ${countryNames[country] || country}`;
+        } else if (state) {
+          courseLocation = `${city}, ${state}`;
+        } else {
+          courseLocation = city;
+        }
+      }
+
+      const courseUpdate: Record<string, string | number | null> = {};
+      if (courseName) courseUpdate.course = courseName;
+      if (courseLocation) courseUpdate.course_location = courseLocation;
+      if (parTotal) courseUpdate.course_par = parTotal;
+
+      if (Object.keys(courseUpdate).length > 0) {
+        await supabase
+          .from('tournaments')
+          .update(courseUpdate)
+          .eq('id', tournament.id)
+          .is('course', null); // Only update if course not already set
+        console.log(`[AUTO-SYNC] 📍 Updated course info for ${tournament.name}: ${courseName || 'N/A'}`);
+      }
+    }
+
     if (players.length === 0) {
       return { success: false, message: 'No players in tournament data' };
     }

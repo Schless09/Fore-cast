@@ -28,35 +28,41 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="mb-2">{tournament.name}</CardTitle>
-            <div className="flex items-center gap-4 text-sm text-gray-600">
-              {tournament.course && (
-                <span>📍 {tournament.course}</span>
+        <div className="space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <CardTitle className="text-lg sm:text-xl">{tournament.name}</CardTitle>
+              {tournament.status === 'active' && (
+                <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-medium whitespace-nowrap">
+                  Round {safeRoundNumber(tournament.current_round)}/4
+                </span>
               )}
             </div>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-medium capitalize whitespace-nowrap shrink-0 ${
+                statusColors[tournament.status]
+              }`}
+            >
+              {tournament.status}
+            </span>
           </div>
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-              statusColors[tournament.status]
-            }`}
-          >
-            {tournament.status}
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-sm text-gray-600">
-            <p>{formatDate(tournament.start_date)} - {formatDate(tournament.end_date)}</p>
-            {tournament.status === 'active' && (
-              <p className="mt-1 font-medium text-gray-900">
-                Round {safeRoundNumber(tournament.current_round)}/4
-              </p>
+          {tournament.course && (
+            <div className="text-sm text-casino-text">
+              <span className="font-medium">{tournament.course}</span>
+              {tournament.course_par && (
+                <span className="text-casino-gray ml-1">&middot; Par {tournament.course_par}</span>
+              )}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-casino-gray">
+            <span>{formatDate(tournament.start_date)} - {formatDate(tournament.end_date)}</span>
+            {tournament.course_location && (
+              <span>{tournament.course_location}</span>
             )}
           </div>
         </div>
+      </CardHeader>
+      <CardContent>
         <Link href={`/tournaments/${tournament.id}`}>
           <Button variant="outline" className="w-full">
             {tournament.status === 'upcoming' ? 'View & Create Roster' : 'View Leaderboard'}
