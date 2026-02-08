@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
@@ -84,6 +85,7 @@ export function LiveTeamStandings({
   displayRound = 1,
 }: LiveTeamStandingsProps) {
   const isCompleted = tournamentStatus === 'completed';
+  const isMobile = useMediaQuery('(max-width: 639px)');
   const [rosters, setRosters] = useState<RosterData[]>([]);
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -525,30 +527,39 @@ export function LiveTeamStandings({
 
       {/* Standings Table: Rank | Team (name + players below) | Pos | Score | Thru | Win | Winnings (rightmost) */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b border-casino-gold/30">
-              <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider w-10 sm:w-14">
+              <th className="px-px sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase sm:tracking-wider w-8 sm:w-14">
                 Rank
               </th>
-              <th className="px-1 sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase tracking-wider min-w-0 max-w-[28%] sm:max-w-none">
+              <th className="px-px sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase sm:tracking-wider min-w-0">
                 Team
               </th>
-              <th className="px-1 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider min-w-10 sm:min-w-14">
+              <th className="px-px sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase sm:tracking-wider min-w-0 sm:min-w-14">
                 Pos
               </th>
-              <th className="px-1 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider min-w-10 sm:min-w-16">
+              <th className="px-px sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase sm:tracking-wider min-w-0 sm:min-w-16">
                 Score
               </th>
-              <th className="px-1 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase tracking-wider min-w-10 sm:min-w-18">
+              <th className="px-px sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase sm:tracking-wider min-w-0 sm:min-w-18">
                 Thru
               </th>
-              <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider min-w-10 sm:min-w-20">
-                $
-              </th>
-              <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider min-w-14 sm:min-w-24">
-                Winnings
-              </th>
+              {/* Mobile: one column for winnings (no $ label) */}
+              {isMobile ? (
+                <th colSpan={2} className="px-px sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase sm:tracking-wider min-w-0">
+                  Winnings
+                </th>
+              ) : (
+                <>
+                  <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider min-w-10 sm:min-w-20">
+                    $
+                  </th>
+                  <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase tracking-wider min-w-14 sm:min-w-24">
+                    Winnings
+                  </th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -566,7 +577,7 @@ export function LiveTeamStandings({
                     className={`border-b border-casino-gold/20 transition-colors ${!isNoLineup ? 'cursor-pointer' : ''} ${rowBg}`}
                     onClick={() => !isNoLineup && toggleRoster(roster.id)}
                   >
-                    <td className="px-1 sm:px-2 py-1.5">
+                    <td className="px-px sm:px-2 py-1.5">
                       <div className="flex items-center gap-1 sm:gap-2">
                         {!isNoLineup ? (
                           <button className="p-0.5 hover:bg-casino-gold/20 rounded transition-colors">
@@ -591,11 +602,10 @@ export function LiveTeamStandings({
                         )}
                       </div>
                     </td>
-                    <td className="px-1 sm:px-2 py-1.5 min-w-0 max-w-[28%] sm:max-w-none">
-                      <span className="font-medium text-casino-text text-xs sm:text-sm truncate block">{roster.roster_name}</span>
+                    <td colSpan={isMobile ? 4 : 5} className="px-px sm:px-2 py-1.5 min-w-0">
+                      <span className="font-medium text-casino-text text-xs sm:text-sm wrap-break-word">{roster.roster_name}</span>
                     </td>
-                    <td colSpan={4} className="py-1.5 px-1 sm:px-4" />
-                    <td className="px-1 sm:px-4 py-1.5 text-right">
+                    <td colSpan={isMobile ? 2 : 1} className="px-px sm:px-4 py-1.5 text-right">
                       {isNoLineup ? (
                         <span className="text-casino-gray text-xs sm:text-sm">No lineup</span>
                       ) : (
@@ -622,35 +632,24 @@ export function LiveTeamStandings({
                       if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
                         return <span className="text-casino-blue">{player.liveScore.thru}</span>;
                       }
-                      // Primary: RapidAPI tee time, fallback: DB tee time
                       if (player.liveScore?.teeTime) return <span className="text-casino-gray">{player.liveScore.teeTime}</span>;
                       if (teeTime) return <span className="text-casino-gray">{convertESTtoLocal(teeTime)}</span>;
                       return <span className="text-casino-gray-dark">-</span>;
                     })();
                     return (
-                      <tr key={idx} className={`border-b border-casino-gold/10 ${detailBg} hover:bg-casino-card/50 transition-colors`}>
-                        {/* Mobile: one cell spanning Rank+Team, name left-aligned below rank - cap width so $/Winnings fit */}
-                        <td colSpan={2} className="sm:hidden px-1 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text min-w-0 max-w-[35%]">
-                          <span className="truncate block pl-2 border-l-2 border-casino-gold/20">
-                            {formatShortName(player.playerName)}
+                      <tr key={`${roster.id}-player-${idx}`} className={`border-b border-casino-gold/10 ${detailBg} hover:bg-casino-card/50 transition-colors`}>
+                        {/* Rank + Team columns merged for golfer rows */}
+                        <td colSpan={2} className="px-px sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text">
+                          <span className="block border-l-2 border-casino-gold/20 truncate pl-1 sm:pl-2">
+                            {isMobile ? formatShortName(player.playerName) : player.playerName}
                             {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
                             {player.cost !== undefined && player.cost !== null && (
                               <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
                             )}
                           </span>
                         </td>
-                        {/* Desktop: empty Rank column, then Team column with indented name */}
-                        <td className="hidden sm:table-cell px-0 sm:px-2 py-1 sm:py-1.5 pl-1 sm:pl-6" />
-                        <td className="hidden sm:table-cell px-1 sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text">
-                          <span className="truncate block pl-3 sm:pl-4 border-l-2 border-casino-gold/20">
-                            {player.playerName}
-                            {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
-                            {player.cost !== undefined && player.cost !== null && (
-                              <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-center min-w-0">
+                        {/* Pos */}
+                        <td className="px-px sm:px-4 py-1 sm:py-1.5 text-xs text-center">
                           {player.liveScore?.position ? (
                             <span className={`font-medium ${
                               player.liveScore.positionValue === 1 ? 'text-casino-gold' :
@@ -662,7 +661,8 @@ export function LiveTeamStandings({
                             <span className="text-casino-gray-dark">-</span>
                           )}
                         </td>
-                        <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-center min-w-0">
+                        {/* Score */}
+                        <td className="px-px sm:px-4 py-1 sm:py-1.5 text-xs text-center">
                           {player.liveScore ? (
                             <span className={
                               parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
@@ -674,15 +674,27 @@ export function LiveTeamStandings({
                             <span className="text-casino-gray-dark">-</span>
                           )}
                         </td>
-                        <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-center min-w-0 whitespace-nowrap">
+                        {/* Thru */}
+                        <td className="px-px sm:px-4 py-1 sm:py-1.5 text-xs text-center whitespace-nowrap">
                           {thruCell}
                         </td>
-                        <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-right min-w-0">
-                          <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
-                            {formatCurrency(player.winnings)}
-                          </span>
-                        </td>
-                        <td className="px-1 sm:px-4 py-1 sm:py-1.5" />
+                        {/* Winnings */}
+                        {isMobile ? (
+                          <td colSpan={2} className="px-px py-1 sm:py-1.5 text-xs text-right">
+                            <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
+                              {formatCurrency(player.winnings)}
+                            </span>
+                          </td>
+                        ) : (
+                          <>
+                            <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-right">
+                              <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
+                                {formatCurrency(player.winnings)}
+                              </span>
+                            </td>
+                            <td className="px-1 sm:px-4 py-1 sm:py-1.5" />
+                          </>
+                        )}
                       </tr>
                     );
                   })}
