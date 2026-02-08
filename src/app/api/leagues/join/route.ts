@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     // Find the league by name
     const { data: league, error: leagueError } = await supabase
       .from('leagues')
-      .select('id, name, password')
+      .select('id, name, password, max_members')
       .eq('name', leagueName)
       .single();
 
@@ -114,6 +114,21 @@ export async function POST(request: NextRequest) {
         leagueName: league.name,
         message: 'Already a member - set as active league'
       });
+    }
+
+    // Check member cap if set
+    if (league.max_members) {
+      const { count } = await supabase
+        .from('league_members')
+        .select('id', { count: 'exact', head: true })
+        .eq('league_id', league.id);
+
+      if (count !== null && count >= league.max_members) {
+        return NextResponse.json(
+          { success: false, error: `This league is full (${league.max_members} member limit)` },
+          { status: 400 }
+        );
+      }
     }
 
     // Add user to league_members

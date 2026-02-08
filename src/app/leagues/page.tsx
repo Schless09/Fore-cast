@@ -7,6 +7,7 @@ interface LeagueRow {
   id: string;
   name: string;
   created_by: string | null;
+  max_members: number | null;
 }
 
 export const metadata: Metadata = {
@@ -71,9 +72,28 @@ export default async function LeaguesPage() {
   // Get all leagues user is a member of
   const { data: memberships } = await supabase
     .from('league_members')
-    .select('league_id, joined_at, leagues(id, name, created_by)')
+    .select('league_id, joined_at, leagues(id, name, created_by, max_members)')
     .eq('user_id', profile?.id)
     .order('joined_at', { ascending: false });
+
+  // Get member counts for all leagues the user belongs to
+  const leagueIds = (memberships || []).map(m => {
+    const raw = m.leagues as LeagueRow | LeagueRow[] | null;
+    const league = Array.isArray(raw) ? raw[0] ?? null : raw;
+    return league?.id;
+  }).filter(Boolean) as string[];
+
+  const memberCounts: Record<string, number> = {};
+  if (leagueIds.length > 0) {
+    const { data: counts } = await supabase
+      .from('league_members')
+      .select('league_id')
+      .in('league_id', leagueIds);
+
+    for (const row of counts || []) {
+      memberCounts[row.league_id] = (memberCounts[row.league_id] || 0) + 1;
+    }
+  }
 
   const leagues = memberships?.map(m => {
     const raw = m.leagues as LeagueRow | LeagueRow[] | null;
@@ -83,6 +103,8 @@ export default async function LeaguesPage() {
       name: league?.name ?? '',
       joined_at: m.joined_at,
       is_commissioner: league?.created_by === profile?.id,
+      member_count: memberCounts[league?.id ?? ''] || 0,
+      max_members: league?.max_members ?? null,
     };
   }) || [];
 

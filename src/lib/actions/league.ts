@@ -140,7 +140,7 @@ export async function joinLeague(leagueName: string, password: string) {
   // Find the league by name
   const { data: league, error: leagueError } = await supabase
     .from('leagues')
-    .select('id, name, password')
+    .select('id, name, password, max_members')
     .eq('name', leagueName)
     .single();
 
@@ -169,6 +169,18 @@ export async function joinLeague(leagueName: string, password: string) {
       .eq('id', profile.id);
     
     return { success: true, leagueName: league.name };
+  }
+
+  // Check member cap if set
+  if (league.max_members) {
+    const { count } = await supabase
+      .from('league_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('league_id', league.id);
+
+    if (count !== null && count >= league.max_members) {
+      return { success: false, error: `This league is full (${league.max_members} member limit)` };
+    }
   }
 
   // Add user to league_members
@@ -442,6 +454,7 @@ export async function getLeagueSettings(leagueId: string) {
       venmo_qr_image_path,
       payment_instructions,
       payout_description,
+      max_members,
       created_by
     `)
     .eq('id', leagueId)
@@ -472,6 +485,7 @@ export async function updateLeagueSettings(
     venmo_qr_image_path?: string | null;
     payment_instructions?: string | null;
     payout_description?: string | null;
+    max_members?: number | null;
   }
 ) {
   const { profile, error: authError } = await getProfileForClerkUser();
@@ -508,6 +522,7 @@ export async function updateLeagueSettings(
       venmo_qr_image_path: settings.venmo_qr_image_path,
       payment_instructions: settings.payment_instructions,
       payout_description: settings.payout_description,
+      max_members: settings.max_members,
       updated_at: new Date().toISOString(),
     })
     .eq('id', leagueId);
@@ -949,6 +964,24 @@ export async function acceptLeagueInvite(inviteCode: string) {
       message: 'You are already a member of this league',
       leagueName: (invite.leagues as unknown as JoinedLeague | null)?.name
     };
+  }
+
+  // Check member cap if set
+  const { data: leagueData } = await supabase
+    .from('leagues')
+    .select('max_members')
+    .eq('id', invite.league_id)
+    .single();
+
+  if (leagueData?.max_members) {
+    const { count } = await supabase
+      .from('league_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('league_id', invite.league_id);
+
+    if (count !== null && count >= leagueData.max_members) {
+      return { success: false, error: `This league is full (${leagueData.max_members} member limit)` };
+    }
   }
 
   // Add user to league_members

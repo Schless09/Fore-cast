@@ -62,6 +62,7 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
     venmo_qr_image_path: '',
     payment_instructions: '',
     payout_description: '',
+    max_members: '',
   });
   const [savingMoneyBoard, setSavingMoneyBoard] = useState(false);
   const [moneyBoardSaved, setMoneyBoardSaved] = useState(false);
@@ -113,6 +114,7 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
             venmo_qr_image_path: settingsResult.settings.venmo_qr_image_path || '',
             payment_instructions: settingsResult.settings.payment_instructions || '',
             payout_description: settingsResult.settings.payout_description || '',
+            max_members: settingsResult.settings.max_members?.toString() || '',
           });
         }
       }
@@ -272,6 +274,7 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
         venmo_qr_image_path: moneyBoardSettings.venmo_qr_image_path || null,
         payment_instructions: moneyBoardSettings.payment_instructions || null,
         payout_description: moneyBoardSettings.payout_description || null,
+        max_members: moneyBoardSettings.max_members ? parseInt(moneyBoardSettings.max_members) : null,
       });
       
       if (!result.success) {
@@ -682,6 +685,51 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                 ))}
               </tbody>
             </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* League Configuration */}
+      <Card className="bg-casino-card border-casino-gold/20 mt-6">
+        <CardHeader>
+          <CardTitle className="text-casino-gold">League Configuration</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-casino-gray mb-1">
+                Max Members
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  value={moneyBoardSettings.max_members}
+                  onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, max_members: e.target.value }))}
+                  placeholder="Unlimited"
+                  min="1"
+                  className="w-32 px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold"
+                />
+                <span className="text-xs text-casino-gray">
+                  {moneyBoardSettings.max_members 
+                    ? `${members.length} / ${moneyBoardSettings.max_members} members`
+                    : 'No limit set'}
+                </span>
+              </div>
+              <p className="text-xs text-casino-gray mt-1">
+                Leave blank for unlimited. New members will be blocked from joining once the cap is reached.
+              </p>
+            </div>
+            <div className="flex items-center gap-4 pt-2">
+              <Button
+                onClick={saveMoneyBoardSettings}
+                disabled={savingMoneyBoard}
+              >
+                {savingMoneyBoard ? 'Saving...' : 'Save'}
+              </Button>
+              {moneyBoardSaved && (
+                <span className="text-casino-green text-sm">Settings saved!</span>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -13,6 +13,8 @@ interface League {
   name: string;
   joined_at: string;
   is_commissioner?: boolean;
+  member_count?: number;
+  max_members?: number | null;
 }
 
 interface CoManagedTeam {
@@ -213,40 +215,54 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId, coManaged
                 return (
                   <div key={league.id}>
                     <div
-                      className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                      className={`p-4 rounded-lg border-2 transition-all ${
                         isActive
                           ? 'border-casino-gold bg-casino-gold/10'
                           : 'border-casino-card hover:border-casino-gold/30'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        {isActive && (
-                          <span className="text-casino-gold text-xl">⭐</span>
-                        )}
-                        <div>
-                          <h3 className="font-bold text-casino-text">
-                            {league.name}
-                            {league.is_commissioner && (
-                              <span className="ml-2 text-xs px-2 py-0.5 bg-casino-gold/20 text-casino-gold rounded-full font-normal">
-                                Commissioner
-                              </span>
-                            )}
-                          </h3>
-                          <p className="text-xs text-casino-gray">
-                            Joined {new Date(league.joined_at).toLocaleDateString()}
-                          </p>
+                      {/* Top: Name, badges, meta */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          {isActive && (
+                            <span className="text-casino-gold text-xl shrink-0">⭐</span>
+                          )}
+                          <div>
+                            <h3 className="font-bold text-casino-text flex items-center flex-wrap gap-2">
+                              {league.name}
+                              {league.is_commissioner && (
+                                <span className="text-xs px-2 py-0.5 bg-casino-gold/20 text-casino-gold rounded-full font-normal">
+                                  Commissioner
+                                </span>
+                              )}
+                            </h3>
+                            <p className="text-xs text-casino-gray mt-0.5">
+                              Joined {new Date(league.joined_at).toLocaleDateString()}
+                              {league.member_count !== undefined && (
+                                <span className="ml-2">
+                                  · {league.member_count}{league.max_members ? ` / ${league.max_members}` : ''} members
+                                </span>
+                              )}
+                            </p>
+                          </div>
                         </div>
+                        {isActive && (
+                          <span className="text-xs px-3 py-1 bg-casino-gold/20 text-casino-gold rounded-full font-medium shrink-0 ml-3">
+                            Active
+                          </span>
+                        )}
                       </div>
 
+                      {/* Bottom: Actions */}
                       <div className="flex items-center gap-2 flex-wrap">
                         {league.is_commissioner && (
                           <Link href={`/leagues/${league.id}/settings`}>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="text-casino-gold border-casino-gold/30 hover:bg-casino-gold/10"
+                              className="text-casino-gold border-casino-gold/30 hover:bg-casino-gold/10 text-xs sm:text-sm"
                             >
-                              ⚙️ Settings
+                              Settings
                             </Button>
                           </Link>
                         )}
@@ -255,17 +271,17 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId, coManaged
                           disabled={loading === league.id}
                           variant="outline"
                           size="sm"
-                          className="text-casino-blue border-casino-blue/30 hover:bg-casino-blue/10"
+                          className="text-casino-blue border-casino-blue/30 hover:bg-casino-blue/10 text-xs sm:text-sm"
                         >
-                          📨 Invite
+                          Invite
                         </Button>
                         <Button
                           onClick={() => handleToggleCoMembers(league.id)}
                           variant="outline"
                           size="sm"
-                          className="text-casino-green border-casino-green/30 hover:bg-casino-green/10"
+                          className="text-casino-green border-casino-green/30 hover:bg-casino-green/10 text-xs sm:text-sm"
                         >
-                          {showCoMembers === league.id ? '✕ Close' : 'Invite Co-Manager'}
+                          {showCoMembers === league.id ? 'Close' : 'Invite Co-Manager'}
                         </Button>
                         {!isActive && (
                           <Button
@@ -273,24 +289,22 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId, coManaged
                             disabled={loading === league.id}
                             variant="outline"
                             size="sm"
+                            className="text-xs sm:text-sm"
                           >
                             {loading === league.id ? 'Switching...' : 'Switch To'}
                           </Button>
                         )}
-                        {isActive && (
-                          <span className="text-xs px-3 py-1 bg-casino-gold/20 text-casino-gold rounded-full font-medium">
-                            Active
-                          </span>
-                        )}
-                        <Button
-                          onClick={() => handleLeaveLeague(league.id, league.name)}
-                          disabled={loading === league.id}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          Leave
-                        </Button>
+                        <div className="ml-auto">
+                          <Button
+                            onClick={() => handleLeaveLeague(league.id, league.name)}
+                            disabled={loading === league.id}
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-400 hover:text-red-300 text-xs sm:text-sm"
+                          >
+                            Leave
+                          </Button>
+                        </div>
                       </div>
                     </div>
                     
