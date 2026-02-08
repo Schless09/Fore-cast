@@ -265,7 +265,7 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId, coManaged
                           size="sm"
                           className="text-casino-green border-casino-green/30 hover:bg-casino-green/10"
                         >
-                          {showCoMembers === league.id ? '✕ Close' : '🤝 Co-Manager'}
+                          {showCoMembers === league.id ? '✕ Close' : 'Invite Co-Manager'}
                         </Button>
                         {!isActive && (
                           <Button
@@ -325,7 +325,7 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId, coManaged
                     {showCoMembers === league.id && (
                       <div className="mt-2 p-4 bg-casino-green/5 border border-casino-green/20 rounded-lg">
                         <h4 className="text-sm font-medium text-casino-text mb-1">
-                          🤝 Team Co-Managers
+                          Team Co-Managers
                         </h4>
                         <p className="text-xs text-casino-gray mb-3">
                           Co-managers can view and edit your roster. They don&apos;t have their own team.
@@ -414,7 +414,7 @@ export function LeagueManager({ initialLeagues, initialActiveLeagueId, coManaged
         <Card className="mb-6 border-casino-green/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <span>🤝</span> Teams You Co-Manage
+              Teams You Co-Manage
             </CardTitle>
           </CardHeader>
           <CardContent>
