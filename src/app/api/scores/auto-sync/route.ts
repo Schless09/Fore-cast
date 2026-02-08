@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { shouldPollNow } from '@/lib/polling-config';
+import { syncTournamentScores } from '@/lib/sync-scores';
+import { calculateTournamentWinnings } from '@/lib/calculate-winnings';
 
 /**
  * Smart Auto-sync endpoint for Vercel Cron
@@ -395,7 +397,8 @@ export async function GET(request: NextRequest) {
         const status = json.status || 'Unknown';
         
         // Transform to our format
-        const transformedData = leaderboard.map((player: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transformedData = leaderboard.map((player: Record<string, any>) => {
           const position = player.position;
           const positionNum = parseInt(position?.replace('T', '')) || null;
           
@@ -405,7 +408,8 @@ export async function GET(request: NextRequest) {
             position: position,
             positionValue: positionNum,
             total: player.total,
-            rounds: player.rounds?.map((r: any) => ({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            rounds: player.rounds?.map((r: Record<string, any>) => ({
               round: r.roundId?.$numberInt || r.roundId,
               score: r.strokes?.$numberInt || r.strokes,
               total: r.scoreToPar,
@@ -541,7 +545,7 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Auto-update tournament status if completed
+        // Auto-update tournament status if completed, then finalize scores & winnings
         if (status === 'Official') {
           await supabase
             .from('tournaments')
@@ -549,6 +553,24 @@ export async function GET(request: NextRequest) {
             .eq('id', tournament.id)
             .eq('status', 'active');
           console.log(`[AUTO-SYNC] ✅ Marked ${tournament.name} as completed`);
+
+          // Sync final scores/positions from cache
+          if (tournament.rapidapi_tourn_id) {
+            const syncResult = await syncTournamentScores(supabase, tournament.id, tournament.rapidapi_tourn_id);
+            if (syncResult.success) {
+              console.log(`[AUTO-SYNC] ✅ Synced final scores for ${tournament.name} (${syncResult.playersUpdated} players)`);
+            } else {
+              console.error(`[AUTO-SYNC] ⚠️ Failed to sync scores for ${tournament.name}: ${syncResult.message}`);
+            }
+          }
+
+          // Calculate and save winnings
+          const winningsResult = await calculateTournamentWinnings(supabase, tournament.id);
+          if (winningsResult.success) {
+            console.log(`[AUTO-SYNC] ✅ Calculated winnings for ${tournament.name} (${winningsResult.playersUpdated} players, purse: ${winningsResult.totalPurse})`);
+          } else {
+            console.error(`[AUTO-SYNC] ⚠️ Failed to calculate winnings for ${tournament.name}: ${winningsResult.message}`);
+          }
         }
 
         console.log(`[AUTO-SYNC] ✅ Cached ${transformedData.length} players for ${tournament.name}`);
@@ -586,10 +608,10 @@ export async function GET(request: NextRequest) {
       results,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[AUTO-SYNC] Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to auto-sync' },
+      { error: error instanceof Error ? error.message : 'Failed to auto-sync' },
       { status: 500 }
     );
   }
