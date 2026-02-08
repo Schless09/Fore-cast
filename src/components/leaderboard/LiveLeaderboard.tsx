@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from 'react';
-import { formatScore, getScoreColor } from '@/lib/utils';
+import { formatScore, getScoreColor, formatShortName } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import { ScorecardModal } from './ScorecardModal';
 import { convertESTtoLocal } from '@/lib/timezone';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 interface LeaderboardRow {
   position: number | null;
@@ -189,6 +190,7 @@ export function LiveLeaderboard({
   playerCostMap,
   initialCutLine,
 }: LiveLeaderboardProps) {
+  const isMobile = useMediaQuery('(max-width: 639px)');
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardRow[]>(initialData);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -428,15 +430,25 @@ export function LiveLeaderboard({
       )}
 
       <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className={`w-full text-sm ${isMobile ? 'table-fixed' : ''}`}>
+        {isMobile && (
+          <colgroup>
+            <col style={{ width: '32px' }} />
+            <col />
+            <col style={{ width: '38px' }} />
+            <col style={{ width: '38px' }} />
+            <col style={{ width: '38px' }} />
+            <col style={{ width: '58px' }} />
+          </colgroup>
+        )}
         <thead>
           <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
-            <th className="px-1 sm:px-3 py-2 w-10 sm:w-14">Pos</th>
-            <th className="px-1 sm:px-3 py-2">Golfer</th>
-            <th className="px-2 sm:px-4 py-2 w-12 sm:w-16">Total</th>
-            <th className="px-2 sm:px-4 py-2 w-12 sm:w-16" title="Click score to view scorecard">Today</th>
-            <th className="px-2 sm:px-4 py-2 min-w-16 sm:min-w-18" title="Holes completed or tee time">Thru</th>
-            <th className="px-2 sm:px-4 py-2 text-right min-w-18 sm:w-20">Prize</th>
+            <th className="px-0.5 sm:px-3 py-2">Pos</th>
+            <th className="px-0.5 sm:px-3 py-2">Golfer</th>
+            <th className="px-0.5 sm:px-4 py-2 text-center">Total</th>
+            <th className="px-0.5 sm:px-4 py-2 text-center" title="Click score to view scorecard">Today</th>
+            <th className="px-0.5 sm:px-4 py-2 text-center" title="Holes completed or tee time">Thru</th>
+            <th className="px-0.5 sm:px-4 py-2 text-right">Prize</th>
           </tr>
         </thead>
         <tbody>
@@ -571,20 +583,22 @@ export function LiveLeaderboard({
                     : 'border-casino-gold/10 hover:bg-casino-elevated'
                 }`}
               >
-                <td className="px-1 sm:px-3 py-2 font-medium text-casino-text text-xs sm:text-sm">
+                <td className="px-0.5 sm:px-3 py-2 font-medium text-casino-text text-xs sm:text-sm">
                   {pos}
                 </td>
-                <td className={`px-1 sm:px-3 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>
-                  {name}
-                  {row.is_amateur && <span className="text-casino-gray font-normal ml-1">(a)</span>}
-                  {playerCost !== undefined && (
-                    <span className="text-casino-gray font-normal ml-1">(${playerCost})</span>
-                  )}
+                <td className={`px-0.5 sm:px-3 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>
+                  <span className="truncate block">
+                    {isMobile ? formatShortName(name) : name}
+                    {row.is_amateur && <span className="text-casino-gray font-normal ml-1">(a)</span>}
+                    {playerCost !== undefined && (
+                      <span className="text-casino-gray font-normal ml-1">(${playerCost})</span>
+                    )}
+                  </span>
                 </td>
-                <td className={`px-2 sm:px-4 py-2 font-semibold text-xs sm:text-sm whitespace-nowrap ${totalClass}`}>
+                <td className={`px-0.5 sm:px-4 py-2 font-semibold text-xs sm:text-sm whitespace-nowrap text-center ${totalClass}`}>
                   {formatScore(row.total_score)}
                 </td>
-                <td className={`px-2 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap ${!row.roundComplete && (row.thru === '-' || row.thru === '0' || row.thru === 0 || !row.thru) ? 'text-casino-gray-dark' : todayClass}`}>
+                <td className={`px-0.5 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap text-center ${!row.roundComplete && (row.thru === '-' || row.thru === '0' || row.thru === 0 || !row.thru) ? 'text-casino-gray-dark' : todayClass}`}>
                   {/* If player hasn't started current round, show dash */}
                   {!row.roundComplete && (row.thru === '-' || row.thru === '0' || row.thru === 0 || !row.thru) ? (
                     <span>-</span>
@@ -600,7 +614,7 @@ export function LiveLeaderboard({
                     formatScore(row.today_score)
                   )}
                 </td>
-                <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap">
+                <td className="px-0.5 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap text-center">
                   {/* Same order as personal leaderboard: finished → on course → hasn't started (tee time) → dash */}
                   {row.roundComplete || row.thru === 'F' || row.thru === 'F*' || row.thru === 18 || row.thru === '18' ? (
                     /* Player finished current round - show F or F* */
@@ -623,7 +637,7 @@ export function LiveLeaderboard({
                     <span className="text-casino-gray-dark">-</span>
                   )}
                 </td>
-                <td className="px-2 sm:px-4 py-2 text-right text-xs sm:text-sm text-casino-gold whitespace-nowrap">
+                <td className="px-0.5 sm:px-4 py-2 text-right text-xs sm:text-sm text-casino-gold whitespace-nowrap">
                   {formatCurrency(prizeAmount || 0)}
                 </td>
               </tr>
