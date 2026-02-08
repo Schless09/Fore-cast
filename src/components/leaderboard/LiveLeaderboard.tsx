@@ -433,12 +433,12 @@ export function LiveLeaderboard({
       <table className={`w-full text-sm ${isMobile ? 'table-fixed' : ''}`}>
         {isMobile && (
           <colgroup>
-            <col style={{ width: '32px' }} />
+            <col style={{ width: '30px' }} />
             <col />
-            <col style={{ width: '38px' }} />
-            <col style={{ width: '38px' }} />
-            <col style={{ width: '38px' }} />
-            <col style={{ width: '58px' }} />
+            <col style={{ width: '42px' }} />
+            <col style={{ width: '42px' }} />
+            <col style={{ width: '42px' }} />
+            <col style={{ width: '68px' }} />
           </colgroup>
         )}
         <thead>
