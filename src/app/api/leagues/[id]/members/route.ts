@@ -93,12 +93,39 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         email: memberProfile?.email || '',
         joined_at: m.joined_at,
         is_commissioner: m.user_id === league.created_by,
+        role: m.user_id === league.created_by ? 'commissioner' as const : 'member' as const,
+      };
+    });
+
+    // Get co-managers for this league
+    const { data: coMembers } = await supabase
+      .from('team_co_members')
+      .select(`
+        co_member_id,
+        created_at,
+        owner_id,
+        co_profile:profiles!team_co_members_co_member_id_fkey(id, username, email),
+        owner_profile:profiles!team_co_members_owner_id_fkey(id, username)
+      `)
+      .eq('league_id', leagueId);
+
+    const formattedCoManagers = (coMembers || []).map(cm => {
+      const coProfile = cm.co_profile as unknown as { id: string; username: string; email: string } | null;
+      const ownerProfile = cm.owner_profile as unknown as { id: string; username: string } | null;
+      return {
+        user_id: cm.co_member_id,
+        username: coProfile?.username || 'Unknown',
+        email: coProfile?.email || '',
+        joined_at: cm.created_at,
+        is_commissioner: false,
+        role: 'co-manager' as const,
+        manages_team_of: ownerProfile?.username || 'Unknown',
       };
     });
 
     return NextResponse.json({
       success: true,
-      members: formattedMembers,
+      members: [...formattedMembers, ...formattedCoManagers],
       isCommissioner,
       commissionerId: league.created_by,
     });
@@ -116,7 +143,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: leagueId } = await params;
-    const { userId: memberToRemove } = await request.json();
+    const { userId: memberToRemove, role } = await request.json();
 
     if (!memberToRemove) {
       return NextResponse.json(
@@ -166,19 +193,36 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Remove the member
-    const { error: deleteError } = await supabase
-      .from('league_members')
-      .delete()
-      .eq('league_id', leagueId)
-      .eq('user_id', memberToRemove);
+    if (role === 'co-manager') {
+      // Remove co-manager from team_co_members
+      const { error: deleteError } = await supabase
+        .from('team_co_members')
+        .delete()
+        .eq('league_id', leagueId)
+        .eq('co_member_id', memberToRemove);
 
-    if (deleteError) {
-      console.error('Error removing league member:', deleteError);
-      return NextResponse.json(
-        { success: false, error: 'Failed to remove member' },
-        { status: 500 }
-      );
+      if (deleteError) {
+        console.error('Error removing co-manager:', deleteError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to remove co-manager' },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Remove the league member
+      const { error: deleteError } = await supabase
+        .from('league_members')
+        .delete()
+        .eq('league_id', leagueId)
+        .eq('user_id', memberToRemove);
+
+      if (deleteError) {
+        console.error('Error removing league member:', deleteError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to remove member' },
+          { status: 500 }
+        );
+      }
     }
 
     // If this was their active league, clear it

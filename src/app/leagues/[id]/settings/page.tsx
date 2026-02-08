@@ -33,6 +33,8 @@ interface Member {
   email: string;
   joined_at: string;
   is_commissioner: boolean;
+  role: 'commissioner' | 'member' | 'co-manager';
+  manages_team_of?: string;
 }
 
 export default function LeagueSettingsPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ welcome?: string }> }) {
@@ -223,9 +225,10 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
     });
   };
 
-  // Remove a member from the league
-  const removeMember = async (userId: string, username: string) => {
-    if (!confirm(`Are you sure you want to remove "${username}" from the league? This cannot be undone.`)) {
+  // Remove a member or co-manager from the league
+  const removeMember = async (userId: string, username: string, role: string = 'member') => {
+    const label = role === 'co-manager' ? 'co-manager' : 'member';
+    if (!confirm(`Are you sure you want to remove "${username}" as a ${label}? This cannot be undone.`)) {
       return;
     }
 
@@ -234,7 +237,7 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
       const response = await fetch(`/api/leagues/${leagueId}/members`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, role }),
       });
 
       const data = await response.json();
@@ -243,8 +246,8 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
         return;
       }
 
-      // Update local state
-      setMembers(prev => prev.filter(m => m.user_id !== userId));
+      // Update local state - match by both user_id and role to handle co-managers who are also members
+      setMembers(prev => prev.filter(m => !(m.user_id === userId && m.role === role)));
     } catch (err) {
       console.error('Error removing member:', err);
       alert('Failed to remove member');
@@ -413,7 +416,7 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
               <tbody>
                 {members.map((member) => (
                   <tr 
-                    key={member.user_id}
+                    key={`${member.user_id}-${member.role}`}
                     className={`border-b border-casino-gold/10 transition-colors hover:bg-casino-elevated ${
                       member.is_commissioner ? 'bg-casino-gold/5' : ''
                     }`}
@@ -435,10 +438,19 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                       {formatJoinDate(member.joined_at)}
                     </td>
                     <td className="px-2 sm:px-4 py-3 text-center">
-                      {member.is_commissioner ? (
+                      {member.role === 'commissioner' ? (
                         <span className="px-2 py-1 bg-casino-gold/20 text-casino-gold rounded text-xs font-medium">
                           Commissioner
                         </span>
+                      ) : member.role === 'co-manager' ? (
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="px-2 py-1 bg-casino-green/20 text-casino-green rounded text-xs font-medium">
+                            Co-Manager
+                          </span>
+                          <span className="text-[10px] text-casino-gray">
+                            ({member.manages_team_of}&apos;s team)
+                          </span>
+                        </div>
                       ) : (
                         <span className="px-2 py-1 bg-casino-elevated text-casino-gray rounded text-xs">
                           Member
@@ -452,7 +464,7 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => removeMember(member.user_id, member.username)}
+                          onClick={() => removeMember(member.user_id, member.username, member.role)}
                           disabled={removingMember === member.user_id}
                           className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
                         >
