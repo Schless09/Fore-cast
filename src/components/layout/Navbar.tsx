@@ -85,7 +85,7 @@ export function Navbar() {
   return (
       <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50 shadow-[0_4px_20px_rgba(251,191,36,0.1)]">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/the-club-house" className="flex items-center gap-2 text-2xl font-bold text-casino-gold font-orbitron tracking-wider hover:scale-105 transition-transform">
+          <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-casino-gold font-orbitron tracking-wider hover:scale-105 transition-transform">
             <Image src="/logo.png" alt="FORE!SIGHT" width={40} height={40} className="rounded" />
             FORE!SIGHT
           </Link>

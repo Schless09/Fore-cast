@@ -46,20 +46,20 @@ export function ChatContainer({ leagueId, leagueName }: ChatContainerProps) {
             setActiveTab('league');
             setSelectedConversation(null);
           }}
-          className={`flex-1 px-4 py-3 text-sm font-semibold transition-colors ${
+          className={`flex-1 px-4 py-3 text-sm font-semibold transition-all duration-200 ease-out ${
             activeTab === 'league'
               ? 'text-casino-gold border-b-2 border-casino-gold bg-casino-gold/10'
-              : 'text-casino-gray hover:text-white'
+              : 'text-casino-gray hover:text-white hover:bg-casino-gold/5'
           }`}
         >
           🏆 League Chat
         </button>
         <button
           onClick={() => setActiveTab('dms')}
-          className={`flex-1 px-4 py-3 text-sm font-semibold transition-colors ${
+          className={`flex-1 px-4 py-3 text-sm font-semibold transition-all duration-200 ease-out ${
             activeTab === 'dms'
               ? 'text-casino-gold border-b-2 border-casino-gold bg-casino-gold/10'
-              : 'text-casino-gray hover:text-white'
+              : 'text-casino-gray hover:text-white hover:bg-casino-gold/5'
           }`}
         >
           💬 Direct Messages
@@ -67,7 +67,7 @@ export function ChatContainer({ leagueId, leagueName }: ChatContainerProps) {
       </div>
 
       {/* Content */}
-      <div className="h-[500px]">
+      <div className="h-[500px] overflow-hidden">
         {activeTab === 'league' ? (
           <LeagueChat leagueId={leagueId} leagueName={leagueName} />
         ) : (
