@@ -470,43 +470,57 @@ export function RosterBuilder({
             </div>
           )}
 
-          <PlayerSelector
-            tournamentPlayers={tournamentPlayers}
-            selectedPlayerIds={selectedPlayerIds}
-            onTogglePlayer={handleTogglePlayer}
-            maxPlayers={MAX_PLAYERS}
-            budgetLimit={BUDGET_LIMIT}
-            budgetSpent={budgetSpent}
-            isLoading={isLoading}
-            tournamentId={tournamentId}
-            venueId={undefined} // TODO: Add venue_id to tournaments table if needed
-            tournamentName={tournamentName}
-          />
-
-          <div className="flex items-center justify-end gap-4 pt-4 border-t">
-            <div className="text-sm text-gray-600 mr-auto">
-              <strong>Total Cost:</strong>{' '}
-              <span className={`font-bold text-lg ${
-                budgetSpent <= BUDGET_LIMIT ? 'text-green-600' : 'text-red-600'
-              }`}>
-                ${budgetSpent.toFixed(2)} / ${BUDGET_LIMIT.toFixed(2)}
-              </span>
+          {!isLoading &&
+          tournamentStatus === 'upcoming' &&
+          (tournamentPlayers.length === 0 ||
+            !tournamentPlayers.some((tp) => tp.cost != null && tp.cost > 0)) ? (
+            <div className="p-6 rounded-lg border border-casino-gold/30 bg-casino-gold/10 text-center text-casino-text">
+              <p className="font-medium">Player costs haven&apos;t been set yet</p>
+              <p className="text-sm text-casino-gray mt-1">
+                Check back later—typically available the week of the tournament.
+              </p>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => router.back()}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSave} 
-              isLoading={isSaving}
-              disabled={budgetSpent > BUDGET_LIMIT || selectedPlayerIds.length === 0}
-            >
-              {existingRoster ? 'Update Roster' : 'Create Roster'}
-            </Button>
-          </div>
+          ) : (
+            <>
+              <PlayerSelector
+                tournamentPlayers={tournamentPlayers}
+                selectedPlayerIds={selectedPlayerIds}
+                onTogglePlayer={handleTogglePlayer}
+                maxPlayers={MAX_PLAYERS}
+                budgetLimit={BUDGET_LIMIT}
+                budgetSpent={budgetSpent}
+                isLoading={isLoading}
+                tournamentId={tournamentId}
+                venueId={undefined} // TODO: Add venue_id to tournaments table if needed
+                tournamentName={tournamentName}
+              />
+
+              <div className="flex items-center justify-end gap-4 pt-4 border-t">
+                <div className="text-sm text-gray-600 mr-auto">
+                  <strong>Total Cost:</strong>{' '}
+                  <span className={`font-bold text-lg ${
+                    budgetSpent <= BUDGET_LIMIT ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    ${budgetSpent.toFixed(2)} / ${BUDGET_LIMIT.toFixed(2)}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => router.back()}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSave} 
+                  isLoading={isSaving}
+                  disabled={budgetSpent > BUDGET_LIMIT || selectedPlayerIds.length === 0}
+                >
+                  {existingRoster ? 'Update Roster' : 'Create Roster'}
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

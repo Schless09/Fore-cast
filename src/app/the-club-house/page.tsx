@@ -2,11 +2,12 @@ import type { Metadata } from 'next';
 import { Card, CardContent } from '@/components/ui/Card';
 import Image from 'next/image';
 import Link from 'next/link';
+import { HowItWorks } from '@/components/HowItWorks';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { createServiceClient } from '@/lib/supabase/service';
 
 export const metadata: Metadata = {
-  title: 'The Money Board',
+  title: 'The Club House',
   description:
     'Fantasy golf league rules, payouts, and payment info. Prize money and Venmo for FORE!SIGHT fantasy golf leagues.',
 };
@@ -23,11 +24,20 @@ interface LeagueSettings {
   payout_description: string | null;
 }
 
-async function getLeagueSettings(): Promise<{ settings: LeagueSettings | null; leagueName: string | null }> {
+interface SegmentDefinition {
+  number: number;
+  name: string;
+}
+
+async function getLeagueSettings(): Promise<{
+  settings: LeagueSettings | null;
+  leagueName: string | null;
+  segments: SegmentDefinition[];
+}> {
   const { userId } = await auth();
   
   if (!userId) {
-    return { settings: null, leagueName: null };
+    return { settings: null, leagueName: null, segments: [] };
   }
 
   const supabase = createServiceClient();
@@ -40,36 +50,52 @@ async function getLeagueSettings(): Promise<{ settings: LeagueSettings | null; l
     .single();
 
   if (!profile?.active_league_id) {
-    return { settings: null, leagueName: null };
+    return { settings: null, leagueName: null, segments: [] };
   }
 
-  // Get the league settings
-  const { data: league } = await supabase
-    .from('leagues')
-    .select(`
-      id,
-      name,
-      google_sheet_url,
-      google_sheet_embed_url,
-      buy_in_amount,
-      venmo_username,
-      venmo_qr_image_path,
-      payment_instructions,
-      payout_description
-    `)
-    .eq('id', profile.active_league_id)
-    .single();
+  // Get the league settings and segments in parallel
+  const [leagueResult, segmentsResult] = await Promise.all([
+    supabase
+      .from('leagues')
+      .select(`
+        id,
+        name,
+        google_sheet_url,
+        google_sheet_embed_url,
+        buy_in_amount,
+        venmo_username,
+        venmo_qr_image_path,
+        payment_instructions,
+        payout_description
+      `)
+      .eq('id', profile.active_league_id)
+      .single(),
+    supabase
+      .from('league_segments')
+      .select('segment_number, name')
+      .eq('league_id', profile.active_league_id)
+      .order('segment_number', { ascending: true }),
+  ]);
+
+  const league = leagueResult.data;
+  const segmentRows = segmentsResult.data || [];
+
+  const segments: SegmentDefinition[] = segmentRows.map((s) => ({
+    number: s.segment_number,
+    name: s.name,
+  }));
 
   return { 
     settings: league as LeagueSettings | null, 
-    leagueName: league?.name || null 
+    leagueName: league?.name || null,
+    segments,
   };
 }
 
-export default async function TheMoneyBoardPage() {
-  const { settings, leagueName } = await getLeagueSettings();
+export default async function TheClubHousePage() {
+  const { settings, leagueName, segments } = await getLeagueSettings();
 
-  // Check if any money board settings are configured
+  // Check if any club house settings are configured
   const hasPaymentInfo = settings && (
     settings.buy_in_amount || 
     settings.venmo_username || 
@@ -85,12 +111,14 @@ export default async function TheMoneyBoardPage() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">
-          The Money Board
+          The Club House
         </h1>
         {leagueName && (
           <p className="text-casino-gray">{leagueName}</p>
         )}
       </div>
+
+      <HowItWorks payoutDescription={settings?.payout_description} segmentDefinitions={segments} />
 
       {/* Venmo Payment Section */}
       {hasPaymentInfo ? (
@@ -156,58 +184,6 @@ export default async function TheMoneyBoardPage() {
         </Card>
       )}
 
-      {/* Rules Section */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <h2 className="text-xl font-bold text-casino-gold mb-4">📋 League Rules</h2>
-          
-          <div className="space-y-3 text-sm">
-            {/* Weekly - Fixed platform rules */}
-            <div className="flex flex-wrap items-baseline gap-x-2">
-              <span className="text-white font-medium">Weekly:</span>
-              <span className="text-casino-gray">$30 budget, up to 10 golfers. Most prize money wins.</span>
-            </div>
-
-            {/* Payouts - from settings or default */}
-            {settings?.payout_description ? (
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-white font-medium">Payouts:</span>
-                <span className="text-casino-gold">{settings.payout_description}</span>
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-casino-gray">Payouts:</span>
-                <span className="text-casino-gold">1st 45%</span>
-                <span className="text-casino-gray">•</span>
-                <span className="text-casino-gold">2nd 30%</span>
-                <span className="text-casino-gray">•</span>
-                <span className="text-casino-gold">3rd 15%</span>
-                <span className="text-casino-gray">•</span>
-                <span className="text-casino-gold">4th 10%</span>
-                <span className="text-casino-gray text-xs ml-1">(Default)</span>
-              </div>
-            )}
-
-            {/* FedEx */}
-            <div>
-              <span className="text-white font-medium">FedEx Cup:</span>
-              <span className="text-casino-gray ml-2">All members → Top 24 → Top 12.</span>
-              <Link href="/fedex" className="text-casino-gold hover:underline ml-1">Playoff rules →</Link>
-            </div>
-
-            {/* Season */}
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-casino-gold/10">
-              <span className="text-white font-medium">Season Standings:</span>
-              <Link href="/standings/season?period=first" className="text-casino-gold hover:underline">1st Half</Link>
-              <span className="text-casino-gray">•</span>
-              <Link href="/standings/season?period=second" className="text-casino-gold hover:underline">2nd Half</Link>
-              <span className="text-casino-gray">•</span>
-              <Link href="/standings/season?period=full" className="text-casino-gold hover:underline">Full Season</Link>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Google Sheet */}
       {hasGoogleSheet ? (
         <Card>
@@ -235,7 +211,7 @@ export default async function TheMoneyBoardPage() {
                   <iframe 
                     src={settings.google_sheet_embed_url}
                     className="w-full h-full border-0 rounded"
-                    title="The Money Board"
+                    title="The Club House"
                   />
                 </div>
               </div>

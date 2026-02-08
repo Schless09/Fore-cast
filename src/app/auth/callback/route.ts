@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const next = searchParams.get('next') ?? '/the-money-board';
+  const next = searchParams.get('next') ?? '/the-club-house';
   
   return NextResponse.redirect(new URL(next, request.url));
 }

@@ -2,7 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
 const isProtectedRoute = createRouteMatcher([
-  '/the-money-board(.*)',
+  '/the-club-house(.*)',
   '/tournaments(.*)',
   '/players(.*)',
   '/admin(.*)',

@@ -106,7 +106,7 @@ All standings pages now filter by the user's league:
 
 3. **Dashboard**
    - Shows your current league name
-   - "The Money Board" iframe shows league-specific data
+   - "The Club House" iframe shows league-specific data
 
 ### Security & Privacy
 

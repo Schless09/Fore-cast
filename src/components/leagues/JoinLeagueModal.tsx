@@ -49,8 +49,8 @@ export function JoinLeagueModal({ onClose, canClose = false }: JoinLeagueModalPr
         // New commissioners go to settings to configure their league
         window.location.href = `/leagues/${result.leagueId}/settings?welcome=true`;
       } else {
-        // Joining a league goes to the money board
-        window.location.href = '/the-money-board';
+        // Joining a league goes to the club house
+        window.location.href = '/the-club-house';
       }
     } catch (err) {
       console.error('Error in handleSubmit:', err);

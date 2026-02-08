@@ -12,7 +12,7 @@ function SignUpContent() {
 
   const redirectUrl = teamInvite
     ? `/team-invite/${teamInvite}`
-    : '/the-money-board';
+    : '/the-club-house';
 
   return (
     <>

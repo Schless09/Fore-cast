@@ -67,5 +67,5 @@ export default async function InvitePage({ params }: InvitePageProps) {
   }
 
   // Success - redirect to dashboard
-  redirect('/the-money-board?joined=true');
+  redirect('/the-club-house?joined=true');
 }

@@ -419,7 +419,7 @@ export async function createLeagueInvite(leagueId: string) {
   };
 }
 
-// Get league settings (money board configuration)
+// Get league settings (club house configuration)
 export async function getLeagueSettings(leagueId: string) {
   const { profile, error: authError } = await getProfileForClerkUser();
   
@@ -474,7 +474,7 @@ export async function getLeagueSettings(leagueId: string) {
   };
 }
 
-// Update league money board settings (commissioner only)
+// Update league club house settings (commissioner only)
 export async function updateLeagueSettings(
   leagueId: string,
   settings: {

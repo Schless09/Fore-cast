@@ -14,7 +14,7 @@ export default function FedExPage() {
     <div className="min-h-screen bg-gradient-to-b from-casino-black via-slate-950 to-casino-black">
       <div className="max-w-3xl mx-auto px-4 py-8 sm:py-12">
         <Link
-          href="/the-money-board"
+          href="/the-club-house"
           className="text-casino-gold hover:text-casino-gold-light mb-6 inline-block text-sm"
         >
           ← Back
@@ -100,9 +100,9 @@ export default function FedExPage() {
         </Card>
 
         <div className="flex justify-center">
-          <Link href="/the-money-board">
+          <Link href="/the-club-house">
             <Button variant="outline" className="border-casino-gold text-casino-gold hover:bg-casino-gold/10">
-              Back to The Money Board
+              Back to The Club House
             </Button>
           </Link>
         </div>

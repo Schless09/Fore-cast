@@ -8,7 +8,7 @@ function AuthContent() {
   const searchParams = useSearchParams();
   const invite = searchParams.get('invite');
   const leagueName = searchParams.get('league');
-  const redirectUrl = invite ? `/invite/${invite}` : '/the-money-board';
+  const redirectUrl = invite ? `/invite/${invite}` : '/the-club-house';
 
   return (
     <>

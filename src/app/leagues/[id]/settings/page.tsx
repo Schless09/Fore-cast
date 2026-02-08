@@ -53,8 +53,8 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
   const [members, setMembers] = useState<Member[]>([]);
   const [removingMember, setRemovingMember] = useState<string | null>(null);
   
-  // Money Board settings state
-  const [moneyBoardSettings, setMoneyBoardSettings] = useState({
+  // Club House settings state
+  const [clubHouseSettings, setClubHouseSettings] = useState({
     google_sheet_url: '',
     google_sheet_embed_url: '',
     buy_in_amount: '',
@@ -64,8 +64,8 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
     payout_description: '',
     max_members: '',
   });
-  const [savingMoneyBoard, setSavingMoneyBoard] = useState(false);
-  const [moneyBoardSaved, setMoneyBoardSaved] = useState(false);
+  const [savingClubHouse, setSavingClubHouse] = useState(false);
+  const [clubHouseSaved, setClubHouseSaved] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   // Resolve params
@@ -102,11 +102,11 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
         setMembers(membersData.members);
       }
 
-      // Fetch money board settings
+      // Fetch club house settings
       if (tournamentsData.isCommissioner) {
         const settingsResult = await getLeagueSettings(leagueId);
         if (settingsResult.success && settingsResult.settings) {
-          setMoneyBoardSettings({
+          setClubHouseSettings({
             google_sheet_url: settingsResult.settings.google_sheet_url || '',
             google_sheet_embed_url: settingsResult.settings.google_sheet_embed_url || '',
             buy_in_amount: settingsResult.settings.buy_in_amount?.toString() || '',
@@ -258,23 +258,23 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
     }
   };
 
-  // Save money board settings
-  const saveMoneyBoardSettings = async () => {
+  // Save club house settings
+  const saveClubHouseSettings = async () => {
     if (!leagueId) return;
     
-    setSavingMoneyBoard(true);
-    setMoneyBoardSaved(false);
+    setSavingClubHouse(true);
+    setClubHouseSaved(false);
     
     try {
       const result = await updateLeagueSettings(leagueId, {
-        google_sheet_url: moneyBoardSettings.google_sheet_url || null,
-        google_sheet_embed_url: moneyBoardSettings.google_sheet_embed_url || null,
-        buy_in_amount: moneyBoardSettings.buy_in_amount ? parseInt(moneyBoardSettings.buy_in_amount) : null,
-        venmo_username: moneyBoardSettings.venmo_username || null,
-        venmo_qr_image_path: moneyBoardSettings.venmo_qr_image_path || null,
-        payment_instructions: moneyBoardSettings.payment_instructions || null,
-        payout_description: moneyBoardSettings.payout_description || null,
-        max_members: moneyBoardSettings.max_members ? parseInt(moneyBoardSettings.max_members) : null,
+        google_sheet_url: clubHouseSettings.google_sheet_url || null,
+        google_sheet_embed_url: clubHouseSettings.google_sheet_embed_url || null,
+        buy_in_amount: clubHouseSettings.buy_in_amount ? parseInt(clubHouseSettings.buy_in_amount) : null,
+        venmo_username: clubHouseSettings.venmo_username || null,
+        venmo_qr_image_path: clubHouseSettings.venmo_qr_image_path || null,
+        payment_instructions: clubHouseSettings.payment_instructions || null,
+        payout_description: clubHouseSettings.payout_description || null,
+        max_members: clubHouseSettings.max_members ? parseInt(clubHouseSettings.max_members) : null,
       });
       
       if (!result.success) {
@@ -282,13 +282,13 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
         return;
       }
       
-      setMoneyBoardSaved(true);
-      setTimeout(() => setMoneyBoardSaved(false), 3000);
+      setClubHouseSaved(true);
+      setTimeout(() => setClubHouseSaved(false), 3000);
     } catch (err) {
-      console.error('Error saving money board settings:', err);
+      console.error('Error saving club house settings:', err);
       alert('Failed to save settings');
     } finally {
-      setSavingMoneyBoard(false);
+      setSavingClubHouse(false);
     }
   };
 
@@ -310,7 +310,7 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
         return;
       }
       
-      setMoneyBoardSettings(prev => ({
+      setClubHouseSettings(prev => ({
         ...prev,
         venmo_qr_image_path: result.publicUrl || ''
       }));
@@ -383,7 +383,7 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                 <ul className="text-sm text-casino-gray space-y-1">
                   <li>• <strong className="text-casino-text">Invite members</strong> - Share an invite link from the Leagues page</li>
                   <li>• <strong className="text-casino-text">Configure segments</strong> - Set up 1st Half, 2nd Half, etc.</li>
-                  <li>• <strong className="text-casino-text">Set up Money Board</strong> - Add payment info and payout structure below</li>
+                  <li>• <strong className="text-casino-text">Set up Club House</strong> - Add payment info and payout structure below</li>
                 </ul>
                 <Button
                   onClick={() => setIsWelcome(false)}
@@ -703,15 +703,15 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
               <div className="flex items-center gap-3">
                 <input
                   type="number"
-                  value={moneyBoardSettings.max_members}
-                  onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, max_members: e.target.value }))}
+                  value={clubHouseSettings.max_members}
+                  onChange={(e) => setClubHouseSettings(prev => ({ ...prev, max_members: e.target.value }))}
                   placeholder="Unlimited"
                   min="1"
                   className="w-32 px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold"
                 />
                 <span className="text-xs text-casino-gray">
-                  {moneyBoardSettings.max_members 
-                    ? `${members.length} / ${moneyBoardSettings.max_members} members`
+                  {clubHouseSettings.max_members 
+                    ? `${members.length} / ${clubHouseSettings.max_members} members`
                     : 'No limit set'}
                 </span>
               </div>
@@ -721,12 +721,12 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
             </div>
             <div className="flex items-center gap-4 pt-2">
               <Button
-                onClick={saveMoneyBoardSettings}
-                disabled={savingMoneyBoard}
+                onClick={saveClubHouseSettings}
+                disabled={savingClubHouse}
               >
-                {savingMoneyBoard ? 'Saving...' : 'Save'}
+                {savingClubHouse ? 'Saving...' : 'Save'}
               </Button>
-              {moneyBoardSaved && (
+              {clubHouseSaved && (
                 <span className="text-casino-green text-sm">Settings saved!</span>
               )}
             </div>
@@ -734,14 +734,14 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
         </CardContent>
       </Card>
 
-      {/* Money Board Settings */}
+      {/* Club House Settings */}
       <Card className="bg-casino-card border-casino-gold/20 mt-6">
         <CardHeader>
-          <CardTitle className="text-casino-gold">💰 Money Board Settings</CardTitle>
+          <CardTitle className="text-casino-gold">💰 Club House Settings</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-casino-gray mb-6">
-            Configure the payment and payout information displayed on your league&apos;s Money Board page.
+            Configure the payment and payout information displayed on your league&apos;s Club House page.
           </p>
           
           <div className="space-y-6">
@@ -754,8 +754,8 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                 </label>
                 <input
                   type="url"
-                  value={moneyBoardSettings.google_sheet_url}
-                  onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, google_sheet_url: e.target.value }))}
+                  value={clubHouseSettings.google_sheet_url}
+                  onChange={(e) => setClubHouseSettings(prev => ({ ...prev, google_sheet_url: e.target.value }))}
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                   className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold"
                 />
@@ -766,8 +766,8 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                 </label>
                 <input
                   type="url"
-                  value={moneyBoardSettings.google_sheet_embed_url}
-                  onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, google_sheet_embed_url: e.target.value }))}
+                  value={clubHouseSettings.google_sheet_embed_url}
+                  onChange={(e) => setClubHouseSettings(prev => ({ ...prev, google_sheet_embed_url: e.target.value }))}
                   placeholder="https://docs.google.com/spreadsheets/d/e/.../pubhtml"
                   className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold"
                 />
@@ -787,8 +787,8 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                   </label>
                   <input
                     type="number"
-                    value={moneyBoardSettings.buy_in_amount}
-                    onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, buy_in_amount: e.target.value }))}
+                    value={clubHouseSettings.buy_in_amount}
+                    onChange={(e) => setClubHouseSettings(prev => ({ ...prev, buy_in_amount: e.target.value }))}
                     placeholder="100"
                     min="0"
                     className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold"
@@ -800,8 +800,8 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                   </label>
                   <input
                     type="text"
-                    value={moneyBoardSettings.venmo_username}
-                    onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, venmo_username: e.target.value }))}
+                    value={clubHouseSettings.venmo_username}
+                    onChange={(e) => setClubHouseSettings(prev => ({ ...prev, venmo_username: e.target.value }))}
                     placeholder="@Your-Name"
                     className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold"
                   />
@@ -814,17 +814,17 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                   Venmo QR Code Image
                 </label>
                 <div className="flex items-start gap-4">
-                  {moneyBoardSettings.venmo_qr_image_path ? (
+                  {clubHouseSettings.venmo_qr_image_path ? (
                     <div className="relative">
                       <Image
-                        src={moneyBoardSettings.venmo_qr_image_path}
+                        src={clubHouseSettings.venmo_qr_image_path}
                         alt="Venmo QR Code"
                         width={100}
                         height={100}
                         className="rounded border border-casino-gold/20"
                       />
                       <button
-                        onClick={() => setMoneyBoardSettings(prev => ({ ...prev, venmo_qr_image_path: '' }))}
+                        onClick={() => setClubHouseSettings(prev => ({ ...prev, venmo_qr_image_path: '' }))}
                         className="absolute -top-2 -right-2 w-5 h-5 bg-casino-red rounded-full text-white text-xs flex items-center justify-center hover:bg-casino-red/80"
                         title="Remove image"
                       >
@@ -858,8 +858,8 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                   Payment Instructions (optional)
                 </label>
                 <textarea
-                  value={moneyBoardSettings.payment_instructions}
-                  onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, payment_instructions: e.target.value }))}
+                  value={clubHouseSettings.payment_instructions}
+                  onChange={(e) => setClubHouseSettings(prev => ({ ...prev, payment_instructions: e.target.value }))}
                   placeholder="Payment due before the start of the first tournament..."
                   rows={2}
                   className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold resize-none"
@@ -875,8 +875,8 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
                   Payout Description
                 </label>
                 <textarea
-                  value={moneyBoardSettings.payout_description}
-                  onChange={(e) => setMoneyBoardSettings(prev => ({ ...prev, payout_description: e.target.value }))}
+                  value={clubHouseSettings.payout_description}
+                  onChange={(e) => setClubHouseSettings(prev => ({ ...prev, payout_description: e.target.value }))}
                   placeholder="1st: 45%, 2nd: 30%, 3rd: 15%, 4th: 10%"
                   rows={3}
                   className="w-full px-3 py-2 bg-casino-dark border border-casino-gold/30 rounded text-sm text-casino-text focus:outline-none focus:border-casino-gold resize-none"
@@ -890,12 +890,12 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
             {/* Save Button */}
             <div className="flex items-center gap-4 pt-4">
               <Button
-                onClick={saveMoneyBoardSettings}
-                disabled={savingMoneyBoard}
+                onClick={saveClubHouseSettings}
+                disabled={savingClubHouse}
               >
-                {savingMoneyBoard ? 'Saving...' : 'Save Money Board Settings'}
+                {savingClubHouse ? 'Saving...' : 'Save Club House Settings'}
               </Button>
-              {moneyBoardSaved && (
+              {clubHouseSaved && (
                 <span className="text-casino-green text-sm">✓ Settings saved!</span>
               )}
             </div>
