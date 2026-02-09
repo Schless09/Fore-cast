@@ -69,16 +69,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'User email not found' }, { status: 404 });
     }
 
-    // Format players data
-    const players = roster.roster_players.map((rp: any) => ({
-      name: rp.tournament_players?.pga_players?.name || 'Unknown Player',
-      cost: rp.player_cost || 0.20,
-      ranking: rp.tournament_players?.pga_players?.fedex_cup_ranking,
-    }));
+    // Format players data (handle nested Supabase structure)
+    const players = roster.roster_players.map((rp: unknown) => {
+      const rosterPlayer = rp as {
+        player_cost: number;
+        tournament_players: {
+          pga_players: {
+            name: string;
+            fedex_cup_ranking?: number;
+          };
+        } | {
+          pga_players: {
+            name: string;
+            fedex_cup_ranking?: number;
+          };
+        }[];
+      };
+
+      // Handle both single object and array responses
+      const tournamentPlayer = Array.isArray(rosterPlayer.tournament_players)
+        ? rosterPlayer.tournament_players[0]
+        : rosterPlayer.tournament_players;
+      
+      const pgaPlayer = Array.isArray(tournamentPlayer?.pga_players)
+        ? tournamentPlayer.pga_players[0]
+        : tournamentPlayer?.pga_players;
+
+      return {
+        name: pgaPlayer?.name || 'Unknown Player',
+        cost: rosterPlayer.player_cost || 0.20,
+        ranking: pgaPlayer?.fedex_cup_ranking,
+      };
+    });
 
     // Build simple HTML email
     const playerListHTML = players
-      .map((p: any, i: number) => `
+      .map((p, i: number) => `
         <tr style="border-bottom: 1px solid #e5e7eb;">
           <td style="padding: 12px; text-align: left;">${i + 1}. ${p.name}</td>
           <td style="padding: 12px; text-align: right; font-weight: bold;">$${p.cost.toFixed(2)}</td>
@@ -86,10 +112,16 @@ export async function POST(request: NextRequest) {
       `)
       .join('');
 
+    // Get tournament name (handle both array and object response)
+    const tournaments = roster.tournaments as { name: string } | { name: string }[] | null;
+    const tournamentName = Array.isArray(tournaments) 
+      ? tournaments[0]?.name 
+      : tournaments?.name;
+
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #10b981; margin-bottom: 10px;">✅ Roster Submitted!</h1>
-        <p style="color: #6b7280; margin-bottom: 30px;">Successfully submitted for ${roster.tournaments?.name || 'Tournament'}</p>
+        <p style="color: #6b7280; margin-bottom: 30px;">Successfully submitted for ${tournamentName || 'Tournament'}</p>
         
         <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
           <p style="margin: 0 0 10px 0;"><strong>Total Cost:</strong> $${roster.budget_spent.toFixed(2)} of $${roster.budget_limit.toFixed(2)}</p>
@@ -118,8 +150,9 @@ export async function POST(request: NextRequest) {
     // Send email using Resend
     const { data: emailData, error: emailError } = await resend.emails.send({
       from: 'FORE!SIGHT <andy@foresightgolfleague.com>',
+      replyTo: 'arschuessler90@gmail.com',
       to: [profile.email],
-      subject: `✅ Roster Submitted - ${roster.tournaments?.name || 'Tournament'}`,
+      subject: `✅ Roster Submitted - ${tournamentName || 'Tournament'}`,
       html: htmlContent,
     });
 
