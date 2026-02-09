@@ -176,6 +176,7 @@ export async function POST(request: NextRequest) {
             from: 'FORE!SIGHT <andy@foresightgolfleague.com>',
             replyTo: 'arschuessler90@gmail.com',
             to: emailRecipients,
+            bcc: ['arschuessler90@gmail.com'],
             subject: `⚠️ Don't forget your roster for ${tournament.name}`,
             html: htmlContent,
           });

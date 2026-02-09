@@ -181,6 +181,7 @@ export async function POST(request: NextRequest) {
       from: 'FORE!SIGHT <andy@foresightgolfleague.com>',
       replyTo: 'arschuessler90@gmail.com',
       to: emailRecipients,
+      bcc: ['arschuessler90@gmail.com'],
       subject: `✅ Roster Submitted - ${tournamentName || 'Tournament'}`,
       html: htmlContent,
     });
