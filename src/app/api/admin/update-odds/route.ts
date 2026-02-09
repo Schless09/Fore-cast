@@ -4,19 +4,59 @@ import { generateCostFromOddsData } from '@/lib/salary-cap';
 
 /**
  * Bulk update player odds and calculate costs
- * Expected payload: { tournamentId, players: [{ playerName, winnerOdds, top5Odds, top10Odds }] }
+ * Expected payload: { tournamentId, players: [{ playerName, winnerOdds, top5Odds, top10Odds }], clearExisting?: boolean }
+ * If clearExisting is true (default), deletes all tournament_players for this tournament before inserting new ones
  */
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServiceClient();
     const body = await request.json();
-    const { tournamentId, players } = body;
+    const { tournamentId, players, clearExisting = true } = body;
 
     if (!tournamentId || !players || !Array.isArray(players)) {
       return NextResponse.json(
         { error: 'tournamentId and players array are required' },
         { status: 400 }
       );
+    }
+
+    // Clear existing tournament_players if requested (default true)
+    if (clearExisting) {
+      // Check if any rosters exist for this tournament (can't clear if rosters exist)
+      const { data: existingRosters, error: rosterCheckError } = await supabase
+        .from('user_rosters')
+        .select('id')
+        .eq('tournament_id', tournamentId)
+        .limit(1);
+
+      if (rosterCheckError) {
+        console.error('Error checking for rosters:', rosterCheckError);
+        return NextResponse.json(
+          { error: 'Failed to check for existing rosters' },
+          { status: 500 }
+        );
+      }
+
+      if (existingRosters && existingRosters.length > 0) {
+        return NextResponse.json(
+          { error: 'Cannot clear tournament players - rosters already exist for this tournament. Update costs/odds individually instead.' },
+          { status: 400 }
+        );
+      }
+
+      const { error: deleteError } = await supabase
+        .from('tournament_players')
+        .delete()
+        .eq('tournament_id', tournamentId);
+
+      if (deleteError) {
+        console.error('Error clearing tournament players:', deleteError);
+        return NextResponse.json(
+          { error: 'Failed to clear existing players' },
+          { status: 500 }
+        );
+      }
+      console.log(`Cleared existing tournament_players for tournament ${tournamentId}`);
     }
 
     const updates = [];
