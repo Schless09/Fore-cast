@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { shouldPollNow } from '@/lib/polling-config';
 import { syncTournamentScores } from '@/lib/sync-scores';
@@ -214,14 +215,16 @@ export async function GET(request: NextRequest) {
   const startTime = Date.now();
   
   try {
-    // Verify the request is from Vercel Cron (in production)
+    // Authorize: Vercel Cron (Bearer CRON_SECRET) or signed-in user (e.g. admin Force Sync)
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
-    
-    // Allow bypass in development or if no secret configured
+    const { userId } = await auth();
+
     const isDev = process.env.NODE_ENV === 'development';
-    const isAuthorized = !cronSecret || authHeader === `Bearer ${cronSecret}` || isDev;
-    
+    const isCronAuth = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    const isUserAuth = !!userId;
+    const isAuthorized = !cronSecret || isCronAuth || isDev || isUserAuth;
+
     if (!isAuthorized) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

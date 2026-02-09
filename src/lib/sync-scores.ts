@@ -111,7 +111,8 @@ const NICKNAME_MAP: Record<string, string> = {
 
 /**
  * Normalize a name for matching: lowercase, remove accents, transliterate Nordic chars.
- * Examples: "Ludvig Åberg" → "ludvig aberg", "Nicolai Højgaard" → "nicolai hojgaard"
+ * Collapses initial patterns (e.g. "S.T.", "S. T.", "ST") so "S.T. Lee" matches "ST Lee".
+ * Examples: "Ludvig Åberg" → "ludvig aberg", "S.T. Lee" → "st lee"
  */
 function normalizeName(name: string): string {
   let normalized = name
@@ -130,7 +131,15 @@ function normalizeName(name: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove combining marks
     .replace(/\s+/g, ' '); // Normalize whitespace
-  
+
+  // Collapse initial patterns: "s.t.", "s. t.", "s t" → "st" so "S.T. Lee" matches "ST Lee"
+  normalized = normalized.replace(/(\b([a-z]\.?\s*)+)/g, (match, _p1, offset, fullStr) => {
+    const letters = match.replace(/[.\s]/g, '').toLowerCase();
+    const nextIdx = offset + match.length;
+    const nextChar = fullStr[nextIdx];
+    return letters + (nextChar && /[a-z]/.test(nextChar) ? ' ' : '');
+  });
+
   // Apply nickname mapping if exists
   return NICKNAME_MAP[normalized] || normalized;
 }
