@@ -104,7 +104,7 @@ export default function Home() {
               Build Your Dream Roster
             </h3>
             <p className="text-gray-400 text-lg sm:text-xl mb-6">
-              Draft PGA Tour pros under a $30 salary cap and outsmart the field.
+              Draft PGA Tour pros under $30 salary cap and outsmart the field.
             </p>
           </div>
 
