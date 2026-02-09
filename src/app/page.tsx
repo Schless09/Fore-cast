@@ -110,7 +110,7 @@ export default function Home() {
 
           <div className="relative z-20 lg:-mb-24">
             <IPhone17Frame
-              src="/roster.jpeg"
+              src="/roster.png"
               alt="Roster screen"
               scale={0.7}
               animate
@@ -122,7 +122,7 @@ export default function Home() {
         <section className="relative grid lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-10 lg:mb-16">
           <div className="relative z-20 lg:-mb-24 order-last lg:order-first">
             <IPhone17Frame
-              src="/leaderboard2.jpeg"
+              src="/leaderboard2.png"
               alt="Leaderboard"
               scale={0.7}
               animate
@@ -152,7 +152,7 @@ export default function Home() {
 
           <div className="relative z-10">
             <IPhone17Frame
-              src="/standings2.jpeg"
+              src="/standings2.png"
               alt="Standings"
               scale={0.7}
               animate
