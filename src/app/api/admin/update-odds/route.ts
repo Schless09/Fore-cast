@@ -5,13 +5,14 @@ import { generateCostFromOddsData } from '@/lib/salary-cap';
 /**
  * Bulk update player odds and calculate costs
  * Expected payload: { tournamentId, players: [{ playerName, winnerOdds, top5Odds, top10Odds }], clearExisting?: boolean }
- * If clearExisting is true (default), deletes all tournament_players for this tournament before inserting new ones
+ * If clearExisting is true, deletes all tournament_players for this tournament before inserting new ones.
+ * Default is false (safe update mode - updates existing + adds new players).
  */
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServiceClient();
     const body = await request.json();
-    const { tournamentId, players, clearExisting = true } = body;
+    const { tournamentId, players, clearExisting = false } = body;
 
     if (!tournamentId || !players || !Array.isArray(players)) {
       return NextResponse.json(

@@ -106,6 +106,7 @@ export default function AdminOddsPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loadingTournaments, setLoadingTournaments] = useState(true);
   const [parsedPlayers, setParsedPlayers] = useState<PlayerOdds[] | null>(null);
+  const [clearExisting, setClearExisting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -196,6 +197,7 @@ export default function AdminOddsPage() {
         body: JSON.stringify({
           tournamentId,
           players: playersData,
+          clearExisting,
         }),
       });
 
@@ -314,6 +316,22 @@ export default function AdminOddsPage() {
               <br />
               Winner odds can be positive (+290) or negative (-145). Costs are calculated from winner odds.
             </p>
+          </div>
+
+          <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <input
+              type="checkbox"
+              id="clearExisting"
+              checked={clearExisting}
+              onChange={(e) => setClearExisting(e.target.checked)}
+              className="w-4 h-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+            />
+            <label htmlFor="clearExisting" className="text-sm text-gray-700">
+              <span className="font-semibold text-red-600">Clear existing field first</span> - Delete all tournament_players before uploading. 
+              <span className="text-xs text-gray-600 block mt-0.5">
+                ⚠️ Only use for new tournaments. Will fail if rosters already exist.
+              </span>
+            </label>
           </div>
 
           {error && (
