@@ -103,6 +103,7 @@ export function IPhone17Frame({
               quality={95}
               className="w-full h-full object-cover object-top"
               priority
+              unoptimized
             />
           </div>
 
