@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { TournamentPlayer, PGAPlayer } from '@/lib/types';
-import { Card } from '@/components/ui/Card';
-import { useParams } from 'next/navigation';
 import { PlayerDetailsModal } from './PlayerDetailsModal';
 
 // Convert country code to flag emoji
@@ -51,7 +49,6 @@ export function PlayerSelector({
   budgetLimit,
   budgetSpent,
   isLoading = false,
-  tournamentId,
   venueId,
   tournamentName,
 }: PlayerSelectorProps) {
@@ -70,24 +67,24 @@ export function PlayerSelector({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between mb-4 p-4 bg-gray-50 rounded-lg">
+      <div className="flex items-center justify-between mb-4 p-4 bg-casino-card border border-casino-gold/20 rounded-lg">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">
+          <h3 className="text-lg font-semibold text-casino-text mb-1">
             Select Players ({selectedPlayerIds.length}/{maxPlayers})
           </h3>
           <div className="flex items-center gap-4 text-sm">
-            <span className="text-gray-600">
-              Budget Spent: <span className="font-semibold text-gray-900">${budgetSpent.toFixed(2)}</span>
+            <span className="text-casino-gray">
+              Budget Spent: <span className="font-semibold text-casino-text">${budgetSpent.toFixed(2)}</span>
             </span>
-            <span className="text-gray-600">
-              Remaining: <span className={`font-semibold ${remainingBudget >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <span className="text-casino-gray">
+              Remaining: <span className={`font-semibold ${remainingBudget >= 0 ? 'text-casino-green' : 'text-casino-red'}`}>
                 ${remainingBudget.toFixed(2)}
               </span>
             </span>
           </div>
         </div>
         {!canAddMore && (
-          <span className="text-sm text-green-600 font-medium px-3 py-1 bg-green-50 rounded">
+          <span className="text-sm text-casino-green font-medium px-3 py-1 bg-casino-green/10 border border-casino-green/30 rounded">
             Roster Complete
           </span>
         )}
@@ -95,7 +92,7 @@ export function PlayerSelector({
 
       {isLoading ? (
         <div className="text-center py-8">
-          <p className="text-gray-600">Loading players...</p>
+          <p className="text-casino-gray">Loading players...</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -113,15 +110,15 @@ export function PlayerSelector({
             ].filter(col => col.length > 0);
 
             return (
-              <div key={sectionIdx} className="bg-white rounded-lg border border-gray-200 p-3">
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+              <div key={sectionIdx} className="bg-casino-card rounded-lg border border-casino-gold/20 p-3">
+                <div className="text-xs font-semibold text-casino-gray uppercase tracking-wide mb-2">
                   Players {startIdx + 1} - {endIdx}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {columns.map((column, colIdx) => (
                     <div key={colIdx} className="space-y-1">
                       {column.map((tp, rowIdx) => {
-                        const pgaPlayer = tp.pga_player || (tp as any).pga_players;
+                        const pgaPlayer = tp.pga_player ?? tp.pga_players;
                         if (!pgaPlayer) return null;
 
                         const playerId = tp.pga_player_id;
@@ -137,10 +134,10 @@ export function PlayerSelector({
                             key={tp.id}
                             className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-all text-sm ${
                               isSelected
-                                ? 'border-green-600 bg-green-50 ring-1 ring-green-600'
+                                ? 'border-casino-green bg-casino-green/10 ring-1 ring-casino-green'
                                 : isDisabled
-                                ? 'border-gray-200 bg-gray-50 opacity-50'
-                                : 'border-gray-200 hover:border-green-400 hover:bg-gray-50'
+                                ? 'border-casino-gold/20 bg-casino-elevated/50 opacity-50'
+                                : 'border-casino-gold/20 hover:border-casino-green/50 hover:bg-casino-elevated'
                             }`}
                           >
                             {/* Info button */}
@@ -149,7 +146,7 @@ export function PlayerSelector({
                                 e.stopPropagation();
                                 setSelectedPlayerForDetails({ player: pgaPlayer, cost });
                               }}
-                              className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0"
+                              className="text-casino-gray hover:text-casino-gold transition-colors shrink-0"
                               title="View player details"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,29 +161,29 @@ export function PlayerSelector({
                               }`}
                               onClick={() => !isDisabled && onTogglePlayer(playerId)}
                             >
-                              <div className="text-xs text-gray-400 w-5 text-right flex-shrink-0">
+                              <div className="text-xs text-casino-gray w-5 text-right shrink-0">
                                 {rank}
                               </div>
                               <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                                <span className="truncate font-medium text-gray-900">
+                                <span className="truncate font-medium text-casino-text">
                                   {pgaPlayer.name}
                                 </span>
                                 {pgaPlayer.country && (
-                                  <span className="text-xs flex-shrink-0" title={pgaPlayer.country}>
+                                  <span className="text-xs shrink-0" title={pgaPlayer.country}>
                                     {getCountryFlag(pgaPlayer.country)}
                                   </span>
                                 )}
                               </div>
-                              <div className={`text-xs font-bold flex-shrink-0 ${
-                                cost >= 10 ? 'text-red-600' : 
-                                cost >= 5 ? 'text-orange-600' : 
-                                cost >= 2 ? 'text-yellow-600' : 
-                                'text-gray-600'
+                              <div className={`text-xs font-bold shrink-0 ${
+                                cost >= 10 ? 'text-casino-red' : 
+                                cost >= 5 ? 'text-amber-400' : 
+                                cost >= 2 ? 'text-casino-gold' : 
+                                'text-casino-gray'
                               }`}>
                                 ${cost.toFixed(2)}
                               </div>
                               {isSelected && (
-                                <div className="text-green-600 font-bold flex-shrink-0">✓</div>
+                                <div className="text-casino-green font-bold shrink-0">✓</div>
                               )}
                             </div>
                           </div>

@@ -327,12 +327,12 @@ export function RosterBuilder({
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden">
+          <div className="bg-casino-card border border-casino-gold/20 rounded-xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden">
             {/* Header with gradient background */}
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-4 relative">
+            <div className="bg-gradient-to-r from-casino-green to-emerald-600 px-4 py-4 relative">
               <button
                 onClick={() => setShowSuccessModal(false)}
-                className="absolute top-3 right-3 text-white hover:text-gray-200 transition-colors"
+                className="absolute top-3 right-3 text-white hover:text-white/80 transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -340,8 +340,8 @@ export function RosterBuilder({
               </button>
               
               <div className="flex items-center gap-2">
-                <div className="bg-white rounded-full p-1.5">
-                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="bg-white/20 rounded-full p-1.5">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
@@ -359,29 +359,29 @@ export function RosterBuilder({
             <div className="p-4 overflow-y-auto max-h-[calc(85vh-140px)]">
               {/* Roster Summary Cards */}
               <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-3 border border-green-200">
-                  <div className="text-xs text-gray-600 mb-0.5">Total Cost</div>
-                  <div className="text-xl font-bold text-green-700">
+                <div className="bg-casino-green/10 rounded-lg p-3 border border-casino-green/30">
+                  <div className="text-xs text-casino-gray mb-0.5">Total Cost</div>
+                  <div className="text-xl font-bold text-casino-green">
                     ${budgetSpent.toFixed(2)}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-casino-gray">
                     of ${BUDGET_LIMIT.toFixed(2)}
                   </div>
                 </div>
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
-                  <div className="text-xs text-gray-600 mb-0.5">Players</div>
-                  <div className="text-xl font-bold text-blue-700">
+                <div className="bg-casino-gold/10 rounded-lg p-3 border border-casino-gold/30">
+                  <div className="text-xs text-casino-gray mb-0.5">Players</div>
+                  <div className="text-xl font-bold text-casino-gold">
                     {selectedPlayerIds.length}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-casino-gray">
                     of {MAX_PLAYERS} max
                   </div>
                 </div>
               </div>
 
               {/* Player List */}
-              <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
-                <div className="bg-gradient-to-r from-gray-800 to-gray-700 px-3 py-2">
+              <div className="rounded-lg overflow-hidden border border-casino-gold/20">
+                <div className="bg-casino-elevated px-3 py-2">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -389,22 +389,22 @@ export function RosterBuilder({
                     Your Players
                   </h3>
                 </div>
-                <div className="divide-y divide-gray-100 bg-white">
+                <div className="divide-y divide-casino-gold/10 bg-casino-card">
                   {getSelectedPlayers().map((tp, index) => {
                     const player = tp?.pga_players || tp?.pga_player;
                     return (
                       <div 
                         key={tp?.id || index} 
-                        className="px-3 py-2.5 flex items-center justify-between hover:bg-gradient-to-r hover:from-gray-50 hover:to-white transition-all duration-150"
+                        className="px-3 py-2.5 flex items-center justify-between hover:bg-casino-elevated transition-all duration-150"
                       >
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-bold text-xs">
                             {index + 1}
                           </div>
                           <div>
-                            <div className="text-sm font-semibold text-gray-900">{player?.name || 'Unknown Player'}</div>
+                            <div className="text-sm font-semibold text-casino-text">{player?.name || 'Unknown Player'}</div>
                             {player?.fedex_cup_ranking && (
-                              <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <div className="text-xs text-casino-gray flex items-center gap-1">
                                 <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                                 </svg>
@@ -414,7 +414,7 @@ export function RosterBuilder({
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-bold text-base text-green-600">
+                          <div className="font-bold text-base text-casino-green">
                             ${(tp?.cost || 0.20).toFixed(2)}
                           </div>
                         </div>
@@ -426,12 +426,12 @@ export function RosterBuilder({
             </div>
 
             {/* Action Buttons */}
-            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row gap-2">
+            <div className="px-4 py-3 bg-casino-card border-t border-casino-gold/20 flex flex-col sm:flex-row gap-2">
               <Button
                 onClick={() => {
                   router.push(`/tournaments/${tournamentId}/roster/${submittedRosterId}`);
                 }}
-                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-sm font-semibold py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+                className="flex-1 bg-gradient-to-r from-casino-green to-emerald-500 hover:from-casino-green-dark hover:to-emerald-600 text-white text-sm font-semibold py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
               >
                 View Roster Details
               </Button>
@@ -445,7 +445,7 @@ export function RosterBuilder({
                     router.push(`/tournaments/${tournamentId}`);
                   }
                 }}
-                className="flex-1 border-2 border-gray-300 hover:border-gray-400 text-gray-700 text-sm font-semibold py-2 rounded-lg hover:bg-gray-50 transition-all duration-200"
+                className="flex-1 border-2 border-casino-gold/30 hover:border-casino-gold/50 text-casino-text text-sm font-semibold py-2 rounded-lg hover:bg-casino-elevated transition-all duration-200"
               >
                 {onSave ? 'Done' : 'Back to Tournament'}
               </Button>
@@ -459,13 +459,13 @@ export function RosterBuilder({
           <CardTitle>
             {existingRoster ? 'Edit Roster' : 'Create New Roster'}
           </CardTitle>
-          <p className="text-sm text-gray-600 mt-2">
+          <p className="text-sm text-casino-gray mt-2">
             Select up to {MAX_PLAYERS} players with a ${BUDGET_LIMIT.toFixed(2)} salary cap
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg">
+            <div className="p-3 text-sm text-casino-red bg-casino-red/10 border border-casino-red/30 rounded-lg">
               {error}
             </div>
           )}
@@ -495,11 +495,11 @@ export function RosterBuilder({
                 tournamentName={tournamentName}
               />
 
-              <div className="flex items-center justify-end gap-4 pt-4 border-t">
-                <div className="text-sm text-gray-600 mr-auto">
+              <div className="flex items-center justify-end gap-4 pt-4 border-t border-casino-gold/20">
+                <div className="text-sm text-casino-gray mr-auto">
                   <strong>Total Cost:</strong>{' '}
                   <span className={`font-bold text-lg ${
-                    budgetSpent <= BUDGET_LIMIT ? 'text-green-600' : 'text-red-600'
+                    budgetSpent <= BUDGET_LIMIT ? 'text-casino-green' : 'text-casino-red'
                   }`}>
                     ${budgetSpent.toFixed(2)} / ${BUDGET_LIMIT.toFixed(2)}
                   </span>
