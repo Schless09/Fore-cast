@@ -107,6 +107,7 @@ const NICKNAME_MAP: Record<string, string> = {
   'kh lee': 'kyoung-hoon lee',
   'ct pan': 'c.t. pan',
   'hj kim': 'h.j. kim',
+  'st lee': 'seung taek lee',
 };
 
 /**
