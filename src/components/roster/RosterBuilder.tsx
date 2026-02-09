@@ -209,6 +209,18 @@ export function RosterBuilder({
         rosterId = await createRoster(profile.id, budgetSpent);
       }
 
+      // Send confirmation email (non-blocking, don't fail if email fails)
+      try {
+        await fetch('/api/rosters/send-confirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rosterId }),
+        });
+      } catch (emailError) {
+        // Log but don't fail the roster submission if email fails
+        console.error('Failed to send confirmation email:', emailError);
+      }
+
       // Show success modal
       setSubmittedRosterId(rosterId);
       setShowSuccessModal(true);
