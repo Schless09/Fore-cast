@@ -57,16 +57,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Roster not found' }, { status: 404 });
     }
 
-    // Get user's email from profiles
+    // Get user's email and active league from profiles
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('email, username')
+      .select('email, username, active_league_id')
       .eq('id', roster.user_id)
       .single();
 
     if (profileError || !profile?.email) {
       console.error('Error fetching profile or email not found:', profileError);
       return NextResponse.json({ success: false, error: 'User email not found' }, { status: 404 });
+    }
+
+    // Collect all email recipients: owner + co-managers
+    const emailRecipients: string[] = [profile.email];
+
+    // If user has an active league, find co-managers
+    if (profile.active_league_id) {
+      const { data: coManagers } = await supabase
+        .from('team_co_members')
+        .select('profiles!team_co_members_co_member_id_fkey(email)')
+        .eq('league_id', profile.active_league_id)
+        .eq('owner_id', roster.user_id);
+
+      if (coManagers && coManagers.length > 0) {
+        coManagers.forEach((cm: unknown) => {
+          const coMember = cm as {
+            profiles: { email: string } | { email: string }[] | null;
+          };
+          
+          // Handle both single object and array responses
+          const profileData = Array.isArray(coMember.profiles)
+            ? coMember.profiles[0]
+            : coMember.profiles;
+
+          if (profileData?.email && !emailRecipients.includes(profileData.email)) {
+            emailRecipients.push(profileData.email);
+          }
+        });
+      }
     }
 
     // Format players data (handle nested Supabase structure)
@@ -147,11 +176,11 @@ export async function POST(request: NextRequest) {
       </div>
     `;
 
-    // Send email using Resend
+    // Send email using Resend to owner and all co-managers
     const { data: emailData, error: emailError } = await resend.emails.send({
       from: 'FORE!SIGHT <andy@foresightgolfleague.com>',
       replyTo: 'arschuessler90@gmail.com',
-      to: [profile.email],
+      to: emailRecipients,
       subject: `✅ Roster Submitted - ${tournamentName || 'Tournament'}`,
       html: htmlContent,
     });
