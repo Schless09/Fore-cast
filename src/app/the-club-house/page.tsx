@@ -247,13 +247,13 @@ export default async function TheClubHousePage() {
               Absolutely crazy how this league grew from 11 to 50 over the course of 7 years - Andy
             </h2>
             <Link
-              href="https://embed.kumu.io/313aaa667fa83343248a3c84f5e58786"
+              href="https://embed.kumu.io/eefa249594f7335cb56165f3f3f532c1"
               target="_blank"
               rel="noopener noreferrer"
               className="block w-full overflow-hidden rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
             >
               <iframe 
-                src="https://embed.kumu.io/313aaa667fa83343248a3c84f5e58786" 
+                src="https://embed.kumu.io/eefa249594f7335cb56165f3f3f532c1" 
                 width="940" 
                 height="600" 
                 className="w-full border-0 pointer-events-none"
