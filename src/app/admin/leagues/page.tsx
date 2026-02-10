@@ -3,6 +3,10 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { createServiceClient } from '@/lib/supabase/service';
 
+// Disable caching for admin pages
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
     month: 'short',
