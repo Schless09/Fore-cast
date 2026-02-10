@@ -244,7 +244,7 @@ export default async function TheClubHousePage() {
         <Card className="mt-6">
           <CardContent className="pt-6">
             <h2 className="text-lg text-casino-text mb-4">
-              I put this together cuz I was genuinely curious how this league grew from 11 to 50 over the course of 7 years
+              Absolutely crazy how this league grew from 11 to 50 over the course of 7 years - Andy
             </h2>
             <Link
               href="https://embed.kumu.io/e8502628fd65baaf25a0015efc395fdf"
