@@ -238,6 +238,26 @@ export default async function TheClubHousePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Kumu Map - Only for Bama Boys 2026 */}
+      {leagueName === 'Bama Boys 2026' && (
+        <Card className="mt-6">
+          <CardContent className="pt-6">
+            <h2 className="text-xl font-bold text-casino-gold mb-4">
+              League Network Map
+            </h2>
+            <div className="w-full overflow-hidden rounded-lg">
+              <iframe 
+                src="https://embed.kumu.io/e8502628fd65baaf25a0015efc395fdf" 
+                width="940" 
+                height="600" 
+                className="w-full border-0"
+                title="League Network Map"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
