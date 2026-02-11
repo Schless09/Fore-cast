@@ -63,7 +63,7 @@ export function UpcomingStandingsRow({
       if (error) {
         console.error('Error fetching roster players:', error);
       } else {
-        setPlayers((data || []) as RosterPlayerRow[]);
+        setPlayers((data || []) as unknown as RosterPlayerRow[]);
       }
     } catch (err) {
       console.error('Error:', err);
@@ -157,7 +157,8 @@ export function UpcomingStandingsRow({
                     <tbody className="bg-casino-bg divide-y divide-casino-gold/10">
                       {players.map((rp, idx) => {
                         const tp = rp.tournament_player;
-                        const name = tp?.pga_players?.name ?? '—';
+                        const pga = Array.isArray(tp?.pga_players) ? tp?.pga_players?.[0] : tp?.pga_players;
+                        const name = (pga as { name?: string } | null)?.name ?? '—';
                         const teeTimeR1 = tp?.tee_time_r1;
                         const displayTime = teeTimeR1
                           ? convertESTtoLocal(teeTimeR1)
