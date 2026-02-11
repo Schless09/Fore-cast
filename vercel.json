@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/reminders/missing-rosters",
-      "schedule": "0 21 * * 3"
+      "schedule": "15 21 * * 3"
     }
   ]
 }

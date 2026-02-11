@@ -6,12 +6,16 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
  * POST /api/reminders/missing-rosters
+ * GET  /api/reminders/missing-rosters (used by Vercel Cron)
  * Send reminder emails to users who haven't submitted rosters for upcoming tournaments
- * 
+ *
  * Runs via Vercel Cron every Wednesday at 3pm CST (9pm UTC / 21:00)
- * Note: CST is UTC-6. During daylight saving (CDT), this becomes 2pm local time.
- * If you need it to always be 3pm local time, adjust cron to 20:00 UTC during DST.
+ * Note: Vercel Cron sends GET requests, so we handle both GET and POST.
  */
+export async function GET(request: NextRequest) {
+  return POST(request);
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
