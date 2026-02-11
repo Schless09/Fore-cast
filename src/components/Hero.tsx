@@ -9,11 +9,6 @@ import { Button } from '@/components/ui/Button';
 export function Hero() {
   return (
     <section className="relative w-full min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Golf course background - subtle, dark */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: 'url(/golf-course.jpg)', opacity: 0.12 }}
-      />
       {/* Overlay */}
       <div className="absolute inset-0 bg-linear-to-br from-casino-bg/90 via-casino-elevated/88 to-casino-bg/90" />
       
