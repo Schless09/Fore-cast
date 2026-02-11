@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { TournamentSelector } from '@/components/tournaments/TournamentSelector';
 import { ExpandableRosterRow } from '@/components/standings/ExpandableRosterRow';
 import { UpcomingStandingsRow } from '@/components/standings/UpcomingStandingsRow';
+import { RosterLockedBadge } from '@/components/standings/RosterLockedBadge';
 import { LiveTeamStandings } from '@/components/standings/LiveTeamStandings';
 
 interface WeeklyStandingsPageProps {
@@ -421,9 +422,7 @@ export default async function WeeklyStandingsByTournamentPage({
                 )}
               </div>
               {tournament.status === 'upcoming' && (
-                <div className="text-xs text-casino-gray bg-casino-card border border-casino-gold/20 px-3 py-1 rounded-md whitespace-nowrap self-start">
-                  🔒 Rosters locked until tournament starts{earliestR1TeeTime ? ` (${earliestR1TeeTime})` : ''}
-                </div>
+                <RosterLockedBadge earliestTeeTimeEST={earliestR1TeeTime} />
               )}
             </div>
           </CardHeader>

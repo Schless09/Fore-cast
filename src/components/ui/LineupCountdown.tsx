@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { convertESTtoLocal } from '@/lib/timezone';
 
 interface LineupCountdownProps {
   /** Tournament start date (ISO string) */
@@ -105,7 +106,7 @@ export function LineupCountdown({ startDate, earliestTeeTime, status }: LineupCo
   return (
     <div className={`${isUrgent ? 'bg-orange-900/30 border-orange-500/50' : 'bg-casino-dark/50 border-casino-gold/30'} border rounded-lg px-4 py-3`}>
       <div className="text-xs text-casino-gray mb-2 text-center">
-        {isUrgent ? '⚠️ Lineup locks soon!' : `⏰ Lineup locks at first tee${earliestTeeTime ? ` (${earliestTeeTime})` : ''}`}
+        {isUrgent ? '⚠️ Lineup locks soon!' : `⏰ Lineup locks at first tee${earliestTeeTime ? ` (${convertESTtoLocal(earliestTeeTime)})` : ''}`}
       </div>
       <div className="flex items-center justify-center gap-3">
         {timeLeft.days > 0 && (
