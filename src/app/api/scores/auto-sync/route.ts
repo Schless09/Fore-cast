@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { shouldPollNow } from '@/lib/polling-config';
 import { syncTournamentScores } from '@/lib/sync-scores';
 import { calculateTournamentWinnings } from '@/lib/calculate-winnings';
+import * as cheerio from 'cheerio';
 
 /**
  * Smart Auto-sync endpoint for Vercel Cron
@@ -41,6 +42,23 @@ function normalizeName(name: string): string {
     .replace(/\s+/g, ' ');
 }
 
+// Nickname → canonical name (same as sync-scores) so API "Matti Schmid" matches DB "Matthias Schmid"
+const TEE_TIME_NICKNAME_MAP: Record<string, string> = {
+  'dan brown': 'daniel brown',
+  'johnny keefer': 'john keefer',
+  'matti schmid': 'matthias schmid',
+  'matt kuchar': 'matthew kuchar',
+  'jt poston': 'j.t. poston',
+  'si woo kim': 'si-woo kim',
+  'sung jae im': 'sungjae im',
+  'byeong hun an': 'byeong-hun an',
+  'k.h. lee': 'kyoung-hoon lee',
+  'kh lee': 'kyoung-hoon lee',
+  'ct pan': 'c.t. pan',
+  'hj kim': 'h.j. kim',
+  'st lee': 'seung taek lee',
+};
+
 /**
  * Sync R1/R2 tee times from RapidAPI tournament endpoint for upcoming tournaments.
  * Called automatically when a tournament is 1-2 days away and tee times haven't been set.
@@ -48,7 +66,7 @@ function normalizeName(name: string): string {
 async function syncPreTournamentTeeTimes(
   supabase: ReturnType<typeof createServiceClient>,
   tournament: { id: string; name: string; rapidapi_tourn_id: string; start_date: string }
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; matchedCount: number; totalFromApi: number }> {
   const year = new Date(tournament.start_date).getFullYear().toString();
   const tournId = tournament.rapidapi_tourn_id;
 
@@ -67,7 +85,7 @@ async function syncPreTournamentTeeTimes(
     );
 
     if (!response.ok) {
-      return { success: false, message: `RapidAPI tournament endpoint returned ${response.status}` };
+      return { success: false, message: `RapidAPI tournament endpoint returned ${response.status}`, matchedCount: 0, totalFromApi: 0 };
     }
 
     const json = await response.json();
@@ -116,7 +134,7 @@ async function syncPreTournamentTeeTimes(
     }
 
     if (players.length === 0) {
-      return { success: false, message: 'No players in tournament data' };
+      return { success: false, message: 'No players in tournament data', matchedCount: 0, totalFromApi: 0 };
     }
 
     // Get tournament_players with their pga_player names for matching
@@ -126,7 +144,7 @@ async function syncPreTournamentTeeTimes(
       .eq('tournament_id', tournament.id);
 
     if (tpError || !tournamentPlayers) {
-      return { success: false, message: `Failed to fetch tournament players: ${tpError?.message}` };
+      return { success: false, message: `Failed to fetch tournament players: ${tpError?.message}`, matchedCount: 0, totalFromApi: players.length };
     }
 
     // Build a map of normalized name -> tournament_player ID
@@ -146,19 +164,22 @@ async function syncPreTournamentTeeTimes(
     for (const apiPlayer of players) {
       const fullName = `${apiPlayer.firstName} ${apiPlayer.lastName}`;
       const normalizedApiName = normalizeName(fullName);
+      // Map API nickname to canonical name (e.g. "matti schmid" -> "matthias schmid")
+      const lookupName = TEE_TIME_NICKNAME_MAP[normalizedApiName] ?? normalizedApiName;
 
-      // Try exact match, then last name match
-      let tpId = nameToIdMap.get(normalizedApiName);
+      // Try exact match (with nickname map), then original normalized name
+      let tpId = nameToIdMap.get(lookupName) ?? nameToIdMap.get(normalizedApiName);
 
       if (!tpId) {
         // Try matching by last name only (handles first name variations)
         const apiLast = normalizeName(apiPlayer.lastName);
         const apiFirst = normalizeName(apiPlayer.firstName);
+        const canonFirst = lookupName.split(' ')[0] ?? apiFirst;
         for (const [dbName, id] of nameToIdMap.entries()) {
           const dbParts = dbName.split(' ');
           const dbLast = dbParts[dbParts.length - 1];
           const dbFirst = dbParts[0];
-          if (dbLast === apiLast && (dbFirst === apiFirst || dbFirst.startsWith(apiFirst) || apiFirst.startsWith(dbFirst))) {
+          if (dbLast === apiLast && (dbFirst === apiFirst || dbFirst === canonFirst || dbFirst.startsWith(apiFirst) || apiFirst.startsWith(dbFirst))) {
             tpId = id;
             break;
           }
@@ -202,12 +223,158 @@ async function syncPreTournamentTeeTimes(
       console.log(`[AUTO-SYNC] Unmatched players: ${unmatchedNames.join(', ')}`);
     }
     console.log(`[AUTO-SYNC] ${msg}`);
-    return { success: true, message: msg };
+    return { success: true, message: msg, matchedCount, totalFromApi: players.length };
 
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error(`[AUTO-SYNC] Error syncing tee times for ${tournament.name}:`, msg);
-    return { success: false, message: msg };
+    return { success: false, message: msg, matchedCount: 0, totalFromApi: 0 };
+  }
+}
+
+const CBS_LEADERBOARD_URL = 'https://www.cbssports.com/golf/leaderboard/';
+
+const TIME_RE = /(\d{1,2}:\d{2}\s*[AP]M)/i;
+
+/**
+ * Parse CBS Sports leaderboard HTML for tee times (name, r1, r2).
+ * Table structure: rows with optional flag, name (in link), r1 time, r2 time. Asterisk = back 9.
+ */
+function parseCBSLeaderboardHTML(html: string): { name: string; r1: string; r2: string; back9R1?: boolean; back9R2?: boolean }[] {
+  const $ = cheerio.load(html);
+  const rows: { name: string; r1: string; r2: string; back9R1?: boolean; back9R2?: boolean }[] = [];
+
+  $('table tbody tr').each((_, tr) => {
+    const cells = $(tr).find('td');
+    if (cells.length < 2) return;
+
+    let nameCol = -1;
+    let name = '';
+
+    cells.each((i, el) => {
+      const $el = $(el);
+      const link = $el.find('a[href*="/golf/players/"]').first();
+      if (link.length) {
+        nameCol = i;
+        name = (link.attr('title') || link.text() || $el.text()).trim();
+      }
+    });
+
+    if (nameCol < 0 || !name) return;
+
+    const r1Cell = cells.eq(nameCol + 1);
+    const r2Cell = cells.eq(nameCol + 2);
+    const r1Text = r1Cell.text().trim();
+    const r2Text = r2Cell.text().trim();
+    const r1Match = r1Text.match(TIME_RE);
+    const r2Match = r2Text.match(TIME_RE);
+
+    const r1 = r1Match ? r1Match[1].replace(/\s+/g, ' ').trim() : '';
+    const r2 = r2Match ? r2Match[1].replace(/\s+/g, ' ').trim() : '';
+    const back9R1 = r1Text.includes('*');
+    const back9R2 = r2Text.includes('*');
+
+    if (r1 || r2) {
+      rows.push({ name, r1, r2, back9R1, back9R2 });
+    }
+  });
+
+  return rows;
+}
+
+/**
+ * When RapidAPI returns 0 tee-time matches, try to fill R1/R2 from CBS Sports leaderboard scrape.
+ */
+async function syncTeeTimesFromCBSFallback(
+  supabase: ReturnType<typeof createServiceClient>,
+  tournament: { id: string; name: string }
+): Promise<{ success: boolean; message: string; matchedCount: number }> {
+  try {
+    console.log(`[AUTO-SYNC] 📺 CBS fallback: fetching ${CBS_LEADERBOARD_URL}...`);
+
+    const response = await fetch(CBS_LEADERBOARD_URL, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; GolfStatsBot/1.0)',
+        'Accept': 'text/html',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return { success: false, message: `CBS returned ${response.status}`, matchedCount: 0 };
+    }
+
+    const html = await response.text();
+    const cbsRows = parseCBSLeaderboardHTML(html);
+
+    if (cbsRows.length === 0) {
+      return { success: true, message: 'CBS fallback: no tee time rows parsed', matchedCount: 0 };
+    }
+
+    const { data: tournamentPlayers, error: tpError } = await supabase
+      .from('tournament_players')
+      .select('id, pga_player_id, pga_players(name)')
+      .eq('tournament_id', tournament.id);
+
+    if (tpError || !tournamentPlayers?.length) {
+      return { success: false, message: 'CBS fallback: no tournament players', matchedCount: 0 };
+    }
+
+    const nameToIdMap = new Map<string, string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tournamentPlayers.forEach((tp: any) => {
+      const pgaPlayer = Array.isArray(tp.pga_players) ? tp.pga_players[0] : tp.pga_players;
+      const playerName = pgaPlayer?.name;
+      if (playerName) nameToIdMap.set(normalizeName(playerName), tp.id);
+    });
+
+    let matchedCount = 0;
+    for (const row of cbsRows) {
+      const normalizedCbs = normalizeName(row.name);
+      const lookupName = TEE_TIME_NICKNAME_MAP[normalizedCbs] ?? normalizedCbs;
+      let tpId = nameToIdMap.get(lookupName) ?? nameToIdMap.get(normalizedCbs);
+
+      if (!tpId) {
+        const parts = lookupName.split(' ');
+        const last = parts[parts.length - 1];
+        const first = parts[0];
+        for (const [dbName, id] of nameToIdMap.entries()) {
+          const dbParts = dbName.split(' ');
+          if (dbParts[dbParts.length - 1] === last && (dbParts[0] === first || dbParts[0].startsWith(first) || first.startsWith(dbParts[0]))) {
+            tpId = id;
+            break;
+          }
+        }
+      }
+
+      if (!tpId) continue;
+
+      const updateData: Record<string, string | number | null> = {};
+      if (row.r1) {
+        updateData.tee_time_r1 = row.r1;
+        updateData.starting_tee_r1 = row.back9R1 ? 10 : 1;
+      }
+      if (row.r2) {
+        updateData.tee_time_r2 = row.r2;
+        updateData.starting_tee_r2 = row.back9R2 ? 10 : 1;
+      }
+      if (Object.keys(updateData).length === 0) continue;
+
+      const { error } = await supabase
+        .from('tournament_players')
+        .update(updateData)
+        .eq('id', tpId);
+
+      if (!error) matchedCount++;
+    }
+
+    const msg = `CBS fallback: ${matchedCount}/${cbsRows.length} tee time rows matched`;
+    console.log(`[AUTO-SYNC] ${msg}`);
+    return { success: true, message: msg, matchedCount };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[AUTO-SYNC] CBS fallback error:`, msg);
+    return { success: false, message: msg, matchedCount: 0 };
   }
 }
 
@@ -265,7 +432,11 @@ export async function GET(request: NextRequest) {
 
           if (!hasTeeTimes) {
             console.log(`[AUTO-SYNC] 📋 ${tournament.name} starts in ${daysUntilStart.toFixed(1)} days, syncing tee times...`);
-            await syncPreTournamentTeeTimes(supabase, tournament);
+            const teeResult = await syncPreTournamentTeeTimes(supabase, tournament);
+            if (teeResult.matchedCount === 0) {
+              console.log(`[AUTO-SYNC] RapidAPI matched 0 tee times; trying CBS Sports fallback...`);
+              await syncTeeTimesFromCBSFallback(supabase, tournament);
+            }
           }
         }
 
