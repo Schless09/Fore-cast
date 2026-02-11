@@ -139,18 +139,14 @@ export function UpcomingStandingsRow({
       </tr>
 
       {isExpanded && canExpand && (
-        <tr className={isUser ? 'bg-casino-green/5' : 'bg-casino-elevated'}>
+        <tr className="bg-casino-elevated">
           <td colSpan={3} className="px-1 sm:px-2 py-2">
             {isLoading ? (
               <div className="text-center py-3 text-casino-gray text-xs sm:text-sm">
                 Loading roster...
               </div>
             ) : players.length > 0 ? (
-              <div className="pl-2 sm:pl-6">
-                <h4 className="text-xs font-semibold text-casino-gold uppercase mb-1.5">
-                  {row.roster?.roster_name || 'Team'} — Roster ({players.length} players)
-                </h4>
-                <div className="overflow-x-auto -mx-1 sm:mx-0">
+              <div className="overflow-x-auto -mx-1 sm:mx-0">
                   <table className="min-w-full text-xs sm:text-sm">
                     <thead className="bg-casino-card border-b border-casino-gold/20">
                       <tr>
@@ -186,7 +182,6 @@ export function UpcomingStandingsRow({
                     </tbody>
                   </table>
                 </div>
-              </div>
             ) : (
               <div className="text-center py-3 text-casino-gray text-sm">
                 No players in this roster
