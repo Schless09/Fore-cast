@@ -40,7 +40,7 @@ export function UpcomingStandingsRow({
   // Pre-tournament: only the current user's team can be expanded (privacy)
   const canExpand = isUser && row.hasRoster && row.roster;
   // Default expanded for the current user's roster when they have one
-  const [isExpanded, setIsExpanded] = useState<boolean>(canExpand);
+  const [isExpanded, setIsExpanded] = useState<boolean>(!!canExpand);
   const [players, setPlayers] = useState<RosterPlayerRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
