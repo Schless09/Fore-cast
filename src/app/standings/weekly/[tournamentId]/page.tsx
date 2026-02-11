@@ -110,10 +110,10 @@ export default async function WeeklyStandingsByTournamentPage({
       .order('status', { ascending: true })
       .order('start_date', { ascending: false }),
     
-    // Get tee times for display round calculation
+    // Get tee times for display round calculation and earliest R1 for lock message
     supabase
       .from('tournament_players')
-      .select('tee_time_r2, tee_time_r3, tee_time_r4')
+      .select('tee_time_r1, tee_time_r2, tee_time_r3, tee_time_r4')
       .eq('tournament_id', tournamentId)
       .limit(200),
     
@@ -159,6 +159,7 @@ export default async function WeeklyStandingsByTournamentPage({
   let displayRound = typeof rawRound === 'object' && rawRound !== null && '$numberInt' in rawRound
     ? parseInt((rawRound as { $numberInt: string }).$numberInt, 10) 
     : (typeof rawRound === 'number' ? rawRound : 1);
+  let earliestR1TeeTime: string | null = null;
   if (teeTimeData && teeTimeData.length > 0 && displayRound < 4) {
     const parseTime = (timeStr: string): number => {
       const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -198,6 +199,7 @@ export default async function WeeklyStandingsByTournamentPage({
       return hoursUntil <= 5 && hoursUntil > -2;
     };
 
+    earliestR1TeeTime = findEarliestTeeTime(teeTimeData.map((t) => (t as { tee_time_r1?: string | null }).tee_time_r1));
     // Check each round transition
     if (displayRound === 1) {
       const earliestR2 = findEarliestTeeTime(teeTimeData.map((t) => t.tee_time_r2));
@@ -420,7 +422,7 @@ export default async function WeeklyStandingsByTournamentPage({
               </div>
               {tournament.status === 'upcoming' && (
                 <div className="text-xs text-casino-gray bg-casino-card border border-casino-gold/20 px-3 py-1 rounded-md whitespace-nowrap self-start">
-                  🔒 Rosters locked until tournament starts
+                  🔒 Rosters locked until tournament starts{earliestR1TeeTime ? ` (${earliestR1TeeTime})` : ''}
                 </div>
               )}
             </div>
