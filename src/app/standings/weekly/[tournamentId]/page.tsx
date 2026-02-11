@@ -473,7 +473,7 @@ export default async function WeeklyStandingsByTournamentPage({
                 </div>
                 <p className="text-xs text-casino-gray mt-4 flex items-center gap-1">
                   <span>💡</span>
-                  <span>Click the arrow next to a team to view their roster and R1 tee times</span>
+                  <span>Click the arrow next to your team to view your roster and R1 tee times</span>
                 </p>
               </>
             ) : rosters && rosters.length > 0 ? (

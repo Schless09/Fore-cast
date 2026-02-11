@@ -36,12 +36,20 @@ export function UpcomingStandingsRow({
   tournamentId,
   currentUserId,
 }: UpcomingStandingsRowProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const isUser = row.user_id === currentUserId;
+  // Pre-tournament: only the current user's team can be expanded (privacy)
+  const canExpand = isUser && row.hasRoster && row.roster;
+  // Default expanded for the current user's roster when they have one
+  const [isExpanded, setIsExpanded] = useState(canExpand);
   const [players, setPlayers] = useState<RosterPlayerRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const isUser = row.user_id === currentUserId;
-  const canExpand = row.hasRoster && row.roster;
+  // Load players when expanded (or on mount if user's row is expanded by default)
+  useEffect(() => {
+    if (canExpand && isExpanded && players.length === 0) {
+      loadPlayers();
+    }
+  }, [canExpand, isExpanded]);
 
   const loadPlayers = async () => {
     if (!row.roster?.id) return;
