@@ -4,12 +4,33 @@ import { shouldPollNow } from '@/lib/polling-config';
 
 const ESPN_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard';
 
+/** e.g. "Thu Feb 12 11:45:00 PST 2026" -> "11:45 AM" */
+function formatTeeTime(raw: string): string {
+  try {
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return raw;
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  } catch {
+    return raw;
+  }
+}
+
 interface ESPNCompetitor {
   id: string;
   order: number;
   score?: string;
   athlete?: { fullName?: string; displayName?: string; shortName?: string };
-  linescores?: Array<{ period: number; value?: number; displayValue?: string }>;
+  linescores?: Array<{
+    period: number;
+    value?: number;
+    displayValue?: string;
+    linescores?: Array<{ period: number; displayValue?: string }>;
+    statistics?: {
+      categories?: Array<{
+        stats?: Array<{ value?: number; displayValue?: string }>;
+      }>;
+    };
+  }>;
 }
 
 /**
@@ -112,6 +133,13 @@ export async function POST(request: NextRequest) {
       const transformedData = competitors.map((c) => {
         const name = c.athlete?.displayName || c.athlete?.fullName || c.athlete?.shortName || 'Unknown';
         const posNum = c.order || 0;
+        const roundLines = c.linescores?.[0];
+        const holeScores = roundLines?.linescores ?? [];
+        const holesPlayed = holeScores.length;
+        const thru = holesPlayed >= 18 ? 'F' : String(holesPlayed);
+        const stats = roundLines?.statistics?.categories?.[0]?.stats;
+        const teeTimeRaw = stats?.length ? stats[stats.length - 1]?.displayValue : null;
+        const teeTime = teeTimeRaw ? formatTeeTime(teeTimeRaw) : null;
         return {
           player: name,
           playerId: String(c.id),
@@ -119,10 +147,10 @@ export async function POST(request: NextRequest) {
           positionValue: posNum,
           total: c.score ?? 'E',
           rounds: [],
-          thru: 'F',
+          thru,
           currentRound: 1,
           currentRoundScore: null,
-          teeTime: null,
+          teeTime,
           roundComplete: false,
           isAmateur: false,
         };
