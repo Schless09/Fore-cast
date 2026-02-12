@@ -173,6 +173,22 @@ export default async function AdminPage() {
             </CardContent>
           </Card>
         </Link>
+
+        <Link href="/secretpage">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle>RapidAPI vs ESPN</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 text-sm mb-4">
+                Compare live leaderboard data from RapidAPI and ESPN caches
+              </p>
+              <Button variant="outline" className="w-full">
+                View Comparison
+              </Button>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   );

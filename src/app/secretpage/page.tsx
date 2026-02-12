@@ -99,7 +99,7 @@ export default async function SecretComparePage() {
                       <td className="px-2 py-1.5">{p.player ?? 'Unknown'}</td>
                       <td className="px-2 py-1.5">{String(p.total ?? '-')}</td>
                       <td className="px-2 py-1.5">{p.thru ?? '-'}</td>
-                      <TeeTimeCell teeTime={p.teeTime} />
+                      <TeeTimeCell teeTime={p.teeTime} source="rapidapi" />
                     </tr>
                   ))}
                 </tbody>
@@ -136,7 +136,7 @@ export default async function SecretComparePage() {
                       <td className="px-2 py-1.5">{p.player ?? 'Unknown'}</td>
                       <td className="px-2 py-1.5">{String(p.total ?? '-')}</td>
                       <td className="px-2 py-1.5">{p.thru ?? '-'}</td>
-                      <TeeTimeCell teeTime={p.teeTime} />
+                      <TeeTimeCell teeTime={p.teeTime} source="espn" />
                     </tr>
                   ))}
                 </tbody>
