@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service';
 import Link from 'next/link';
+import { TeeTimeCell } from '@/components/compare/TeeTimeCell';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -98,7 +99,7 @@ export default async function SecretComparePage() {
                       <td className="px-2 py-1.5">{p.player ?? 'Unknown'}</td>
                       <td className="px-2 py-1.5">{String(p.total ?? '-')}</td>
                       <td className="px-2 py-1.5">{p.thru ?? '-'}</td>
-                      <td className="px-2 py-1.5 text-casino-gray">{p.teeTime ?? '-'}</td>
+                      <TeeTimeCell teeTime={p.teeTime} />
                     </tr>
                   ))}
                 </tbody>
@@ -135,7 +136,7 @@ export default async function SecretComparePage() {
                       <td className="px-2 py-1.5">{p.player ?? 'Unknown'}</td>
                       <td className="px-2 py-1.5">{String(p.total ?? '-')}</td>
                       <td className="px-2 py-1.5">{p.thru ?? '-'}</td>
-                      <td className="px-2 py-1.5 text-casino-gray">{p.teeTime ?? '-'}</td>
+                      <TeeTimeCell teeTime={p.teeTime} />
                     </tr>
                   ))}
                 </tbody>

@@ -4,12 +4,17 @@ import { shouldPollNow } from '@/lib/polling-config';
 
 const ESPN_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard';
 
-/** e.g. "Thu Feb 12 11:45:00 PST 2026" -> "11:45 AM" */
-function formatTeeTime(raw: string): string {
+/** e.g. "Thu Feb 12 11:45:00 PST 2026" -> "2:45 PM" (EST) for consistent convertESTtoLocal display */
+function formatTeeTimeToEST(raw: string): string {
   try {
     const d = new Date(raw);
     if (Number.isNaN(d.getTime())) return raw;
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    return d.toLocaleTimeString('en-US', {
+      timeZone: 'America/New_York',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
   } catch {
     return raw;
   }
@@ -136,10 +141,15 @@ export async function POST(request: NextRequest) {
         const roundLines = c.linescores?.[0];
         const holeScores = roundLines?.linescores ?? [];
         const holesPlayed = holeScores.length;
-        const thru = holesPlayed >= 18 ? 'F' : String(holesPlayed);
+        const firstHolePeriod = holeScores.length > 0
+          ? Math.min(...holeScores.map((h) => h.period ?? 99))
+          : 0;
+        const startedBackNine = firstHolePeriod >= 10;
+        let thru = holesPlayed >= 18 ? 'F' : String(holesPlayed);
+        if (thru !== 'F' && startedBackNine) thru += '*';
         const stats = roundLines?.statistics?.categories?.[0]?.stats;
         const teeTimeRaw = stats?.length ? stats[stats.length - 1]?.displayValue : null;
-        const teeTime = teeTimeRaw ? formatTeeTime(teeTimeRaw) : null;
+        const teeTime = teeTimeRaw ? formatTeeTimeToEST(teeTimeRaw) : null;
         return {
           player: name,
           playerId: String(c.id),
