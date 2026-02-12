@@ -124,7 +124,12 @@ export function PlayerSelector({
                         const playerId = tp.pga_player_id;
                         const isSelected = selectedPlayerIds.includes(playerId);
                         const cost = tp.cost || 0.20;
-                        const wouldExceedBudget = !isSelected && (cost > remainingBudget);
+
+                        // Work in whole cents to avoid floating point edge cases
+                        const remainingBudgetCents = Math.round(remainingBudget * 100);
+                        const costCents = Math.round(cost * 100);
+
+                        const wouldExceedBudget = !isSelected && (costCents > remainingBudgetCents);
                         const wouldExceedMax = !isSelected && !canAddMore;
                         const isDisabled = wouldExceedBudget || wouldExceedMax;
                         const rank = startIdx + (colIdx * 10) + rowIdx + 1;
