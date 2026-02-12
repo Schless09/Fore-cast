@@ -1,15 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { SortableLeagueRoster } from '@/components/admin/SortableLeagueRoster';
 import { createServiceClient } from '@/lib/supabase/service';
-
-function formatJoinDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
 
 export default async function AdminLeagueDetailPage({
   params,
@@ -60,16 +53,80 @@ export default async function AdminLeagueDetailPage({
   const creatorName =
     creator?.username || creator?.email?.split('@')[0] || creator?.email || '—';
 
-  const membersWithRole = (members ?? []).map((m: any) => {
+  const memberIds = (members ?? []).map((m: { user_id: string }) => m.user_id);
+
+  // Fetch co-managers for this league
+  const { data: coMembers } = await supabase
+    .from('team_co_members')
+    .select(`
+      co_member_id,
+      created_at,
+      owner_id,
+      co_profile:profiles!team_co_members_co_member_id_fkey(id, username, email),
+      owner_profile:profiles!team_co_members_owner_id_fkey(id, username)
+    `)
+    .eq('league_id', id);
+
+  const coMemberIds = new Set((coMembers ?? []).map((cm: { co_member_id: string }) => cm.co_member_id));
+  const allUserIds = [...new Set([...memberIds, ...coMemberIds])];
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const { data: pageViewByPath } = allUserIds.length > 0
+    ? await supabase.rpc('get_page_view_counts_by_users_per_path', {
+        p_user_ids: allUserIds,
+        p_since: thirtyDaysAgo.toISOString(),
+      })
+    : { data: [] };
+
+  const viewsByUser = new Map<
+    string,
+    { tournaments: number; standings_weekly: number; standings_season: number }
+  >();
+  (pageViewByPath ?? []).forEach((row: { user_id: string; tournaments: number; standings_weekly: number; standings_season: number }) => {
+    viewsByUser.set(row.user_id, {
+      tournaments: Number(row.tournaments) || 0,
+      standings_weekly: Number(row.standings_weekly) || 0,
+      standings_season: Number(row.standings_season) || 0,
+    });
+  });
+
+  const memberRows = (members ?? []).map((m: any) => {
     const profile = m.profiles as { id: string; username?: string; email?: string } | null;
+    const v = viewsByUser.get(m.user_id) ?? { tournaments: 0, standings_weekly: 0, standings_season: 0 };
     return {
+      rowKey: `member-${m.user_id}`,
       user_id: m.user_id,
       username: profile?.username || 'Unknown',
       email: profile?.email || '',
       joined_at: m.joined_at,
       is_commissioner: m.user_id === league.created_by,
+      role: 'member' as const,
+      manages_team_of: undefined as string | undefined,
+      views: v,
     };
   });
+
+  const coManagerRows = (coMembers ?? []).map((cm: any) => {
+    const coProfile = cm.co_profile as { id: string; username?: string; email?: string } | null;
+    const ownerProfile = cm.owner_profile as { username?: string } | null;
+    const v = viewsByUser.get(cm.co_member_id) ?? { tournaments: 0, standings_weekly: 0, standings_season: 0 };
+    return {
+      rowKey: `co-${cm.co_member_id}-${cm.owner_id}`,
+      user_id: cm.co_member_id,
+      username: coProfile?.username || 'Unknown',
+      email: coProfile?.email || '',
+      joined_at: cm.created_at,
+      is_commissioner: false,
+      role: 'co-manager' as const,
+      manages_team_of: ownerProfile?.username || 'Unknown',
+      views: v,
+    };
+  });
+
+  const membersWithRole = [...memberRows, ...coManagerRows];
+
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -89,63 +146,17 @@ export default async function AdminLeagueDetailPage({
       <Card className="bg-casino-card border-casino-gold/20">
         <CardHeader>
           <CardTitle className="text-casino-gold">
-            League Roster ({membersWithRole.length} members)
+            League Roster ({membersWithRole.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
-                  <th className="px-2 sm:px-4 py-3">Username</th>
-                  <th className="px-2 sm:px-4 py-3 hidden sm:table-cell">Email</th>
-                  <th className="px-2 sm:px-4 py-3 hidden md:table-cell">Joined</th>
-                  <th className="px-2 sm:px-4 py-3 text-center">Role</th>
-                </tr>
-              </thead>
-              <tbody>
-                {membersWithRole.map((member) => (
-                  <tr
-                    key={member.user_id}
-                    className={`border-b border-casino-gold/10 transition-colors hover:bg-casino-elevated ${
-                      member.is_commissioner ? 'bg-casino-gold/5' : ''
-                    }`}
-                  >
-                    <td className="px-2 sm:px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-casino-text">
-                          {member.username}
-                        </span>
-                        <span className="text-xs text-casino-gray sm:hidden">
-                          {member.email}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-2 sm:px-4 py-3 text-casino-gray hidden sm:table-cell">
-                      {member.email}
-                    </td>
-                    <td className="px-2 sm:px-4 py-3 text-casino-gray hidden md:table-cell">
-                      {formatJoinDate(member.joined_at)}
-                    </td>
-                    <td className="px-2 sm:px-4 py-3 text-center">
-                      {member.is_commissioner ? (
-                        <span className="px-2 py-1 bg-casino-gold/20 text-casino-gold rounded text-xs font-medium">
-                          Commissioner
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 bg-casino-elevated text-casino-gray rounded text-xs">
-                          Member
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SortableLeagueRoster members={membersWithRole} />
           {membersWithRole.length === 0 && (
             <p className="text-center text-casino-gray py-4">No members found</p>
           )}
+          <p className="text-xs text-casino-gray mt-4">
+            Views (30d): page loads per route
+          </p>
         </CardContent>
       </Card>
     </div>

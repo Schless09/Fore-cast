@@ -15,12 +15,17 @@ const LeagueCheck = dynamic(() => import('@/components/leagues/LeagueCheck').the
   ssr: false,
 });
 
+const PageViewTracker = dynamic(() => import('@/components/analytics/PageViewTracker').then(mod => ({ default: mod.PageViewTracker })), {
+  ssr: false,
+});
+
 export function ClientOnlyComponents() {
   return (
     <>
       <ErrorHandler />
       <EnvWarningBanner />
       <LeagueCheck />
+      <PageViewTracker />
     </>
   );
 }
