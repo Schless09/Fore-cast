@@ -81,6 +81,7 @@ export function Navbar() {
   }
 
   const displayName = user?.username || user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] || 'User';
+  const isAdmin = user?.username === 'aschuessontheloose';
 
   return (
       <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50 shadow-[0_4px_20px_rgba(251,191,36,0.1)]">
@@ -133,6 +134,14 @@ export function Navbar() {
               </span>
             )}
           </Link>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="text-casino-text hover:text-casino-gold font-medium transition-all hover:tracking-wide"
+            >
+              Admin
+            </Link>
+          )}
           <div className="flex items-center gap-3 pl-6 border-l border-casino-gold/30">
             <span className="text-sm text-casino-gold font-semibold tracking-wide">
               {displayName}
@@ -213,6 +222,15 @@ export function Navbar() {
                 </span>
               )}
             </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="text-casino-text hover:text-casino-gold hover:bg-casino-card/50 font-medium transition-all px-4 py-3 rounded-lg"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Admin
+              </Link>
+            )}
             <div className="border-t border-casino-gold/20 mt-2 pt-2 px-4">
               <p className="text-sm text-casino-gold font-semibold mb-3">
                 {displayName}

@@ -1,20 +1,9 @@
 {
   "crons": [
-    {
-      "path": "/api/scores/auto-sync",
-      "schedule": "*/4 * * * *"
-    },
-    {
-      "path": "/api/cron/sync-rankings",
-      "schedule": "0 17 * * 1"
-    },
-    {
-      "path": "/api/reminders/missing-rosters",
-      "schedule": "15 21 * * 3"
-    },
-    {
-      "path": "/api/reminders/missing-rosters-late",
-      "schedule": "0 3 * * 4"
-    }
+    {"path": "/api/scores/auto-sync", "schedule": "*/4 * * * *"},
+    {"path": "/api/scores/espn-sync", "schedule": "*/2 * * * *"},
+    {"path": "/api/cron/sync-rankings", "schedule": "0 17 * * 1"},
+    {"path": "/api/reminders/missing-rosters", "schedule": "15 21 * * 3"},
+    {"path": "/api/reminders/missing-rosters-late", "schedule": "0 3 * * 4"}
   ]
 }
