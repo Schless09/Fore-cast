@@ -37,6 +37,7 @@ export function ConversationList({ leagueId, onSelectConversation, selectedConve
   const [leagueMembers, setLeagueMembers] = useState<LeagueMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showNewDM, setShowNewDM] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
   const supabase = createClient();
 
   // Fetch conversations and league members
@@ -165,12 +166,27 @@ export function ConversationList({ leagueId, onSelectConversation, selectedConve
       {/* New DM dropdown */}
       {showNewDM && (
         <div className="p-2 border-b border-casino-gold/20 bg-casino-black/40">
-          <p className="text-xs text-casino-gray mb-2">Start conversation with:</p>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-xs text-casino-gray">Start conversation with:</p>
+            <input
+              type="text"
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              placeholder="Search username..."
+              className="flex-1 px-2 py-1 text-xs rounded bg-casino-black/70 border border-casino-gold/30 text-white placeholder-casino-gray focus:outline-none focus:border-casino-gold"
+            />
+          </div>
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {leagueMembers.length === 0 ? (
               <p className="text-xs text-casino-gray">No other members in league</p>
             ) : (
-              leagueMembers.map((member) => (
+              leagueMembers
+                .filter((member) =>
+                  member.username
+                    ?.toLowerCase()
+                    .includes(memberSearch.trim().toLowerCase())
+                )
+                .map((member) => (
                 <button
                   key={member.clerk_id}
                   onClick={() => startConversation(member)}
