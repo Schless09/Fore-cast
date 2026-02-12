@@ -147,7 +147,9 @@ export default async function SecretComparePage() {
         <p className="text-xs text-casino-gray">
           Tournament: {tournament.name} • RapidAPI ID: {tournament.rapidapi_tourn_id ?? '—'} • ESPN ID: {tournament.espn_event_id ?? '—'}
           <br />
-          Set espn_event_id in admin for tournaments you want to compare. Both crons run every 4 min.
+          Set espn_event_id in admin for tournaments you want to compare.
+          <br />
+          ESPN sync runs every 2 min • RapidAPI sync runs every 4 min (during active tournament windows).
         </p>
       </div>
     </div>
