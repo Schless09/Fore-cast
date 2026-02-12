@@ -32,17 +32,17 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Find tournaments starting in the next 1-7 days with status='upcoming'
+    // Find tournaments starting in the next 3 days (same as late reminder). Avoids e.g. Genesis 8 days out when cron runs in UTC.
     const today = new Date();
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
+    const cutoff = new Date(today);
+    cutoff.setDate(today.getDate() + 3);
 
     const { data: upcomingTournaments, error: tournamentsError } = await supabase
       .from('tournaments')
       .select('id, name, start_date')
       .eq('status', 'upcoming')
       .gte('start_date', today.toISOString().split('T')[0])
-      .lte('start_date', nextWeek.toISOString().split('T')[0])
+      .lte('start_date', cutoff.toISOString().split('T')[0])
       .order('start_date', { ascending: true });
 
     if (tournamentsError) {

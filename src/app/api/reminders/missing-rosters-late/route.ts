@@ -27,17 +27,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Disabled: was sending for wrong tournament (e.g. Genesis 8 days out). Date window now 3 days (was 7).
+    // Re-enable with REMINDERS_LATE_ENABLED=true when ready; consider also scoping by league_tournaments.
+    const lateRemindersEnabled = process.env.REMINDERS_LATE_ENABLED === 'true';
+    if (!lateRemindersEnabled) {
+      return NextResponse.json({
+        success: true,
+        message: 'Late roster reminders disabled (set REMINDERS_LATE_ENABLED=true to re-enable)',
+        totalEmailsSent: 0,
+        tournaments: [],
+        elapsedMs: Date.now() - startTime,
+      });
+    }
+
     const supabase = createServiceClient();
     const today = new Date();
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
+    // Only tournaments starting in the next 3 days — "about to tee off". Avoids e.g. Genesis (8 days out).
+    const cutoff = new Date(today);
+    cutoff.setDate(today.getDate() + 3);
 
     const { data: upcomingTournaments, error: tournamentsError } = await supabase
       .from('tournaments')
       .select('id, name, start_date')
       .eq('status', 'upcoming')
       .gte('start_date', today.toISOString().split('T')[0])
-      .lte('start_date', nextWeek.toISOString().split('T')[0])
+      .lte('start_date', cutoff.toISOString().split('T')[0])
       .order('start_date', { ascending: true });
 
     if (tournamentsError) {
