@@ -4,6 +4,39 @@ import { shouldPollNow } from '@/lib/polling-config';
 
 const ESPN_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard';
 
+/** Derive round score to par from hole-by-hole scoreType displayValues (E, -1, +1, etc.) */
+function deriveRoundScoreFromHoles(
+  holeScores: Array<{ scoreType?: { displayValue?: string } }>
+): string | null {
+  if (!holeScores || holeScores.length === 0) return null;
+  let total = 0;
+  for (const h of holeScores) {
+    const dv = h.scoreType?.displayValue;
+    if (!dv) continue;
+    if (dv === 'E') total += 0;
+    else {
+      const n = parseInt(dv, 10);
+      if (!Number.isNaN(n)) total += n;
+    }
+  }
+  if (total === 0) return 'E';
+  if (total > 0) return `+${total}`;
+  return String(total);
+}
+
+/** Format to-par value for display (E, +1, -2). */
+function formatToPar(value: number): string {
+  if (value === 0) return 'E';
+  return value > 0 ? `+${value}` : String(value);
+}
+
+/** Normalize round displayValue from API (string or number) to display string. */
+function normalizeRoundDisplay(raw: unknown): string | null {
+  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'number') return formatToPar(raw);
+  return null;
+}
+
 /** e.g. "Thu Feb 12 11:45:00 PST 2026" -> "2:45 PM" (EST) for consistent convertESTtoLocal display */
 function formatTeeTimeToEST(raw: string): string {
   try {
@@ -29,7 +62,7 @@ interface ESPNCompetitor {
     period: number;
     value?: number;
     displayValue?: string;
-    linescores?: Array<{ period: number; displayValue?: string }>;
+    linescores?: Array<{ period: number; displayValue?: string; scoreType?: { displayValue?: string } }>;
     statistics?: {
       categories?: Array<{
         stats?: Array<{ value?: number; displayValue?: string }>;
@@ -134,13 +167,16 @@ export async function POST(request: NextRequest) {
       if (!competition?.competitors) continue;
 
       const competitors = competition.competitors as ESPNCompetitor[];
-      const currentRound = competition.status?.period ?? event.status?.period ?? 1;
-      const roundIndex = Math.max(0, currentRound - 1);
+      const currentRoundNum = Number(competition.status?.period ?? event.status?.period ?? 1) || 1;
+      const roundIndex = Math.max(0, currentRoundNum - 1);
 
       const transformedData = competitors.map((c) => {
         const name = c.athlete?.displayName || c.athlete?.fullName || c.athlete?.shortName || 'Unknown';
         const posNum = c.order || 0;
-        const roundLines = c.linescores?.[roundIndex];
+        // Resolve current round: by period match first, then by index (R1=0, R2=1, ...)
+        const roundLines =
+          c.linescores?.find((r) => Number(r.period) === currentRoundNum) ??
+          c.linescores?.[roundIndex];
         const holeScores = roundLines?.linescores ?? [];
         const holesPlayed = holeScores.length;
         const firstHolePeriod = holeScores.length > 0
@@ -152,6 +188,19 @@ export async function POST(request: NextRequest) {
         const stats = roundLines?.statistics?.categories?.[0]?.stats;
         const teeTimeRaw = stats?.length ? stats[stats.length - 1]?.displayValue : null;
         const teeTime = teeTimeRaw ? formatTeeTimeToEST(teeTimeRaw) : null;
+        // Today's score: round displayValue (to par), then round value, then derived from holes
+        const roundDisplay = normalizeRoundDisplay(
+          (roundLines as Record<string, unknown> | undefined)?.displayValue
+        );
+        const roundValue =
+          roundLines && typeof (roundLines as { value?: number }).value === 'number'
+            ? (roundLines as { value: number }).value
+            : null;
+        const todayScore =
+          roundDisplay ??
+          (roundValue !== null ? formatToPar(roundValue) : null) ??
+          deriveRoundScoreFromHoles(holeScores) ??
+          null;
         return {
           player: name,
           playerId: String(c.id),
@@ -160,8 +209,8 @@ export async function POST(request: NextRequest) {
           total: c.score ?? 'E',
           rounds: [],
           thru,
-          currentRound,
-          currentRoundScore: null,
+          currentRound: currentRoundNum,
+          currentRoundScore: todayScore,
           teeTime,
           roundComplete: false,
           isAmateur: false,
@@ -176,7 +225,7 @@ export async function POST(request: NextRequest) {
         source: 'espn',
         timestamp: Date.now(),
         tournamentStatus: status,
-        currentRound,
+        currentRound: currentRoundNum,
         lastUpdated: new Date().toISOString(),
         cutLine: null,
       };
@@ -187,7 +236,7 @@ export async function POST(request: NextRequest) {
           tournament_id: tournament.id,
           data: cacheData,
           tournament_status: status,
-          current_round: currentRound,
+          current_round: currentRoundNum,
           player_count: transformedData.length,
         },
         { onConflict: 'cache_key' }

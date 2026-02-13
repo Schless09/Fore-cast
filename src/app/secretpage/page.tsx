@@ -88,6 +88,7 @@ export default async function SecretComparePage() {
                     <th className="px-2 py-2">#</th>
                     <th className="px-2 py-2">Name</th>
                     <th className="px-2 py-2">Total</th>
+                    <th className="px-2 py-2">Today</th>
                     <th className="px-2 py-2">Thru</th>
                     <th className="px-2 py-2">Tee</th>
                   </tr>
@@ -98,6 +99,7 @@ export default async function SecretComparePage() {
                       <td className="px-2 py-1.5">{p.positionValue ?? p.position ?? '-'}</td>
                       <td className="px-2 py-1.5">{p.player ?? 'Unknown'}</td>
                       <td className="px-2 py-1.5">{String(p.total ?? '-')}</td>
+                      <td className="px-2 py-1.5">{p.currentRoundScore != null ? String(p.currentRoundScore) : '-'}</td>
                       <td className="px-2 py-1.5">{p.thru ?? '-'}</td>
                       <TeeTimeCell teeTime={p.teeTime} source="rapidapi" />
                     </tr>
@@ -125,6 +127,7 @@ export default async function SecretComparePage() {
                     <th className="px-2 py-2">#</th>
                     <th className="px-2 py-2">Name</th>
                     <th className="px-2 py-2">Total</th>
+                    <th className="px-2 py-2">Today</th>
                     <th className="px-2 py-2">Thru</th>
                     <th className="px-2 py-2">Tee</th>
                   </tr>
@@ -135,6 +138,7 @@ export default async function SecretComparePage() {
                       <td className="px-2 py-1.5">{p.positionValue ?? p.position ?? '-'}</td>
                       <td className="px-2 py-1.5">{p.player ?? 'Unknown'}</td>
                       <td className="px-2 py-1.5">{String(p.total ?? '-')}</td>
+                      <td className="px-2 py-1.5">{p.currentRoundScore != null ? String(p.currentRoundScore) : '-'}</td>
                       <td className="px-2 py-1.5">{p.thru ?? '-'}</td>
                       <TeeTimeCell teeTime={p.teeTime} source="espn" />
                     </tr>
