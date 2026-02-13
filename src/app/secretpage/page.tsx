@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service';
 import Link from 'next/link';
+import { ESPNCompareTable } from '@/components/secretpage/ESPNCompareTable';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -106,41 +107,11 @@ export default async function SecretComparePage() {
           </div>
 
           {/* ESPN */}
-          <div className="bg-casino-card border border-casino-gold/20 rounded-lg p-4">
-            <h2 className="text-lg font-semibold text-casino-gold mb-2">
-              ESPN (espn_cache)
-            </h2>
-            <p className="text-xs text-casino-gray mb-4">
-              Updated: {espnCache?.updated_at
-                ? new Date(espnCache.updated_at).toLocaleString()
-                : 'never'}
-            </p>
-            <p className="text-sm text-casino-gray mb-2">{espnPlayers.length} players</p>
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
-                    <th className="px-2 py-2">#</th>
-                    <th className="px-2 py-2">Name</th>
-                    <th className="px-2 py-2">Total</th>
-                    <th className="px-2 py-2">Today</th>
-                    <th className="px-2 py-2">Thru</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {espnPlayers.map((p, i) => (
-                    <tr key={i} className="border-b border-casino-gold/10">
-                      <td className="px-2 py-1.5">{p.positionValue ?? p.position ?? '-'}</td>
-                      <td className="px-2 py-1.5">{p.player ?? 'Unknown'}</td>
-                      <td className="px-2 py-1.5">{String(p.total ?? '-')}</td>
-                      <td className="px-2 py-1.5">{p.currentRoundScore != null ? String(p.currentRoundScore) : '-'}</td>
-                      <td className="px-2 py-1.5">{p.thru ?? '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ESPNCompareTable
+            players={espnPlayers}
+            updatedAt={espnCache?.updated_at ?? null}
+            espnEventId={tournament.espn_event_id ?? null}
+          />
         </div>
 
         <p className="text-xs text-casino-gray">

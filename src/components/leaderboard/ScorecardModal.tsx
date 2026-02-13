@@ -41,8 +41,9 @@ interface ScorecardModalProps {
   onClose: () => void;
   playerId: string;
   playerName: string;
-  eventId: string; // This is the tournId (e.g., "004")
-  year?: string; // Tournament year, defaults to current year
+  eventId: string; // RapidAPI: tournId (e.g., "004"); ESPN: espn event ID (e.g., "401811932")
+  year?: string; // Tournament year (RapidAPI only), defaults to current year
+  source?: 'rapidapi' | 'espn';
 }
 
 // Helper to parse score string like "-9", "+2", "E"
@@ -108,13 +109,13 @@ function HoleScore({ strokes, scoreToPar }: { strokes: number | string; scoreToP
   );
 }
 
-export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId, year }: ScorecardModalProps) {
+export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId, year, source = 'rapidapi' }: ScorecardModalProps) {
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
 
-  // Use provided year or default to current year
+  // Use provided year or default to current year (RapidAPI only)
   const tournamentYear = year || new Date().getFullYear().toString();
 
   const fetchScorecard = useCallback(async () => {
@@ -123,8 +124,12 @@ export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId,
     setIsLoading(true);
     setError(null);
     
+    const url = source === 'espn'
+      ? `/api/scores/espn-scorecard?eventId=${encodeURIComponent(eventId)}&playerId=${encodeURIComponent(playerId)}`
+      : `/api/scores/scorecard?year=${tournamentYear}&tournId=${eventId}&playerId=${playerId}`;
+    
     try {
-      const response = await fetch(`/api/scores/scorecard?year=${tournamentYear}&tournId=${eventId}&playerId=${playerId}`);
+      const response = await fetch(url);
       const result = await response.json();
       
       if (!response.ok || !result.data) {
@@ -133,19 +138,20 @@ export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId,
       }
       
       setScorecard(result.data);
-      // Default to latest round
+      // Default to first round with hole data, otherwise latest
       if (result.data.rounds?.length > 0) {
-        const latestRound = result.data.rounds[result.data.rounds.length - 1];
-        setSelectedRound(Number(latestRound.roundNumber));
+        const roundWithHoles = result.data.rounds.find((r: Round) => r.holes?.length > 0);
+        const targetRound = roundWithHoles ?? result.data.rounds[result.data.rounds.length - 1];
+        setSelectedRound(Number(targetRound.roundNumber));
       } else if (result.data.currentRound) {
         setSelectedRound(Number(result.data.currentRound));
       }
-    } catch (err) {
+    } catch {
       setError('Network error - unable to load scorecard');
     } finally {
       setIsLoading(false);
     }
-  }, [playerId, eventId, tournamentYear]);
+  }, [playerId, eventId, tournamentYear, source]);
 
   useEffect(() => {
     if (isOpen && playerId) {

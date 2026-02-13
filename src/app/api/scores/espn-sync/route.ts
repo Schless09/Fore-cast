@@ -217,6 +217,7 @@ export async function POST(request: NextRequest) {
           teeTime,
           roundComplete: false,
           isAmateur: false,
+          linescores: c.linescores ?? [],
         };
       });
 
