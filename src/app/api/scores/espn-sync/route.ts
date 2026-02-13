@@ -134,11 +134,13 @@ export async function POST(request: NextRequest) {
       if (!competition?.competitors) continue;
 
       const competitors = competition.competitors as ESPNCompetitor[];
+      const currentRound = competition.status?.period ?? event.status?.period ?? 1;
+      const roundIndex = Math.max(0, currentRound - 1);
 
       const transformedData = competitors.map((c) => {
         const name = c.athlete?.displayName || c.athlete?.fullName || c.athlete?.shortName || 'Unknown';
         const posNum = c.order || 0;
-        const roundLines = c.linescores?.[0];
+        const roundLines = c.linescores?.[roundIndex];
         const holeScores = roundLines?.linescores ?? [];
         const holesPlayed = holeScores.length;
         const firstHolePeriod = holeScores.length > 0
@@ -158,7 +160,7 @@ export async function POST(request: NextRequest) {
           total: c.score ?? 'E',
           rounds: [],
           thru,
-          currentRound: 1,
+          currentRound,
           currentRoundScore: null,
           teeTime,
           roundComplete: false,
@@ -174,7 +176,7 @@ export async function POST(request: NextRequest) {
         source: 'espn',
         timestamp: Date.now(),
         tournamentStatus: status,
-        currentRound: 1,
+        currentRound,
         lastUpdated: new Date().toISOString(),
         cutLine: null,
       };
@@ -185,7 +187,7 @@ export async function POST(request: NextRequest) {
           tournament_id: tournament.id,
           data: cacheData,
           tournament_status: status,
-          current_round: 1,
+          current_round: currentRound,
           player_count: transformedData.length,
         },
         { onConflict: 'cache_key' }
