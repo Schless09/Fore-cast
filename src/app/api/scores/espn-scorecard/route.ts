@@ -53,8 +53,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const cacheData = cacheRow.data as { data?: Array<{ playerId?: string; player?: string; linescores?: ESPNLineScore[] }> };
+  const cacheData = cacheRow.data as {
+    data?: Array<{ playerId?: string; player?: string; linescores?: ESPNLineScore[] }>;
+    currentRound?: number;
+  };
   const players = Array.isArray(cacheData?.data) ? cacheData.data : [];
+  const activeRound = typeof cacheData?.currentRound === 'number' ? cacheData.currentRound : undefined;
 
   const player = players.find((p) => String(p.playerId) === String(playerId));
   if (!player) {
@@ -140,6 +144,7 @@ export async function GET(request: NextRequest) {
     },
     rounds,
     currentRound: rounds.length,
+    activeRound, // tournament's active round (e.g. 2) for default tab selection
     totalScore,
   };
 

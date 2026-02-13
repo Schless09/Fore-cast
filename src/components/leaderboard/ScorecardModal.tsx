@@ -138,11 +138,16 @@ export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId,
       }
       
       setScorecard(result.data);
-      // Default to first round with hole data, otherwise latest
+      // Default to active round (tournament's current round) if we have hole data for it, else first with holes, else latest
       if (result.data.rounds?.length > 0) {
-        const roundWithHoles = result.data.rounds.find((r: Round) => r.holes?.length > 0);
-        const targetRound = roundWithHoles ?? result.data.rounds[result.data.rounds.length - 1];
-        setSelectedRound(Number(targetRound.roundNumber));
+        const activeRound = (result.data as { activeRound?: number }).activeRound;
+        let targetRound: Round | undefined;
+        if (typeof activeRound === 'number') {
+          targetRound = result.data.rounds.find((r: Round) => Number(r.roundNumber) === activeRound && (r.holes?.length ?? 0) > 0);
+        }
+        targetRound ??= result.data.rounds.find((r: Round) => (r.holes?.length ?? 0) > 0);
+        targetRound ??= result.data.rounds[result.data.rounds.length - 1];
+        if (targetRound) setSelectedRound(Number(targetRound.roundNumber));
       } else if (result.data.currentRound) {
         setSelectedRound(Number(result.data.currentRound));
       }
