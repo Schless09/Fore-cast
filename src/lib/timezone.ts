@@ -4,48 +4,44 @@
  */
 
 /**
- * Convert a time string from EST to the user's local timezone
- * @param estTimeStr - Time string in format "12:10 PM" or "1:30 AM" (assumed EST)
+ * Convert a time string from Eastern (ET) to the user's local timezone.
+ * @param estTimeStr - Time string in format "12:10 PM", "1:30 AM", or "11:45am" (assumed Eastern)
  * @returns Time string in user's local timezone, or original string if parsing fails
  */
 export function convertESTtoLocal(estTimeStr: string): string {
   if (!estTimeStr) return estTimeStr;
-  
+
   try {
-    // Parse the time string (e.g., "12:10 PM")
     const match = estTimeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-    if (!match) return estTimeStr; // Return as-is if format doesn't match
-    
+    if (!match) return estTimeStr;
+
     let hours = parseInt(match[1], 10);
     const minutes = parseInt(match[2], 10);
     const period = match[3].toUpperCase();
-    
-    // Convert to 24-hour format
-    if (period === 'PM' && hours !== 12) {
-      hours += 12;
-    } else if (period === 'AM' && hours === 12) {
-      hours = 0;
-    }
-    
-    // Create a date object with EST timezone
-    // Use today's date for the conversion (the actual date doesn't matter for time-only display)
+
+    if (period === 'PM' && hours !== 12) hours += 12;
+    else if (period === 'AM' && hours === 12) hours = 0;
+
     const now = new Date();
-    const estDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
-    
-    // Parse as EST (America/New_York handles EST/EDT automatically)
-    const estDate = new Date(estDateStr + '-05:00'); // EST is UTC-5
-    
-    // Format in user's local timezone
-    const localTime = estDate.toLocaleTimeString('en-US', {
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const day = now.getDate();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateStr = `${y}-${pad(m + 1)}-${pad(day)}T${pad(hours)}:${pad(minutes)}:00`;
+
+    // America/New_York: EST (UTC-5) or EDT (UTC-4). Rough DST: March–October.
+    const inDST = m >= 2 && m <= 9;
+    const offset = inDST ? '-04:00' : '-05:00';
+    const etMoment = new Date(dateStr + offset);
+
+    return etMoment.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     });
-    
-    return localTime;
   } catch (error) {
     console.error('Error converting timezone:', error);
-    return estTimeStr; // Return original on error
+    return estTimeStr;
   }
 }
 

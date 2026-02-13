@@ -1,6 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service';
 import Link from 'next/link';
-import { TeeTimeCell } from '@/components/compare/TeeTimeCell';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -12,7 +11,6 @@ interface CachedPlayer {
   positionValue?: number;
   total?: string | number;
   thru?: string;
-  teeTime?: string;
   currentRoundScore?: string | number;
 }
 
@@ -90,7 +88,6 @@ export default async function SecretComparePage() {
                     <th className="px-2 py-2">Total</th>
                     <th className="px-2 py-2">Today</th>
                     <th className="px-2 py-2">Thru</th>
-                    <th className="px-2 py-2">Tee</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -101,7 +98,6 @@ export default async function SecretComparePage() {
                       <td className="px-2 py-1.5">{String(p.total ?? '-')}</td>
                       <td className="px-2 py-1.5">{p.currentRoundScore != null ? String(p.currentRoundScore) : '-'}</td>
                       <td className="px-2 py-1.5">{p.thru ?? '-'}</td>
-                      <TeeTimeCell teeTime={p.teeTime} source="rapidapi" />
                     </tr>
                   ))}
                 </tbody>
@@ -129,7 +125,6 @@ export default async function SecretComparePage() {
                     <th className="px-2 py-2">Total</th>
                     <th className="px-2 py-2">Today</th>
                     <th className="px-2 py-2">Thru</th>
-                    <th className="px-2 py-2">Tee</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -140,7 +135,6 @@ export default async function SecretComparePage() {
                       <td className="px-2 py-1.5">{String(p.total ?? '-')}</td>
                       <td className="px-2 py-1.5">{p.currentRoundScore != null ? String(p.currentRoundScore) : '-'}</td>
                       <td className="px-2 py-1.5">{p.thru ?? '-'}</td>
-                      <TeeTimeCell teeTime={p.teeTime} source="espn" />
                     </tr>
                   ))}
                 </tbody>

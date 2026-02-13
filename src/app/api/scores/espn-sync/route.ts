@@ -37,7 +37,10 @@ function normalizeRoundDisplay(raw: unknown): string | null {
   return null;
 }
 
-/** e.g. "Thu Feb 12 11:45:00 PST 2026" -> "2:45 PM" (EST) for consistent convertESTtoLocal display */
+/**
+ * ESPN sends datetime strings in the tournament's timezone (e.g. "Thu Feb 12 11:45:00 PST 2026"
+ * for Pebble Beach). Parse and convert to Eastern for storage; display then converts to user's local.
+ */
 function formatTeeTimeToEST(raw: string): string {
   try {
     const d = new Date(raw);
