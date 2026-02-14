@@ -900,7 +900,11 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       {showPersonalLeaderboard && existingRosterData && (
         <div className="mb-6">
           {tournament.status === 'active' && tournament.rapidapi_tourn_id ? (
-            <LivePersonalLeaderboard
+            <Link
+              href={`/standings/weekly/${id}`}
+              className="block *:transition-colors *:hover:border-casino-gold/40 *:cursor-pointer"
+            >
+              <LivePersonalLeaderboard
               rosterId={existingRosterData.id}
               rosterName={existingRosterData.roster_name}
               tournamentName={tournament.name}
@@ -911,6 +915,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               }))}
               displayRound={displayRound}
             />
+            </Link>
           ) : (
             <PersonalLeaderboard
               rosterId={existingRosterData.id}
