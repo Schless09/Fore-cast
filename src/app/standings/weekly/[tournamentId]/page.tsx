@@ -347,10 +347,11 @@ export default async function WeeklyStandingsByTournamentPage({
         </Card>
       )}
 
-      {/* Tournament Info */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="space-y-2">
+      {/* Tournament Info - clickable to /tournaments */}
+      <Link href="/tournaments" className="block">
+        <Card className="mb-6 transition-colors hover:border-casino-gold/40 cursor-pointer">
+          <CardHeader>
+            <div className="space-y-2">
             {/* Top row: Name + Round badge + Status */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
@@ -392,10 +393,11 @@ export default async function WeeklyStandingsByTournamentPage({
               {tournament.course_location && (
                 <span>{tournament.course_location}</span>
               )}
+              </div>
             </div>
-          </div>
-        </CardHeader>
-      </Card>
+          </CardHeader>
+        </Card>
+      </Link>
 
       {/* Standings Table - only when this tournament is included in the user's league */}
       {!tournamentIncludedInLeague ? (
