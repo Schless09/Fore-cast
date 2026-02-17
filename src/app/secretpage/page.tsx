@@ -119,7 +119,7 @@ export default async function SecretComparePage() {
           <br />
           Set espn_event_id in admin for tournaments you want to compare.
           <br />
-          ESPN sync runs every 2 min • RapidAPI sync runs every 4 min (during active tournament windows).
+          ESPN sync runs every 2 min • RapidAPI runs once/day (6 AM UTC) via rapidapi-daily cron.
         </p>
       </div>
     </div>

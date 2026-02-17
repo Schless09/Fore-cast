@@ -440,20 +440,71 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       return Math.round(totalPrize / tieCount);
     };
 
-    // PRIORITY 1: Check live_scores_cache (where RapidAPI data is stored)
-    // Query by tournament_id directly - this is how auto-sync stores the data
-    const { data: cachedData } = await supabase
-      .from('live_scores_cache')
-      .select('data, updated_at, tournament_status, current_round, player_count')
-      .eq('tournament_id', id)
-      .single();
-    
-    // Extract cut line from cached data
-    cutLine = cachedData?.data?.cutLine || null;
+    // PRIORITY 1a: For active tournaments, prefer ESPN cache (refreshed every 2 min, no limit)
+    let useEspnForLeaderboard = false;
+    if ((tournament.status === 'active' || tournament.status === 'completed') && tournament.espn_event_id) {
+      const { data: espnCached } = await supabase
+        .from('espn_cache')
+        .select('data, updated_at, tournament_status, current_round')
+        .eq('tournament_id', id)
+        .single();
 
-    if (cachedData?.data?.data && Array.isArray(cachedData.data.data) && cachedData.data.data.length > 0) {
+      if (espnCached?.data?.data && Array.isArray(espnCached.data.data) && espnCached.data.data.length > 0) {
+        useEspnForLeaderboard = true;
+        leaderboardSource = 'espn';
+        const scores = espnCached.data.data;
+
+        const positionCounts = new Map<number, number>();
+        scores.forEach((player: CachedLeaderboardPlayer) => {
+          const posNum = player.positionValue;
+          if (posNum && posNum > 0 && posNum < 900) {
+            positionCounts.set(posNum, (positionCounts.get(posNum) || 0) + 1);
+          }
+        });
+
+        tournamentLeaderboard = scores.map((player: CachedLeaderboardPlayer) => {
+          const posNum = player.positionValue;
+          const actualPosition = (posNum && posNum < 900) ? posNum : null;
+          const tieCount = actualPosition ? (positionCounts.get(actualPosition) || 1) : 1;
+          const isTied = tieCount > 1;
+          return {
+            position: actualPosition,
+            is_tied: isTied,
+            tied_with_count: tieCount,
+            total_score: parseScore(player.total ?? 0),
+            today_score: player.currentRoundScore ? parseScore(player.currentRoundScore) : 0,
+            thru: player.thru || 'F',
+            prize_money: calculateTiePrizeMoney(actualPosition, tieCount),
+            name: player.player || 'Unknown',
+            tee_time: player.teeTime || null,
+            starting_tee: null,
+            prize_distribution: actualPosition && prizeDistributionMap.has(actualPosition)
+              ? prizeDistributionMap.get(actualPosition)
+              : undefined,
+            apiPlayerId: player.playerId,
+          };
+        });
+        tournamentLeaderboard.sort((a, b) => {
+          if (a.position === null && b.position === null) return 0;
+          if (a.position === null) return 1;
+          if (b.position === null) return -1;
+          return a.position - b.position;
+        });
+      }
+    }
+
+    // PRIORITY 1b: If not using ESPN, check live_scores_cache (RapidAPI)
+    if (!useEspnForLeaderboard) {
+      const { data: cachedData } = await supabase
+        .from('live_scores_cache')
+        .select('data, updated_at, tournament_status, current_round, player_count')
+        .eq('tournament_id', id)
+        .single();
+
+      cutLine = cachedData?.data?.cutLine || null;
+
+      if (cachedData?.data?.data && Array.isArray(cachedData.data.data) && cachedData.data.data.length > 0) {
         leaderboardSource = 'cache';
-        
         const scores = cachedData.data.data;
         
         // Count players at each position to detect ties
@@ -485,16 +536,17 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             prize_distribution: actualPosition && prizeDistributionMap.has(actualPosition)
               ? prizeDistributionMap.get(actualPosition)
               : undefined,
+            apiPlayerId: player.playerId,
           };
         });
-        
-        // Sort by position
+
         tournamentLeaderboard.sort((a, b) => {
           if (a.position === null && b.position === null) return 0;
           if (a.position === null) return 1;
           if (b.position === null) return -1;
           return a.position - b.position;
         });
+      }
     }
 
     // PRIORITY 2: Try database tournament_players if no cache data
@@ -721,6 +773,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             userRosterPlayerIds={userRosterPlayerIds}
             playerNameToIdMap={playerNameToIdMap}
             liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
+            espnEventId={tournament.espn_event_id}
+            scorecardSource={leaderboardSource === 'espn' ? 'espn' : 'rapidapi'}
             tournamentStatus={tournament.status}
             currentRound={displayRound}
             teeTimeMap={teeTimeMap}
@@ -899,7 +953,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       {/* Show personal leaderboard for active tournaments */}
       {showPersonalLeaderboard && existingRosterData && (
         <div className="mb-6">
-          {tournament.status === 'active' && tournament.rapidapi_tourn_id ? (
+          {tournament.status === 'active' && (tournament.rapidapi_tourn_id || tournament.espn_event_id) ? (
             <Link
               href={`/standings/weekly/${id}`}
               className="block *:transition-colors *:hover:border-casino-gold/40 *:cursor-pointer"
@@ -909,6 +963,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               rosterName={existingRosterData.roster_name}
               tournamentName={tournament.name}
               liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
+              espnEventId={tournament.espn_event_id}
+              scorecardSource={leaderboardSource === 'espn' ? 'espn' : 'rapidapi'}
               prizeDistributions={(prizeDistributions || []).map((p: PrizeDistribution) => ({
                 position: typeof p.position === 'string' ? parseInt(p.position, 10) : p.position,
                 amount: p.amount || 0,

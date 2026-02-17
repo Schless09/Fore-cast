@@ -32,7 +32,9 @@ interface LivePersonalLeaderboardProps {
   rosterId: string;
   rosterName: string;
   tournamentName: string;
-  liveGolfAPITournamentId: string;
+  liveGolfAPITournamentId?: string;
+  espnEventId?: string | null;
+  scorecardSource?: 'espn' | 'rapidapi';
   prizeDistributions: Array<{
     position: number;
     amount: number;
@@ -66,9 +68,16 @@ export function LivePersonalLeaderboard({
   rosterName,
   tournamentName,
   liveGolfAPITournamentId,
+  espnEventId,
+  scorecardSource = 'rapidapi',
   prizeDistributions,
   displayRound = 1,
 }: LivePersonalLeaderboardProps) {
+  const liveUrl = scorecardSource === 'espn' && espnEventId
+    ? `/api/scores/live?source=espn&eventId=${encodeURIComponent(espnEventId)}`
+    : liveGolfAPITournamentId
+      ? `/api/scores/live?eventId=${liveGolfAPITournamentId}`
+      : null;
   const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>([]);
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -219,15 +228,15 @@ export function LivePersonalLeaderboard({
     setRosterPlayers(players);
   }, [rosterId]);
 
-  // Fetch live scores from API
+  // Fetch live scores from API (ESPN or RapidAPI based on scorecardSource)
   const fetchLiveScores = useCallback(async () => {
-    if (!liveGolfAPITournamentId || isRefreshing) return;
+    if (!liveUrl || isRefreshing) return;
 
     setIsRefreshing(true);
     setSyncError(null);
 
     try {
-      const response = await fetch(`/api/scores/live?eventId=${liveGolfAPITournamentId}`);
+      const response = await fetch(liveUrl);
       const result = await response.json();
 
       if (!response.ok || !result.data) {
@@ -243,7 +252,7 @@ export function LivePersonalLeaderboard({
       setIsRefreshing(false);
       setNextRefreshIn(REFRESH_INTERVAL_MS / 1000);
     }
-  }, [liveGolfAPITournamentId, isRefreshing]);
+  }, [liveUrl, isRefreshing]);
 
   // Initial load
   useEffect(() => {

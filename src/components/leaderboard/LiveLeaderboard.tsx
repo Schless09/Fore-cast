@@ -62,10 +62,12 @@ interface LiveLeaderboardProps {
   userRosterPlayerIds: string[];
   playerNameToIdMap: Map<string, string>;
   liveGolfAPITournamentId?: string;
+  espnEventId?: string | null;
+  scorecardSource?: 'espn' | 'rapidapi';
   tournamentStatus?: 'upcoming' | 'active' | 'completed';
   currentRound?: number;
-  teeTimeMap?: Map<string, TeeTimeData>; // Map of player name to tee time data
-  playerCostMap?: Map<string, number>; // Map of player name to salary cost
+  teeTimeMap?: Map<string, TeeTimeData>;
+  playerCostMap?: Map<string, number>;
   initialCutLine?: CutLineData | null;
 }
 
@@ -184,12 +186,22 @@ export function LiveLeaderboard({
   userRosterPlayerIds,
   playerNameToIdMap,
   liveGolfAPITournamentId,
+  espnEventId,
+  scorecardSource = 'rapidapi',
   tournamentStatus: initialTournamentStatus,
   currentRound,
   teeTimeMap,
   playerCostMap,
   initialCutLine,
 }: LiveLeaderboardProps) {
+  // Use ESPN for live refresh when preferred; otherwise RapidAPI
+  const liveRefreshEventId = scorecardSource === 'espn' && espnEventId ? espnEventId : liveGolfAPITournamentId;
+  const liveRefreshUrl = scorecardSource === 'espn' && espnEventId
+    ? `/api/scores/live?source=espn&eventId=${encodeURIComponent(espnEventId)}`
+    : liveGolfAPITournamentId
+      ? `/api/scores/live?eventId=${liveGolfAPITournamentId}`
+      : null;
+  const scorecardEventId = scorecardSource === 'espn' && espnEventId ? espnEventId : liveGolfAPITournamentId;
   const isMobile = useMediaQuery('(max-width: 639px)');
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardRow[]>(initialData);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -215,9 +227,8 @@ export function LiveLeaderboard({
 
   // Function to fetch directly from API and transform
   const fetchFromAPI = useCallback(async () => {
-    if (!liveGolfAPITournamentId || isRefreshing) return;
-    
-    // Don't fetch if tournament is already completed
+    if (!liveRefreshUrl || isRefreshing) return;
+
     if (isCompleted) {
       console.log('[LiveLeaderboard] Tournament completed, skipping fetch');
       return;
@@ -227,8 +238,7 @@ export function LiveLeaderboard({
     setSyncError(null);
 
     try {
-      // Fetch directly from our API route that calls LiveGolfAPI
-      const response = await fetch(`/api/scores/live?eventId=${liveGolfAPITournamentId}`);
+      const response = await fetch(liveRefreshUrl);
       const result = await response.json();
 
       if (!response.ok || !result.data) {
@@ -333,12 +343,11 @@ export function LiveLeaderboard({
       setNextRefreshIn(REFRESH_INTERVAL_MS / 1000);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveGolfAPITournamentId, prizeDistributionMap, isCompleted]);
+  }, [liveRefreshUrl, prizeDistributionMap, isCompleted]);
 
   // Trigger initial fetch on mount - but skip for completed tournaments
-  // Server already provides final data, no need to re-fetch
   useEffect(() => {
-    if (liveGolfAPITournamentId && !hasInitialSynced.current && !isCompleted) {
+    if (liveRefreshEventId && !hasInitialSynced.current && !isCompleted) {
       hasInitialSynced.current = true;
       // Small delay to prevent flash on initial render
       const timer = setTimeout(() => {
@@ -347,7 +356,7 @@ export function LiveLeaderboard({
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [liveGolfAPITournamentId, fetchFromAPI, isCompleted]);
+  }, [liveRefreshEventId, fetchFromAPI, isCompleted]);
 
   useEffect(() => {
     // Don't poll if tournament is completed
@@ -391,7 +400,7 @@ export function LiveLeaderboard({
   return (
     <div>
       {/* Refresh Status Bar */}
-      {liveGolfAPITournamentId && (
+      {liveRefreshEventId && (
         <div className="mb-3">
           <div className="flex items-center justify-between text-xs text-casino-gray">
             <div className="flex items-center gap-2">
@@ -648,14 +657,16 @@ export function LiveLeaderboard({
       </table>
       </div>
 
-      {/* Scorecard Modal */}
-      {liveGolfAPITournamentId && (
+      {/* Scorecard Modal — ESPN or RapidAPI based on scorecardSource */}
+      {scorecardEventId && (
         <ScorecardModal
           isOpen={selectedPlayer !== null}
           onClose={() => setSelectedPlayer(null)}
           playerId={selectedPlayer?.id || ''}
           playerName={selectedPlayer?.name || ''}
-          eventId={liveGolfAPITournamentId}
+          eventId={scorecardEventId}
+          source={scorecardSource}
+          year={scorecardSource === 'rapidapi' ? new Date().getFullYear().toString() : undefined}
         />
       )}
     </div>

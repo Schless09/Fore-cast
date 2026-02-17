@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { getProfile } from '@/lib/auth/profile';
 import { Card, CardContent } from '@/components/ui/Card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { createServiceClient } from '@/lib/supabase/service';
+import { filterTournamentsIncludedInLeague } from '@/lib/league-utils';
 
 export const metadata: Metadata = {
   title: 'Weekly Fantasy Golf Standings',
@@ -16,72 +18,50 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export default async function WeeklyStandingsPage() {
+  const profile = await getProfile();
   const supabase = createServiceClient();
+  const userLeagueId = profile?.active_league_id ?? null;
 
-  // Priority:
-  // 1) Active tournament (currently in progress)
-  // 2) Most recent completed (if ended today or yesterday - to let users see final results)
-  // 3) Next upcoming tournament
-  // 4) Most recent completed (fallback)
-  
-  const { data: activeTournament } = await supabase
+  const { data: tournaments } = await supabase
     .from('tournaments')
     .select('*')
-    .eq('status', 'active')
-    .order('start_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order('start_date', { ascending: false });
 
-  const { data: completedTournament } = await supabase
-    .from('tournaments')
-    .select('*')
-    .eq('status', 'completed')
-    .order('end_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const all = await filterTournamentsIncludedInLeague(
+    supabase,
+    userLeagueId,
+    tournaments || []
+  );
 
-  const { data: upcomingTournament } = await supabase
-    .from('tournaments')
-    .select('*')
-    .eq('status', 'upcoming')
-    .order('start_date', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  // Same default logic as Tournaments page
+  const active = all.filter((t) => t.status === 'active');
+  const upcoming = all
+    .filter((t) => t.status === 'upcoming')
+    .sort((a, b) => a.start_date.localeCompare(b.start_date));
+  const completed = all
+    .filter((t) => t.status === 'completed')
+    .sort((a, b) => b.end_date.localeCompare(a.end_date));
 
-  // Check if we should show the completed tournament
-  // Show completed tournament until Monday noon CST, then switch to upcoming
   const isBeforeMondayNoonCST = () => {
     const now = new Date();
-    // Convert to CST
     const cstTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
-    const dayOfWeek = cstTime.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const dayOfWeek = cstTime.getDay();
     const hour = cstTime.getHours();
-    
-    // Before Monday noon: Sunday (day 0) or Monday before noon (day 1, hour < 12)
     return dayOfWeek === 0 || (dayOfWeek === 1 && hour < 12);
   };
-  
-  const shouldShowCompletedTournament = () => {
-    if (!completedTournament?.end_date) return false;
-    
-    // Only show completed tournament if we're before Monday noon CST
-    return isBeforeMondayNoonCST();
-  };
+
+  const shouldShowCompletedTournament = completed.length > 0 && isBeforeMondayNoonCST();
 
   let tournament;
-  
-  if (activeTournament) {
-    // Active tournament takes priority
-    tournament = activeTournament;
-  } else if (shouldShowCompletedTournament()) {
-    // Show completed tournament if it ended today or yesterday
-    tournament = completedTournament;
-  } else if (upcomingTournament) {
-    // Otherwise show next upcoming
-    tournament = upcomingTournament;
+
+  if (active[0]) {
+    tournament = active[0];
+  } else if (shouldShowCompletedTournament) {
+    tournament = completed[0];
+  } else if (upcoming[0]) {
+    tournament = upcoming[0];
   } else {
-    // Fallback to most recent completed
-    tournament = completedTournament;
+    tournament = completed[0];
   }
 
   if (!tournament) {

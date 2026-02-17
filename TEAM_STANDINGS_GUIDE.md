@@ -22,16 +22,17 @@ Example format:
 ]
 ```
 
-#### **Step 2: Sync Scores from LiveGolfAPI**
+#### **Step 2: Sync scores (RapidAPI)**
 Go to `/admin/scores`:
-1. Enter your Tournament ID (or select from dropdown)
-2. Enter the LiveGolfAPI Tournament ID (e.g., `272e7c64-be4c-4081-8423-6d07af029626`)
-3. Click "Sync Scores from LiveGolfAPI"
+1. Select the tournament from the dropdown
+2. Click "Sync Scores" (or "Sync from RapidAPI")
 
 This will:
-- Fetch leaderboard from LiveGolfAPI
+- Fetch leaderboard from RapidAPI (Live Golf Data) or use cached data
 - Update player positions in `tournament_players`
 - Match players by name
+
+Live data architecture: ESPN for in-play leaderboard (every 2 min); RapidAPI for official positions and once-daily sync. See [AUTO_SCORING_SETUP.md](./AUTO_SCORING_SETUP.md) and [PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md).
 
 #### **Step 3: Calculate Winnings**
 On the same `/admin/scores` page:

@@ -4,18 +4,20 @@ A complete fantasy golf statistics and live leaderboard web application where us
 
 ## Features
 
-- 🏌️ **Fantasy Golf Rosters**: Create custom rosters of PGA Tour players for each tournament
-- 📊 **Personalized Leaderboards**: See ONLY your selected players with real-time updates
-- 🏆 **Fantasy Scoring**: Points based on player performance, position, and achievements
-- ⚡ **Real-time Updates**: Live score updates via Supabase subscriptions
-- 🔐 **User Authentication**: Secure sign-up and login with Supabase Auth
-- 📱 **Responsive Design**: Beautiful, mobile-first UI built with Tailwind CSS
-- 👨‍💼 **Admin Dashboard**: Manage tournaments, players, and scores
+- 🏌️ **Fantasy Golf Rosters**: Salary-cap rosters of PGA Tour players per tournament (costs from sportsbook odds)
+- 📊 **Prize-money scoring**: Roster score = sum of your players’ actual tournament winnings
+- 📈 **Live leaderboards**: Full field and “my players” view; ESPN (every 2 min) for live, RapidAPI (daily) for official wrap-up
+- 🏆 **Leagues**: Multiple leagues; weekly and season standings; tournaments can be included/excluded per league
+- 🔐 **Auth**: Clerk (sign-up / login)
+- 📱 **Responsive UI**: Next.js, TypeScript, Tailwind
+- 👨‍💼 **Admin**: Tournaments, prize money, odds, tee times, score sync
+
+For a concise product and architecture overview (e.g. for LLMs), see **[PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md)**.
 
 ## Tech Stack
 
 - **Frontend**: Next.js 14 (App Router), TypeScript, React, Tailwind CSS
-- **Backend**: Supabase (PostgreSQL, Auth, Real-time)
+- **Backend**: Supabase (PostgreSQL); **Auth**: Clerk
 - **Deployment**: Vercel (free tier)
 
 ## Getting Started
@@ -110,33 +112,14 @@ Since you'll be uploading players weekly for each tournament:
    SELECT 'tournament-uuid', id FROM pga_players WHERE name IN ('Player 1', 'Player 2', ...);
    ```
 
-## API Integration with LiveGolfAPI.com
+## Live scores and sync (ESPN + RapidAPI)
 
-To integrate with LiveGolfAPI.com for automatic score updates:
+Live leaderboards use two sources:
 
-1. Create a cron job or scheduled function (e.g., using Vercel Cron)
-2. Fetch tournament data from LiveGolfAPI.com
-3. Transform the data to match the expected format
-4. Call the `/api/scores/update` endpoint with the player scores
+- **ESPN** — Refreshed every 2 minutes on tournament days; used for in-play leaderboard and scorecards. No rate limit.
+- **RapidAPI** (Live Golf Data) — Runs once per day (6 AM UTC); updates tee times, final positions, and winnings. Used for official wrap-up and DB persistence.
 
-Example payload format:
-```json
-{
-  "tournamentId": "uuid",
-  "players": [
-    {
-      "pgaPlayerId": "uuid",
-      "total_score": -10,
-      "today_score": -3,
-      "thru": 18,
-      "position": 1,
-      "made_cut": true,
-      "round_1_score": -5,
-      "round_2_score": -2
-    }
-  ]
-}
-```
+Crons: `espn-sync` (every 2 min), `auto-sync` (every 4 min, activation only), `rapidapi-daily` (once/day). See **[AUTO_SCORING_SETUP.md](./AUTO_SCORING_SETUP.md)** and **[PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md)** for details.
 
 ## Project Structure
 

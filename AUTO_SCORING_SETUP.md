@@ -1,145 +1,83 @@
-# Automatic Score Syncing Setup
+# Automatic score and live data setup
 
-This guide explains how to set up automatic score syncing for live tournaments.
+How live leaderboards and official results are kept in sync.
 
-## How It Works
+## Architecture (ESPN + RapidAPI)
 
-The system automatically syncs scores from LiveGolfAPI every 5 minutes during active tournaments using Vercel Cron Jobs.
+| Source | Role | Schedule | What it updates |
+|--------|------|----------|------------------|
+| **ESPN** | Live leaderboard and scorecards during the tournament | Every **2 minutes** (tournament days Thu–Sun) | `espn_cache` |
+| **RapidAPI** (Live Golf Data) | Official wrap-up: tee times, final positions, winnings | **Once per day** (6 AM UTC) | `live_scores_cache`, `tournament_players` (tee times, position, prize_money), tournament status |
 
-## Setup Steps
+- **Tournament page** prefers ESPN when `espn_event_id` is set and cache has data; otherwise uses RapidAPI cache or DB.
+- **Tee times in the DB** come only from RapidAPI (or CBS fallback if RapidAPI returns no matches). ESPN tee times are only in `espn_cache` for display.
 
-### 1. Set Required Environment Variables
+See **[PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md)** for full context.
 
-Add these to your Vercel project or `.env.local`:
+## Required environment variables
+
+In Vercel or `.env.local`:
 
 ```bash
-# Your app URL (important for cron to call the sync endpoint)
 NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
+CRON_SECRET=<secure-random-string>
 
-# Generate a random secret for cron authentication
-CRON_SECRET=your-random-secret-here-generate-a-secure-one
+# RapidAPI (Live Golf Data) — used by rapidapi-daily and admin sync
+RAPIDAPI_KEY=<your-rapidapi-key>
 ```
 
-To generate a secure `CRON_SECRET`:
-```bash
-# On Mac/Linux:
-openssl rand -base64 32
+Generate `CRON_SECRET` (e.g. `openssl rand -base64 32`).
 
-# Or use any secure random string generator
-```
+## Cron jobs (vercel.json)
 
-### 2. Configure Vercel Cron (Already Done!)
+| Path | Schedule | Purpose |
+|------|----------|---------|
+| `/api/scores/espn-sync` | `*/2 * * * *` (every 2 min) | Fetch ESPN scoreboard; update `espn_cache` for tournaments with `espn_event_id`. Only runs on tournament days (Thu–Sun). |
+| `/api/scores/auto-sync` | `*/4 * * * *` (every 4 min) | Tournament **activation only**: set status `upcoming` → `active` when start time has passed. No API calls. |
+| `/api/scores/rapidapi-daily` | `0 6 * * *` (daily 6 AM UTC) | Runs all RapidAPI logic by calling `auto-sync?force=true&source=rapidapi-daily`: tee times (R1/R2) for upcoming, leaderboard for active, mark completed, sync final scores and winnings. |
 
-The `vercel.json` file is already configured to run `/api/scores/auto-sync` every 5 minutes.
+Other crons: rankings sync (Mondays), roster reminders (Wed/Thu).
 
-### 3. Deploy to Vercel
+## Enabling live data for a tournament
 
-```bash
-# Push your changes
-git add .
-git commit -m "Add automatic score syncing"
-git push
+1. **ESPN** (live leaderboard + scorecards): Set `espn_event_id` on the tournament (e.g. from ESPN scoreboard URL). ESPN sync will fill `espn_cache` for that event.
+2. **RapidAPI** (tee times, official results): Set `rapidapi_tourn_id` (e.g. `"002"`, `"004"`). Used by rapidapi-daily and admin “Sync scores”.
 
-# Vercel will automatically detect vercel.json and set up the cron job
-```
+Mark the tournament **active** when it starts (auto-sync does this automatically from start date + earliest tee time).
 
-### 4. Add CRON_SECRET to Vercel
+## Manual sync
 
-In your Vercel project dashboard:
-1. Go to **Settings** → **Environment Variables**
-2. Add `CRON_SECRET` with the value you generated
-3. Add `NEXT_PUBLIC_APP_URL` with your production URL
-4. Redeploy for changes to take effect
-
-### 5. Mark Tournament as "Active"
-
-For auto-sync to work:
-1. Go to `/admin/tournaments`
-2. Set tournament status to **"Active (Live)"**
-3. Ensure `rapidapi_tourn_id` is set
-
-## How Auto-Sync Works
-
-1. **Every 5 minutes**, Vercel Cron calls `/api/scores/auto-sync`
-2. The endpoint finds all tournaments with `status = 'active'`
-3. For each tournament, it calls `/api/scores/sync` to fetch latest scores
-4. Scores are updated in the database
-5. Fantasy points are automatically recalculated
-
-## Manual Sync
-
-You can still manually sync scores anytime from `/admin/scores`
+- **Force full RapidAPI run** (tee times + leaderboard + wrap-up):  
+  `GET /api/scores/auto-sync?force=true` with `Authorization: Bearer <CRON_SECRET>` (or while signed in as admin).
+- **Admin scores page** (`/admin/scores`): Select tournament and use “Sync Scores” to pull from RapidAPI and update positions/winnings.
 
 ## Monitoring
 
-Check cron job execution in Vercel:
-1. Go to your project in Vercel
-2. Navigate to **Logs**
-3. Filter by `/api/scores/auto-sync` to see sync activity
+- **Vercel** → Logs: filter by `/api/scores/espn-sync`, `/api/scores/auto-sync`, `/api/scores/rapidapi-daily`.
+- **RapidAPI usage**: `api_call_log` rows with `api_name = 'rapidapi'` (leaderboard and tournament endpoints).
 
 ## Troubleshooting
 
-### Scores Not Updating
+**No live leaderboard**
 
-1. **Check tournament status:**
-   - Must be set to "active"
-   - Must have `rapidapi_tourn_id`
+- Tournament has `espn_event_id` and is active? ESPN sync runs every 2 min on Thu–Sun.
+- If using RapidAPI only: cache is updated once per day; use “Force sync” or wait for 6 AM UTC run.
 
-2. **Check environment variables:**
-   - `CRON_SECRET` is set in Vercel
-   - `NEXT_PUBLIC_APP_URL` points to your production URL
+**Tee times missing in DB**
 
-3. **Check Vercel logs:**
-   - Look for errors in `/api/scores/auto-sync` calls
-   - Verify cron is running every 5 minutes
+- RapidAPI runs once per day. Ensure `rapidapi_tourn_id` is set. If RapidAPI returns no matches, CBS Sports fallback runs (same daily run).
+- ESPN tee times are not written to DB; they only appear from `espn_cache` when the UI uses ESPN data.
 
-4. **Check LiveGolfAPI:**
-   - Ensure API is returning data
-   - Check player name matching
+**Scores / winnings not finalizing**
 
-### Cron Not Running
+- When tournament status becomes “Official”, auto-sync (during rapidapi-daily) marks it completed and runs score sync + winnings calculation. Trigger manually with `?force=true` if needed.
 
-1. Ensure `vercel.json` is in project root
-2. Redeploy after adding/changing cron configuration
-3. Check Vercel dashboard for cron job status
-
-## Adjusting Sync Frequency
-
-Edit `vercel.json` to change frequency:
-
-```json
-{
-  "crons": [
-    {
-      "path": "/api/scores/auto-sync",
-      "schedule": "*/5 * * * *"  // Every 5 minutes
-      // "schedule": "*/10 * * * *"  // Every 10 minutes
-      // "schedule": "*/2 * * * *"   // Every 2 minutes
-    }
-  ]
-}
-```
-
-**Note:** More frequent syncs = more API calls. Balance between freshness and API limits.
-
-## Cost Considerations
-
-- **Vercel Cron:** Free on all plans
-- **API Calls:** 12 calls per hour per active tournament (at 5-minute intervals)
-- **Database Writes:** Minimal cost, one update per player per sync
-
-## Testing Locally
-
-For local testing, you can manually trigger the auto-sync:
+## Testing locally
 
 ```bash
-curl -X POST http://localhost:3000/api/scores/auto-sync \
-  -H "Authorization: Bearer your-cron-secret"
+# ESPN sync (tournament days only)
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/scores/espn-sync
+
+# RapidAPI full run (activation + tee times + leaderboard + wrap-up)
+curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/scores/auto-sync?force=true"
 ```
-
-## Next Steps After Tournament
-
-After tournament completes:
-1. Set tournament status to "completed"
-2. Run `/api/scores/calculate-winnings` to finalize prize money
-3. Auto-sync will stop automatically (only syncs "active" tournaments)

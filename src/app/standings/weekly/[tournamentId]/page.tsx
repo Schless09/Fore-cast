@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
-import { getLeagueIdForWeeklyStandings } from '@/lib/league-utils';
+import { getLeagueIdForWeeklyStandings, filterTournamentsIncludedInLeague } from '@/lib/league-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/prize-money';
 import { formatTimestampCST, formatDate } from '@/lib/utils';
@@ -239,72 +239,34 @@ export default async function WeeklyStandingsByTournamentPage({
   const userRosterIndex = rosters?.findIndex((r: any) => r.user_id === profile.id);
   const userRank = userRosterIndex !== undefined && userRosterIndex !== -1 ? userRosterIndex + 1 : null;
 
-  // Re-sort to prioritize: active > completed (recent) > upcoming (next)
+  // Sort tournaments: active first, then upcoming (by date), then completed (recent first) — matches Tournaments page
   const sortedTournaments = allTournaments
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? [...allTournaments].sort((a: any, b: any) => {
-        // Priority: active > completed > upcoming
+    ? [...allTournaments].sort((a, b) => {
         const statusPriority: Record<string, number> = {
-          active: 1,
+          active: 0,
+          upcoming: 1,
           completed: 2,
-          upcoming: 3,
         };
-        const aPriority = statusPriority[a.status] || 99;
-        const bPriority = statusPriority[b.status] || 99;
+        const aPriority = statusPriority[a.status] ?? 3;
+        const bPriority = statusPriority[b.status] ?? 3;
 
-        if (aPriority !== bPriority) {
-          return aPriority - bPriority;
-        }
+        if (aPriority !== bPriority) return aPriority - bPriority;
 
-        // Within same status, sort by date
-        if (a.status === 'upcoming') {
-          // For upcoming, show next one first (ascending)
-          return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
-        } else {
-          // For active/completed, show most recent first (descending)
-          return new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
-        }
+        if (a.status === 'upcoming') return a.start_date.localeCompare(b.start_date);
+        return b.start_date.localeCompare(a.start_date);
       })
     : [];
 
-  // Determine current week's tournament from sortedTournaments (no extra query needed)
-  // 1. If there's an active tournament, show that
-  // 2. After Monday noon CST, show the next upcoming tournament
-  // 3. Otherwise, show the most recent completed tournament
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const currentActive = sortedTournaments.find((t: any) => t.status === 'active');
+  // Only show tournaments included in the user's league in the selector — matches Tournaments page
+  const tournamentsForSelector = await filterTournamentsIncludedInLeague(
+    supabase,
+    profile.active_league_id,
+    sortedTournaments
+  );
 
-  // Check if it's after Monday noon CST
-  const isAfterMondayNoonCST = () => {
-    const now = new Date();
-    // Convert to CST (UTC-6)
-    const cstTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
-    const dayOfWeek = cstTime.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const hour = cstTime.getHours();
-    
-    // After Monday noon: Monday after 12pm, or any day Tuesday-Sunday
-    return dayOfWeek === 1 ? hour >= 12 : dayOfWeek !== 0;
-  };
-
-  let currentWeekTournamentId;
-  
-  if (currentActive?.id) {
-    // Active tournament takes priority
-    currentWeekTournamentId = currentActive.id;
-  } else if (isAfterMondayNoonCST()) {
-    // After Monday noon CST: show next upcoming tournament
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    currentWeekTournamentId = sortedTournaments.find((t: any) => t.status === 'upcoming')?.id;
-  } else {
-    // Before Monday noon CST: show most recent completed tournament
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    currentWeekTournamentId = sortedTournaments.find((t: any) => t.status === 'completed')?.id;
-  }
-  
-  // Fallback to first available tournament
-  if (!currentWeekTournamentId && sortedTournaments.length > 0) {
-    currentWeekTournamentId = sortedTournaments[0].id;
-  }
+  // Current week = active tournament — matches Tournaments page UX
+  const currentWeekTournament = tournamentsForSelector.find((t) => t.status === 'active');
+  const currentWeekTournamentId = currentWeekTournament?.id ?? null;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -315,12 +277,12 @@ export default async function WeeklyStandingsByTournamentPage({
         </p>
       </div>
 
-      {/* Tournament Selector */}
-      {sortedTournaments && sortedTournaments.length > 1 && (
+      {/* Tournament Selector — same UX and default as Tournaments page */}
+      {tournamentsForSelector && tournamentsForSelector.length > 1 && (
         <Card className="mb-6">
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-casino-gray">
                 Select Tournament
               </label>
               {currentWeekTournamentId && currentWeekTournamentId !== tournamentId && (
@@ -332,13 +294,13 @@ export default async function WeeklyStandingsByTournamentPage({
               )}
             </div>
             <TournamentSelector
-              tournaments={sortedTournaments}
+              tournaments={tournamentsForSelector}
               currentTournamentId={tournamentId}
-              currentWeekTournamentId={currentWeekTournamentId || null}
+              currentWeekTournamentId={currentWeekTournamentId}
               basePath="/standings/weekly"
             />
             {currentWeekTournamentId === tournamentId && (
-              <p className="mt-3 text-xs text-green-600 flex items-center gap-1">
+              <p className="mt-3 text-xs text-casino-green flex items-center gap-1">
                 <span>⭐</span>
                 <span>This is the current week&apos;s tournament</span>
               </p>

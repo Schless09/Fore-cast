@@ -7,7 +7,7 @@ The FORE!cast Golf application uses **actual tournament prize money** as the sco
 ## How It Works
 
 1. **Import Prize Money Distribution**: Admin imports the tournament's prize money payout table
-2. **Sync Player Positions**: Scores are synced from LiveGolfAPI, which provides final positions
+2. **Sync Player Positions**: Positions are synced from RapidAPI (Live Golf Data) or via admin "Sync Scores"; final positions stored in `tournament_players`
 3. **Calculate Winnings**: System automatically calculates each player's prize money based on:
    - Final position
    - Tie handling (ties split combined prize money)
@@ -68,7 +68,7 @@ This endpoint:
 1. **Create Tournament**: Set up tournament in admin panel
 2. **Import Odds**: Import sportsbook odds to calculate player costs
 3. **Import Prize Money**: Go to `/admin/prize-money` and import the prize money distribution
-4. **Sync Scores**: Use `/admin/scores` to sync player positions from LiveGolfAPI
+4. **Sync Scores**: Use `/admin/scores` to sync player positions from RapidAPI (or run rapidapi-daily / auto-sync?force=true)
 5. **Calculate Winnings**: After tournament completion, click "Calculate Winnings" to finalize prize money
 
 ## Example: American Express 2026

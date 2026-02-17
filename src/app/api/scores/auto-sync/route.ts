@@ -10,15 +10,14 @@ import * as cheerio from 'cheerio';
  * Smart Auto-sync endpoint for Vercel Cron
  * 
  * Features:
- * - Only polls during tournament hours (Thu-Sun)
- * - Uses RapidAPI (Live Golf Data) instead of LiveGolfAPI
- * - Stores results in Supabase cache for all users
- * - Logs API calls for monitoring rate limits
+ * - RapidAPI limited to once per 24 hours (official wrap-up, event transitions)
+ * - ESPN cache (espn-sync) used for live score reporting throughout tournament
+ * - Only polls during tournament days (Thu-Sun)
+ * - Uses RapidAPI (Live Golf Data) for tee times, leaderboard, and official results
  * - Auto-syncs R1/R2 tee times for upcoming tournaments (1-2 days before)
  * - Auto-writes current round tee times from leaderboard data
  * 
- * Cron runs every 4 minutes, but we check shouldPollNow() to determine
- * if we actually make an API call based on tournament schedule.
+ * Cron runs every 4 minutes; shouldPollNow() and 24h throttle gate RapidAPI calls.
  */
 
 const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com';
@@ -73,6 +72,7 @@ async function syncPreTournamentTeeTimes(
   try {
     console.log(`[AUTO-SYNC] 📋 Fetching R1/R2 tee times for ${tournament.name}...`);
 
+    const fetchStart = Date.now();
     const response = await fetch(
       `https://${RAPIDAPI_HOST}/tournament?year=${year}&tournId=${tournId}&orgId=1`,
       {
@@ -83,6 +83,16 @@ async function syncPreTournamentTeeTimes(
         cache: 'no-store',
       }
     );
+    const fetchDuration = Date.now() - fetchStart;
+
+    await supabase.from('api_call_log').insert({
+      api_name: 'rapidapi',
+      endpoint: '/tournament',
+      cache_key: `${year}-${tournId}`,
+      success: response.ok,
+      response_time_ms: fetchDuration,
+      error_message: response.ok ? null : `HTTP ${response.status}`,
+    });
 
     if (!response.ok) {
       return { success: false, message: `RapidAPI tournament endpoint returned ${response.status}`, matchedCount: 0, totalFromApi: 0 };
@@ -402,11 +412,16 @@ export async function GET(request: NextRequest) {
     // Check if we should poll based on tournament schedule
     const pollStatus = shouldPollNow(now);
     
+    const forceSync = request.nextUrl.searchParams.get('force') === 'true';
+    const rapidApiDaily = request.nextUrl.searchParams.get('source') === 'rapidapi-daily';
+    // Only run RapidAPI when triggered by rapidapi-daily cron or admin Force Sync
+    const runRapidApi = forceSync || rapidApiDaily;
+
     console.log(`[AUTO-SYNC] ${now.toISOString()}`);
-    console.log(`[AUTO-SYNC] Should poll: ${pollStatus.shouldPoll} - ${pollStatus.reason}`);
+    console.log(`[AUTO-SYNC] Run RapidAPI: ${runRapidApi} (force=${forceSync}, rapidapi-daily=${rapidApiDaily})`);
 
     // Auto-activate upcoming tournaments that have started
-    // Also auto-sync R1/R2 tee times for tournaments starting within 2 days
+    // Also auto-sync R1/R2 tee times for tournaments starting within 2 days (only on tournament days to avoid RapidAPI calls on Mon–Wed)
     const { data: upcomingTournaments } = await supabase
       .from('tournaments')
       .select('id, name, start_date, rapidapi_tourn_id')
@@ -418,7 +433,13 @@ export async function GET(request: NextRequest) {
         const daysUntilStart = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
 
         // Auto-sync R1/R2 tee times if tournament starts within 2 days and has a RapidAPI ID
-        if (daysUntilStart <= 2 && daysUntilStart > -1 && tournament.rapidapi_tourn_id) {
+        // Only when runRapidApi (rapidapi-daily cron or admin Force Sync)
+        if (
+          runRapidApi &&
+          daysUntilStart <= 2 &&
+          daysUntilStart > -1 &&
+          tournament.rapidapi_tourn_id
+        ) {
           // Check if R1 tee times already exist (non-null and non-"-")
           const { data: existingTeeTimes } = await supabase
             .from('tournament_players')
@@ -528,22 +549,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Allow force bypass with ?force=true for manual triggering
-    const forceSync = request.nextUrl.searchParams.get('force') === 'true';
-    
-    // If we shouldn't poll now, just return status (unless forced)
-    if (!pollStatus.shouldPoll && !forceSync) {
+    // Skip RapidAPI unless triggered by rapidapi-daily or Force Sync (ESPN handles live scores)
+    if (!runRapidApi) {
       return NextResponse.json({
         success: true,
-        message: `Skipping sync: ${pollStatus.reason}`,
+        message: 'Activation only. RapidAPI runs via rapidapi-daily cron (once/day). ESPN for live scores.',
         pollingStatus: pollStatus,
         activeTournaments: tournaments.length,
-        nextPollIn: `${pollStatus.nextPollMinutes} minutes`,
         timestamp: now.toISOString(),
       });
     }
 
-    // Time to poll! Fetch and cache scores for each active tournament
+    // Time to poll RapidAPI — fetch and cache scores for each active tournament
     const results = [];
     
     for (const tournament of tournaments) {
