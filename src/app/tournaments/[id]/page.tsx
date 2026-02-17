@@ -391,7 +391,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   let prizeDistributions: PrizeDistributionRow[] = [];
 
   let tournamentLeaderboard: LeaderboardRow[] = [];
-  let leaderboardSource: 'database' | 'rapidapi' | 'cache' | 'none' = 'none';
+  let leaderboardSource: 'database' | 'rapidapi' | 'cache' | 'espn' | 'none' = 'none';
   let cutLine: { cutScore: string; cutCount: number } | null = null;
 
   // Helper to parse LiveGolfAPI scores
