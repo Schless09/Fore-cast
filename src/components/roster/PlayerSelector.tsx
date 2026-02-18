@@ -10,13 +10,13 @@ function getCountryFlag(countryCode: string | null): string {
   
   // Convert 3-letter codes to 2-letter ISO codes
   const countryMap: Record<string, string> = {
-    'USA': 'US', 'GBR': 'GB', 'CAN': 'CA', 'AUS': 'AU', 'JPN': 'JP',
+    'USA': 'US', 'GBR': 'GB', 'CAN': 'CA', 'AUS': 'AU', 'AUT': 'AT', 'JPN': 'JP',
     'KOR': 'KR', 'CHN': 'CN', 'MEX': 'MX', 'ESP': 'ES', 'FRA': 'FR',
     'GER': 'DE', 'ITA': 'IT', 'SWE': 'SE', 'NOR': 'NO', 'DEN': 'DK',
     'FIN': 'FI', 'IRL': 'IE', 'SCO': 'GB', 'ENG': 'GB', 'WAL': 'GB',
     'NIR': 'GB', 'ARG': 'AR', 'BRA': 'BR', 'CHI': 'CL', 'COL': 'CO',
     'RSA': 'ZA', 'NZL': 'NZ', 'IND': 'IN', 'THA': 'TH', 'PHI': 'PH',
-    'TAI': 'TW', 'VEN': 'VE',
+    'TAI': 'TW', 'TPE': 'TW', 'VEN': 'VE',
   };
 
   const code = countryCode.toUpperCase();

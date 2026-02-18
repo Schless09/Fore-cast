@@ -59,11 +59,17 @@ export default async function PlayerProfilePage({
     tournamentInfo = data;
   }
 
-  // Generate flag emoji
+  // Generate flag emoji (3-letter codes mapped to 2-letter ISO)
   function getCountryFlag(countryCode: string | null): string {
     if (!countryCode) return '';
-    const codePoints = countryCode
-      .toUpperCase()
+    const countryMap: Record<string, string> = {
+      'USA': 'US', 'GBR': 'GB', 'CAN': 'CA', 'AUS': 'AU', 'AUT': 'AT', 'JPN': 'JP',
+      'KOR': 'KR', 'CHN': 'CN', 'MEX': 'MX', 'ESP': 'ES', 'FRA': 'FR', 'GER': 'DE',
+      'ITA': 'IT', 'TPE': 'TW', 'VEN': 'VE',
+    };
+    const code = countryCode.toUpperCase();
+    const twoLetter = countryMap[code] || code.substring(0, 2);
+    const codePoints = twoLetter
       .split('')
       .map((char) => 127397 + char.charCodeAt(0));
     return String.fromCodePoint(...codePoints);

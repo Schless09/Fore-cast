@@ -369,6 +369,7 @@ function getFlagEmoji(countryCode: string) {
     'GBR': 'GB',
     'CAN': 'CA',
     'AUS': 'AU',
+    'AUT': 'AT', // Austria (not Australia)
     'JPN': 'JP',
     'KOR': 'KR',
     'CHN': 'CN',
@@ -396,6 +397,7 @@ function getFlagEmoji(countryCode: string) {
     'THA': 'TH',
     'PHI': 'PH',
     'TAI': 'TW',
+    'TPE': 'TW', // Chinese Taipei
     'VEN': 'VE',
   };
 
