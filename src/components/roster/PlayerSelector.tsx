@@ -58,7 +58,11 @@ export function PlayerSelector({
   } | null>(null);
 
   const canAddMore = selectedPlayerIds.length < maxPlayers;
-  const remainingBudget = budgetLimit - budgetSpent;
+  // Work in integer cents to avoid floating-point errors (e.g. $0.55 remaining not allowing $0.55 player)
+  const budgetLimitCents = Math.round(budgetLimit * 100);
+  const budgetSpentCents = Math.round(budgetSpent * 100);
+  const remainingBudgetCents = budgetLimitCents - budgetSpentCents;
+  const remainingBudget = remainingBudgetCents / 100;
 
   // Sort players by cost (descending) for better UX
   const sortedPlayers = [...tournamentPlayers].sort(
@@ -124,9 +128,6 @@ export function PlayerSelector({
                         const playerId = tp.pga_player_id;
                         const isSelected = selectedPlayerIds.includes(playerId);
                         const cost = tp.cost || 0.20;
-
-                        // Work in whole cents to avoid floating point edge cases
-                        const remainingBudgetCents = Math.round(remainingBudget * 100);
                         const costCents = Math.round(cost * 100);
 
                         const wouldExceedBudget = !isSelected && (costCents > remainingBudgetCents);

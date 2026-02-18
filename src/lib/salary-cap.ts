@@ -121,12 +121,15 @@ export function validateRoster(
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   const totalCost = calculateRosterCost(playerCosts);
-  
+  // Compare in integer cents to avoid floating-point rejecting valid rosters (e.g. $30.00 total)
+  const totalCents = Math.round(totalCost * 100);
+  const limitCents = Math.round(budgetLimit * 100);
+
   if (playerCosts.length > maxPlayers) {
     errors.push(`Maximum ${maxPlayers} players allowed. You have ${playerCosts.length}.`);
   }
-  
-  if (totalCost > budgetLimit) {
+
+  if (totalCents > limitCents) {
     errors.push(`Budget exceeded. Total: $${totalCost.toFixed(2)}, Limit: $${budgetLimit.toFixed(2)}`);
   }
   
