@@ -10,6 +10,7 @@ import { formatShortName } from '@/lib/utils';
 import {
   processLiveScoresForPrizes,
   normalizeNameForLookup,
+  firstNamesMatchForLiveScores,
 } from '@/lib/live-scores-prizes';
 
 interface RosterData {
@@ -180,11 +181,8 @@ export function LiveTeamStandings({
       for (const [key, score] of playerScoreMap.entries()) {
         if (key.startsWith('__fuzzy__')) {
           const [, fuzzyLastName, fuzzyFirstName] = key.split('__').filter(Boolean);
-          // Match if last names match and one first name starts with the other
-          if (fuzzyLastName === lastName) {
-            if (firstName.startsWith(fuzzyFirstName) || fuzzyFirstName.startsWith(firstName)) {
-              return score;
-            }
+          if (fuzzyLastName === lastName && firstNamesMatchForLiveScores(firstName, fuzzyFirstName)) {
+            return score;
           }
         }
       }

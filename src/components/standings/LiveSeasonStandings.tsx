@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import {
   processLiveScoresForPrizes,
   normalizeNameForLookup,
+  firstNamesMatchForLiveScores,
 } from '@/lib/live-scores-prizes';
 
 interface CompletedStanding {
@@ -152,10 +153,8 @@ export function LiveSeasonStandings({
       for (const [key, score] of playerScoreMap.entries()) {
         if (key.startsWith('__fuzzy__')) {
           const [, fuzzyLastName, fuzzyFirstName] = key.split('__').filter(Boolean);
-          if (fuzzyLastName === lastName) {
-            if (firstName.startsWith(fuzzyFirstName) || fuzzyFirstName.startsWith(firstName)) {
-              return score;
-            }
+          if (fuzzyLastName === lastName && firstNamesMatchForLiveScores(firstName, fuzzyFirstName)) {
+            return score;
           }
         }
       }

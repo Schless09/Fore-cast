@@ -47,6 +47,34 @@ export function normalizeNameForLookup(name: string): string {
     .replace(/\s+/g, ' ');
 }
 
+/** First-name nickname aliases so "Matti Schmid" (DB) matches "Matthias Schmid" (ESPN) and vice versa */
+export const FIRST_NAME_ALIASES: Record<string, string[]> = {
+  cam: ['cameron'],
+  cameron: ['cam'],
+  dan: ['daniel'],
+  daniel: ['dan'],
+  johnny: ['john', 'jon'],
+  john: ['johnny', 'jon'],
+  jon: ['john', 'johnny'],
+  matti: ['matt', 'matthias'],
+  matt: ['matthias', 'matti'],
+  matthias: ['matt', 'matti'],
+  nico: ['nicolas'],
+  nicolas: ['nico'],
+  's.t.': ['seung taek', 'seung'],
+  seung: ['s.t.'],
+  'seung taek': ['s.t.'],
+};
+
+/** Returns true if two first names match (exact, prefix, or alias) */
+export function firstNamesMatchForLiveScores(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (a.startsWith(b) || b.startsWith(a)) return true;
+  if (FIRST_NAME_ALIASES[a]?.includes(b)) return true;
+  if (FIRST_NAME_ALIASES[b]?.includes(a)) return true;
+  return false;
+}
+
 export interface ProcessedPrizeData {
   position: number | null;
   tieCount: number;
