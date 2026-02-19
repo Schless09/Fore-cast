@@ -4,8 +4,8 @@
  */
 
 /**
- * Format tee time for display. ESPN sends "Thu Feb 19 11:27:00 PST 2026" — render as "11:27 AM".
- * Pass-through for already short formats like "11:35 AM".
+ * Format tee time for display. ESPN sends "Thu Feb 19 11:27:00 PST 2026" but the time is Eastern (US TV).
+ * Render as "11:27 AM ET". Pass-through for already short formats like "11:35 AM".
  */
 export function formatTeeTimeDisplay(teeTime: string): string {
   if (!teeTime?.trim()) return teeTime;
@@ -20,7 +20,7 @@ export function formatTeeTimeDisplay(teeTime: string): string {
     const period = hours >= 12 ? 'PM' : 'AM';
     if (hours > 12) hours -= 12;
     else if (hours === 0) hours = 12;
-    return `${hours}:${minutes} ${period}`;
+    return `${hours}:${minutes} ${period} ET`;
   }
   return teeTime;
 }
