@@ -10,6 +10,7 @@ import {
   normalizeNameForLookup,
   firstNamesMatchForLiveScores,
 } from '@/lib/live-scores-prizes';
+import { formatTeeTimeDisplay } from '@/lib/timezone';
 
 interface LiveScore {
   player: string;
@@ -397,10 +398,10 @@ export function LivePersonalLeaderboard({
                         }
                         // Player hasn't started - primary: cache tee time (EST), fallback: DB tee time
                         if (player.liveScore?.teeTime) {
-                          return <span className="text-casino-gray">{player.liveScore.teeTime}</span>;
+                          return <span className="text-casino-gray">{formatTeeTimeDisplay(player.liveScore.teeTime)}</span>;
                         }
                         if (teeTime) {
-                          return <span className="text-casino-gray">{teeTime}</span>;
+                          return <span className="text-casino-gray">{formatTeeTimeDisplay(teeTime)}</span>;
                         }
                         return <span className="text-casino-gray-dark">-</span>;
                       })()}

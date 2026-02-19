@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from 'react';
 import { formatScore, getScoreColor, formatShortName } from '@/lib/utils';
+import { formatTeeTimeDisplay } from '@/lib/timezone';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import { assignPositionsByScore } from '@/lib/leaderboard-positions';
@@ -663,13 +664,13 @@ export function LiveLeaderboard({
                     <span className="text-casino-blue">{row.thru}</span>
                   ) : (() => {
                     if (row.teeTime) {
-                      return <span className="text-casino-gray">{row.teeTime}</span>;
+                      return <span className="text-casino-gray">{formatTeeTimeDisplay(row.teeTime)}</span>;
                     }
                     // Fallback: look up from DB tee time map
                     const teeTimeData = getTeeTimeDataForPlayer(teeTimeMap, row.name);
                     const teeTimeStr = getTeeTimeForRound(teeTimeData, currentRound);
                     return teeTimeStr ? (
-                      <span className="text-casino-gray">{teeTimeStr}</span>
+                      <span className="text-casino-gray">{formatTeeTimeDisplay(teeTimeStr)}</span>
                     ) : null;
                   })() ?? (
                     <span className="text-casino-gray-dark">-</span>

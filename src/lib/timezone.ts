@@ -1,7 +1,29 @@
 /**
  * Timezone utilities (getUserTimezoneAbbr, isUserInEST).
- * Tee times are displayed as stored in the data with no conversion.
+ * formatTeeTimeDisplay: shortens ESPN "Thu Feb 19 11:27:00 PST 2026" → "11:27 AM"
  */
+
+/**
+ * Format tee time for display. ESPN sends "Thu Feb 19 11:27:00 PST 2026" — render as "11:27 AM".
+ * Pass-through for already short formats like "11:35 AM".
+ */
+export function formatTeeTimeDisplay(teeTime: string): string {
+  if (!teeTime?.trim()) return teeTime;
+  // Only transform ESPN-style full datetimes (contain timezone abbrev)
+  if (!/PST|PDT|EST|EDT|CST|CDT|MST|MDT|GMT|UTC/i.test(teeTime)) {
+    return teeTime;
+  }
+  const match = teeTime.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const minutes = match[2];
+    const period = hours >= 12 ? 'PM' : 'AM';
+    if (hours > 12) hours -= 12;
+    else if (hours === 0) hours = 12;
+    return `${hours}:${minutes} ${period}`;
+  }
+  return teeTime;
+}
 
 /**
  * Get the user's timezone abbreviation (e.g., "PST", "EST", "CST")

@@ -11,6 +11,7 @@ import {
   normalizeNameForLookup,
   firstNamesMatchForLiveScores,
 } from '@/lib/live-scores-prizes';
+import { formatTeeTimeDisplay } from '@/lib/timezone';
 
 interface RosterData {
   id: string;
@@ -623,8 +624,8 @@ export function LiveTeamStandings({
                       if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
                         return <span className="text-casino-blue">{player.liveScore.thru}</span>;
                       }
-                      if (player.liveScore?.teeTime) return <span className="text-casino-gray">{player.liveScore.teeTime}</span>;
-                      if (teeTime) return <span className="text-casino-gray">{teeTime}</span>;
+                      if (player.liveScore?.teeTime) return <span className="text-casino-gray">{formatTeeTimeDisplay(player.liveScore.teeTime)}</span>;
+                      if (teeTime) return <span className="text-casino-gray">{formatTeeTimeDisplay(teeTime)}</span>;
                       return <span className="text-casino-gray-dark">-</span>;
                     })();
                     return (
