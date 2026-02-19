@@ -230,6 +230,7 @@ export function LiveTeamStandings({
             } as LiveScore : undefined,
             winnings,
             isAmateur: player.isAmateur ?? false,
+            hasTeedOff: true, // Completed: all players finished
           };
         }
         
