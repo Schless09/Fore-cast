@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { convertESTtoLocal } from '@/lib/timezone';
 import { formatShortName } from '@/lib/utils';
 
 interface RosterInfo {
@@ -165,7 +164,7 @@ export function UpcomingStandingsRow({
                         const name = (pga as { name?: string } | null)?.name ?? '—';
                         const teeTimeR1 = tp?.tee_time_r1;
                         const displayTime = teeTimeR1
-                          ? convertESTtoLocal(teeTimeR1)
+                          ? teeTimeR1
                           : '—';
                         return (
                           <tr key={idx} className="hover:bg-casino-card/50 transition-colors">

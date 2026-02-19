@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
-import { LocalTeeTime } from '@/components/leaderboard/LocalTeeTime';
 import {
   processLiveScoresForPrizes,
   normalizeNameForLookup,
@@ -398,10 +397,10 @@ export function LivePersonalLeaderboard({
                         }
                         // Player hasn't started - primary: cache tee time (EST), fallback: DB tee time
                         if (player.liveScore?.teeTime) {
-                          return <LocalTeeTime teeTime={player.liveScore.teeTime} className="text-casino-gray" />;
+                          return <span className="text-casino-gray">{player.liveScore.teeTime}</span>;
                         }
                         if (teeTime) {
-                          return <LocalTeeTime teeTime={teeTime} className="text-casino-gray" />;
+                          return <span className="text-casino-gray">{teeTime}</span>;
                         }
                         return <span className="text-casino-gray-dark">-</span>;
                       })()}

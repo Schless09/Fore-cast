@@ -1,7 +1,6 @@
 import { TournamentPlayer, PGAPlayer } from '@/lib/types';
 import { formatScore, getScoreColor } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
-import { convertESTtoLocal } from '@/lib/timezone';
 
 interface PlayerRowProps {
   player: TournamentPlayer & { pga_player?: PGAPlayer };
@@ -31,7 +30,7 @@ function getTeeTimeForRound(player: TournamentPlayer, currentRound?: number): st
   }
   
   // Convert EST to local timezone
-  return estTime ? convertESTtoLocal(estTime) : null;
+  return estTime ?? null;
 }
 
 export function PlayerRow({ player, playerWinnings, rank, currentRound }: PlayerRowProps) {

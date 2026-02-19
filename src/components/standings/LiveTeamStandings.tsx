@@ -5,7 +5,6 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
-import { LocalTeeTime } from '@/components/leaderboard/LocalTeeTime';
 import { formatShortName } from '@/lib/utils';
 import {
   processLiveScoresForPrizes,
@@ -624,8 +623,8 @@ export function LiveTeamStandings({
                       if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
                         return <span className="text-casino-blue">{player.liveScore.thru}</span>;
                       }
-                      if (player.liveScore?.teeTime) return <LocalTeeTime teeTime={player.liveScore.teeTime} className="text-casino-gray" />;
-                      if (teeTime) return <LocalTeeTime teeTime={teeTime} className="text-casino-gray" />;
+                      if (player.liveScore?.teeTime) return <span className="text-casino-gray">{player.liveScore.teeTime}</span>;
+                      if (teeTime) return <span className="text-casino-gray">{teeTime}</span>;
                       return <span className="text-casino-gray-dark">-</span>;
                     })();
                     return (

@@ -6,7 +6,6 @@ import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import { assignPositionsByScore } from '@/lib/leaderboard-positions';
 import { ScorecardModal } from './ScorecardModal';
-import { LocalTeeTime } from './LocalTeeTime';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 interface LeaderboardRow {
@@ -663,15 +662,14 @@ export function LiveLeaderboard({
                     /* Player is on course - show holes completed */
                     <span className="text-casino-blue">{row.thru}</span>
                   ) : (() => {
-                    // Primary: use teeTime from cache (stored in EST); convert on client to user's local
                     if (row.teeTime) {
-                      return <LocalTeeTime teeTime={row.teeTime} className="text-casino-gray" />;
+                      return <span className="text-casino-gray">{row.teeTime}</span>;
                     }
                     // Fallback: look up from DB tee time map
                     const teeTimeData = getTeeTimeDataForPlayer(teeTimeMap, row.name);
                     const teeTimeStr = getTeeTimeForRound(teeTimeData, currentRound);
                     return teeTimeStr ? (
-                      <LocalTeeTime teeTime={teeTimeStr} className="text-casino-gray" />
+                      <span className="text-casino-gray">{teeTimeStr}</span>
                     ) : null;
                   })() ?? (
                     <span className="text-casino-gray-dark">-</span>

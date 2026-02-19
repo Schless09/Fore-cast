@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
-import { convertESTtoLocal } from '@/lib/timezone';
 import { formatShortName } from '@/lib/utils';
 
 interface ExpandableRosterRowProps {
@@ -291,7 +290,7 @@ export function ExpandableRosterRow({
                                 <span className="text-casino-blue">{tp.thru}</span>
                               ) : tp?.tee_time_r1 ? (
                                 <span className="text-casino-gray">
-                                  {convertESTtoLocal(tp.tee_time_r1)}
+                                  {tp.tee_time_r1}
                                 </span>
                               ) : (
                                 <span className="text-casino-gray-dark">-</span>

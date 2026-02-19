@@ -15,7 +15,7 @@ export interface Profile {
 
 /**
  * Get or create a profile for the current Clerk user.
- * This is the main helper for server-side auth.
+ * Uses auth() for the common case (avoids Clerk API call). Only calls currentUser() when creating a new profile.
  */
 export async function getProfile(): Promise<Profile | null> {
   const { userId } = await auth();
@@ -24,14 +24,9 @@ export async function getProfile(): Promise<Profile | null> {
     return null;
   }
 
-  const user = await currentUser();
-  if (!user) {
-    return null;
-  }
-
   const supabase = createServiceClient();
   
-  // Try to find existing profile by clerk_id
+  // Try to find existing profile by clerk_id (no Clerk API call needed)
   const { data: existingProfile } = await supabase
     .from('profiles')
     .select('*')
@@ -42,7 +37,12 @@ export async function getProfile(): Promise<Profile | null> {
     return existingProfile as Profile;
   }
 
-  // Create profile if it doesn't exist
+  // Profile doesn't exist — fetch user from Clerk only when creating
+  const user = await currentUser();
+  if (!user) {
+    return null;
+  }
+
   const email = user.emailAddresses?.[0]?.emailAddress || '';
   const username = user.username || user.firstName || email.split('@')[0];
   
