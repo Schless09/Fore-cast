@@ -79,7 +79,7 @@ export default async function WeeklyStandingsByTournamentPage({
   }
 
   // Run remaining queries in parallel for faster page load (skip rosters if tournament not in league)
-  const [prizeDistributionsResult, rostersResult, allTournamentsResult, teeTimeResult, leagueProfilesResult] = await Promise.all([
+  const [prizeDistributionsResult, rostersResult, allTournamentsResult, teeTimeResult, leagueProfilesResult, espnCacheResult] = await Promise.all([
     // Get prize distributions for live calculations
     supabase
       .from('prize_money_distributions')
@@ -122,6 +122,10 @@ export default async function WeeklyStandingsByTournamentPage({
     tournamentIncludedInLeague && leagueMemberIds.length > 0
       ? supabase.from('profiles').select('id, username').in('id', leagueMemberIds)
       : Promise.resolve({ data: [] as { id: string; username: string | null }[], error: null }),
+    // ESPN cache has live current_round (updated every 2 min) — prefer over stale tournament.current_round
+    tournament.espn_event_id
+      ? supabase.from('espn_cache').select('current_round').eq('cache_key', `espn-${tournament.espn_event_id}`).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const prizeDistributions = prizeDistributionsResult.data;
@@ -129,6 +133,7 @@ export default async function WeeklyStandingsByTournamentPage({
   const allTournaments = allTournamentsResult.data;
   const teeTimeData = teeTimeResult.data;
   const leagueProfiles = leagueProfilesResult.data ?? [];
+  const espnCache = espnCacheResult.data;
 
   // For upcoming tournaments: all league members with "Picks In" / "Not Submitted Yet" and roster when set
   const rosterUserIds = new Set((rosters ?? []).map((r: { user_id: string }) => r.user_id));
@@ -154,9 +159,10 @@ export default async function WeeklyStandingsByTournamentPage({
     console.error('Error loading rosters:', rostersResult.error);
   }
 
-  // Calculate display round - switch to next round 5 hours before first tee time
+  // Calculate display round — prefer ESPN cache (live, every 2 min) over tournament record (may be stale)
   // Handle MongoDB extended JSON format {$numberInt: "1"} that may come from RapidAPI
-  const rawRound = tournament.current_round as unknown;
+  const roundSource = espnCache?.current_round ?? tournament.current_round;
+  const rawRound = roundSource as unknown;
   let displayRound = typeof rawRound === 'object' && rawRound !== null && '$numberInt' in rawRound
     ? parseInt((rawRound as { $numberInt: string }).$numberInt, 10) 
     : (typeof rawRound === 'number' ? rawRound : 1);
