@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import { assignPositionsByScore } from '@/lib/leaderboard-positions';
 import { ScorecardModal } from './ScorecardModal';
+import { SuspendedStatusBanner } from './SuspendedStatusBanner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 interface LeaderboardRow {
@@ -461,6 +462,13 @@ export function LiveLeaderboard({
           </div>
         </div>
       )}
+
+      <SuspendedStatusBanner
+        isSuspended={String(apiTournamentStatus || '').toLowerCase().includes('suspended')}
+        statusDetail={
+          apiTournamentStatus && apiTournamentStatus !== 'Suspended' ? apiTournamentStatus : undefined
+        }
+      />
 
       <div className="overflow-x-auto">
       <table className={`w-full text-sm ${isMobile ? 'table-fixed' : ''}`}>

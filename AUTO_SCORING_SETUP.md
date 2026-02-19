@@ -14,6 +14,12 @@ How live leaderboards and official results are kept in sync.
 
 See **[PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md)** for full context.
 
+## Suspended play & PGA TOUR Comms
+
+When ESPN reports `STATUS_SUSPENDED` (e.g. rain delay), the live leaderboard shows a banner with recent tweets from [@PGATOURComms](https://x.com/PGATOURComms). Tweets are fetched via Nitter RSS.
+
+- **Optional**: `NITTER_BASE_URL` — Prefer a specific Nitter instance (e.g. `https://nitter.poast.org`). If unset, several public instances are tried in order. Instances can block server requests; if all fail, a fallback link to X is shown.
+
 ## Required environment variables
 
 In Vercel or `.env.local`:
