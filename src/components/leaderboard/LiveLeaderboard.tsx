@@ -71,6 +71,8 @@ interface LiveLeaderboardProps {
   teeTimeMap?: Map<string, TeeTimeData>;
   playerCostMap?: Map<string, number>;
   initialCutLine?: CutLineData | null;
+  /** Number of league teams that picked each golfer (by player name). Used for Picks column. */
+  picksByPlayer?: Record<string, number>;
 }
 
 /** Player has teed off if thru shows holes played (1, 2, F) not a tee time (1:39 PM) */
@@ -206,7 +208,9 @@ export function LiveLeaderboard({
   teeTimeMap,
   playerCostMap,
   initialCutLine,
+  picksByPlayer = {},
 }: LiveLeaderboardProps) {
+  const [rightColumnMode, setRightColumnMode] = useState<'Picks' | 'Prize'>('Picks');
   // Use ESPN for live refresh when preferred; otherwise RapidAPI
   const liveRefreshEventId = scorecardSource === 'espn' && espnEventId ? espnEventId : liveGolfAPITournamentId;
   const liveRefreshUrl = scorecardSource === 'espn' && espnEventId
@@ -417,15 +421,6 @@ export function LiveLeaderboard({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Compute "made the cut" count from leaderboard (players at or better than cut score)
-  const madeCutCount = useMemo(() => {
-    if (!cutLine) return null;
-    const cutScoreNum = parseScore(cutLine.cutScore);
-    return leaderboardData.filter(
-      (row) => row.position !== null && row.total_score <= cutScoreNum
-    ).length;
-  }, [leaderboardData, cutLine]);
-
   return (
     <div>
       {/* Refresh Status Bar */}
@@ -486,7 +481,15 @@ export function LiveLeaderboard({
             <th className="px-0.5 sm:px-4 py-2 text-center">Total</th>
             <th className="px-0.5 sm:px-4 py-2 text-center" title="Click score to view scorecard">Today</th>
             <th className="px-0.5 sm:px-4 py-2 text-center" title="Holes completed or tee time">Thru</th>
-            <th className="px-0.5 sm:px-4 py-2 text-right">Prize</th>
+            <th className="px-0.5 sm:px-4 py-2 text-right">
+              <button
+                type="button"
+                onClick={() => setRightColumnMode((m) => (m === 'Picks' ? 'Prize' : 'Picks'))}
+                className="text-xs font-medium text-casino-gold hover:text-casino-gold/80 transition-colors uppercase"
+              >
+                {rightColumnMode}
+              </button>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -676,8 +679,25 @@ export function LiveLeaderboard({
                     <span className="text-casino-gray-dark">-</span>
                   )}
                 </td>
-                <td className="px-0.5 sm:px-4 py-2 text-right text-xs sm:text-sm text-casino-gold whitespace-nowrap">
-                  {showPrizeDash ? '—' : formatCurrency(prizeAmount || 0)}
+                <td className="px-0.5 sm:px-4 py-2 text-right text-xs sm:text-sm whitespace-nowrap">
+                  {rightColumnMode === 'Picks' ? (
+                    (() => {
+                      const pickCount = picksByPlayer[name] ?? picksByPlayer[matchedMapName] ?? 0;
+                      return pickCount > 0 ? (
+                        <span className="text-casino-text" title={`${pickCount} team${pickCount !== 1 ? 's' : ''} picked this golfer`}>
+                          {pickCount}
+                        </span>
+                      ) : (
+                        <span className="text-casino-gray-dark">—</span>
+                      );
+                    })()
+                  ) : (
+                    showPrizeDash ? (
+                      <span className="text-casino-gray-dark">—</span>
+                    ) : (
+                      <span className="text-casino-gold">{formatCurrency(prizeAmount || 0)}</span>
+                    )
+                  )}
                 </td>
               </tr>
               </Fragment>

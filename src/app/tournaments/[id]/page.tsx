@@ -691,6 +691,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   // Create a map of player names to IDs and costs from tournament_players
   const playerNameToIdMap = new Map<string, string>();
   const playerCostMap = new Map<string, number>();
+  let picksByPlayer: Record<string, number> = {};
   if ((tournament.status === 'active' || tournament.status === 'completed') && (existingRoster || tournament.status === 'completed')) {
     const { data: allPlayers } = await supabase
       .from('tournament_players')
@@ -713,6 +714,34 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         }
       }
     });
+
+    // League picks count (for leaderboard Picks column) — same logic as Inside the Field
+    if (profile.active_league_id) {
+      const { data: leagueRosters } = await supabase
+        .from('user_rosters')
+        .select('id, profiles!inner(active_league_id)')
+        .eq('tournament_id', id)
+        .eq('profiles.active_league_id', profile.active_league_id);
+      const rosterIds = leagueRosters?.map((r) => r.id) ?? [];
+      if (rosterIds.length > 0) {
+        const { data: selectionData } = await supabase
+          .from('roster_players')
+          .select(`
+            tournament_player:tournament_players!inner(
+              pga_players!inner(name)
+            )
+          `)
+          .in('roster_id', rosterIds);
+        const counts = new Map<string, number>();
+        selectionData?.forEach((row: unknown) => {
+          const tp = (row as { tournament_player?: { pga_players?: { name: string } | { name: string }[] } })?.tournament_player;
+          const pga = Array.isArray(tp?.pga_players) ? tp.pga_players[0] : tp?.pga_players;
+          const name = pga?.name;
+          if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+        });
+        picksByPlayer = Object.fromEntries(counts);
+      }
+    }
   }
 
   const renderTournamentLeaderboard = () => {
@@ -803,6 +832,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             teeTimeMap={teeTimeMap}
             playerCostMap={playerCostMap}
             initialCutLine={cutLine}
+            picksByPlayer={picksByPlayer}
           />
         </CardContent>
       </Card>
