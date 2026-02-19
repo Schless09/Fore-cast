@@ -395,6 +395,8 @@ export default async function WeeklyStandingsByTournamentPage({
               <LiveTeamStandings
                 tournamentId={tournamentId}
                 liveGolfAPITournamentId={tournament.rapidapi_tourn_id}
+                espnEventId={tournament.espn_event_id}
+                scorecardSource={tournament.espn_event_id ? 'espn' : 'rapidapi'}
                 prizeDistributions={(prizeDistributions || []).map((p) => ({
                   position: p.position,
                   amount: p.amount || 0,

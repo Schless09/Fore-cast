@@ -5,8 +5,12 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
-import { convertESTtoLocal } from '@/lib/timezone';
+import { LocalTeeTime } from '@/components/leaderboard/LocalTeeTime';
 import { formatShortName } from '@/lib/utils';
+import {
+  processLiveScoresForPrizes,
+  normalizeNameForLookup,
+} from '@/lib/live-scores-prizes';
 
 interface RosterData {
   id: string;
@@ -48,6 +52,8 @@ interface LiveScore {
 interface LiveTeamStandingsProps {
   tournamentId: string;
   liveGolfAPITournamentId: string;
+  espnEventId?: string | null;
+  scorecardSource?: 'espn' | 'rapidapi';
   prizeDistributions: Array<{
     position: number;
     amount: number;
@@ -76,6 +82,8 @@ const parseScore = (score: string | number | null): number => {
 export function LiveTeamStandings({
   tournamentId,
   liveGolfAPITournamentId,
+  espnEventId,
+  scorecardSource = 'rapidapi',
   prizeDistributions,
   currentUserId,
   coManagedOwnerId,
@@ -88,6 +96,7 @@ export function LiveTeamStandings({
   const isMobile = useMediaQuery('(max-width: 639px)');
   const [rosters, setRosters] = useState<RosterData[]>([]);
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
+  const [liveSource, setLiveSource] = useState<'espn' | 'rapidapi'>(scorecardSource);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -184,34 +193,16 @@ export function LiveTeamStandings({
     return undefined;
   }, [playerScoreMap]);
 
-  // Count players at each position to detect ties
-  const positionCounts = useMemo(() => {
-    const counts = new Map<number, number>();
-    liveScores.forEach((score) => {
-      const position = score.positionValue;
-      if (position && position > 0) {
-        counts.set(position, (counts.get(position) || 0) + 1);
-      }
+  // Shared prize logic: position-from-score (ESPN), tie split, exclude non-teed-off
+  const prizeDataByPlayer = useMemo(() => {
+    if (!liveScores.length) return new Map<string, { winnings: number; hasTeedOff: boolean }>();
+    const processed = processLiveScoresForPrizes(liveScores, liveSource, prizeMap);
+    const byPlayer = new Map<string, { winnings: number; hasTeedOff: boolean }>();
+    processed.forEach((data, key) => {
+      byPlayer.set(key, { winnings: data.winnings, hasTeedOff: data.hasTeedOff });
     });
-    return counts;
-  }, [liveScores]);
-
-  // Helper to calculate prize money with proper tie handling
-  const calculateTiePrizeMoney = useCallback((position: number | null): number => {
-    if (!position || position < 1) return 0;
-    
-    const tieCount = positionCounts.get(position) || 1;
-    
-    // Sum prize money for positions position through position + tieCount - 1
-    let totalPrize = 0;
-    for (let i = 0; i < tieCount; i++) {
-      const pos = position + i;
-      totalPrize += prizeMap.get(pos) || 0;
-    }
-    
-    // Split evenly among tied players
-    return Math.round(totalPrize / tieCount);
-  }, [positionCounts, prizeMap]);
+    return byPlayer;
+  }, [liveScores, liveSource, prizeMap]);
 
   // Calculate winnings for each roster based on live scores OR stored final data
   const rostersWithLiveWinnings = useMemo(() => {
@@ -242,22 +233,19 @@ export function LiveTeamStandings({
           };
         }
         
-        // For active tournaments, use live scores
+        // For active tournaments, use shared prize logic
         const liveScore = findLiveScore(player.playerName);
-        const position = liveScore?.positionValue;
-        const isAmateur = liveScore?.isAmateur === true;
-        
-        // Calculate winnings with proper tie handling
-        // Amateurs cannot collect prize money
-        const winnings = isAmateur ? 0 : calculateTiePrizeMoney(position || null);
-        
+        const lookupKey = liveScore ? normalizeNameForLookup(liveScore.player) : null;
+        const prizeData = lookupKey ? prizeDataByPlayer.get(lookupKey) : null;
+        const winnings = prizeData?.winnings ?? 0;
         totalWinnings += winnings;
 
         return {
           ...player,
           liveScore,
           winnings,
-          isAmateur,
+          isAmateur: liveScore?.isAmateur === true,
+          hasTeedOff: prizeData?.hasTeedOff ?? false,
         };
       });
 
@@ -275,7 +263,7 @@ export function LiveTeamStandings({
       if (a.noLineup && b.noLineup) return a.username.localeCompare(b.username);
       return 0;
     });
-  }, [rosters, findLiveScore, calculateTiePrizeMoney, isCompleted]);
+  }, [rosters, findLiveScore, prizeDataByPlayer, isCompleted]);
 
   // Fetch rosters from database
   const fetchRosters = useCallback(async () => {
@@ -396,14 +384,18 @@ export function LiveTeamStandings({
 
   // Fetch live scores from API (skip for completed tournaments)
   const fetchLiveScores = useCallback(async () => {
-    // Don't fetch live scores for completed tournaments - use stored final data
-    if (isCompleted || !liveGolfAPITournamentId || isRefreshing) return;
+    const effectiveUrl = scorecardSource === 'espn' && espnEventId
+      ? `/api/scores/live?source=espn&eventId=${encodeURIComponent(espnEventId)}`
+      : liveGolfAPITournamentId
+        ? `/api/scores/live?eventId=${liveGolfAPITournamentId}`
+        : null;
+    if (isCompleted || !effectiveUrl || isRefreshing) return;
 
     setIsRefreshing(true);
     setSyncError(null);
 
     try {
-      const response = await fetch(`/api/scores/live?eventId=${liveGolfAPITournamentId}`);
+      const response = await fetch(effectiveUrl);
       const result = await response.json();
 
       if (!response.ok || !result.data) {
@@ -412,6 +404,7 @@ export function LiveTeamStandings({
       }
 
       setLiveScores(result.data);
+      setLiveSource(result.source === 'espn' ? 'espn' : 'rapidapi');
       console.log('[LiveTeamStandings] Refreshed scores at', new Date().toLocaleTimeString());
     } catch (error) {
       setSyncError('Network error - unable to refresh scores');
@@ -420,7 +413,7 @@ export function LiveTeamStandings({
       setIsRefreshing(false);
       setNextRefreshIn(REFRESH_INTERVAL_MS / 1000);
     }
-  }, [liveGolfAPITournamentId, isRefreshing, isCompleted]);
+  }, [liveGolfAPITournamentId, espnEventId, scorecardSource, isRefreshing, isCompleted]);
 
   // Initial load
   useEffect(() => {
@@ -632,8 +625,8 @@ export function LiveTeamStandings({
                       if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
                         return <span className="text-casino-blue">{player.liveScore.thru}</span>;
                       }
-                      if (player.liveScore?.teeTime) return <span className="text-casino-gray">{player.liveScore.teeTime}</span>;
-                      if (teeTime) return <span className="text-casino-gray">{convertESTtoLocal(teeTime)}</span>;
+                      if (player.liveScore?.teeTime) return <LocalTeeTime teeTime={player.liveScore.teeTime} className="text-casino-gray" />;
+                      if (teeTime) return <LocalTeeTime teeTime={teeTime} className="text-casino-gray" />;
                       return <span className="text-casino-gray-dark">-</span>;
                     })();
                     return (
@@ -681,16 +674,24 @@ export function LiveTeamStandings({
                         {/* Winnings */}
                         {isMobile ? (
                           <td colSpan={2} className="px-px py-1 sm:py-1.5 text-xs text-right">
-                            <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
-                              {formatCurrency(player.winnings)}
-                            </span>
+                            {!player.hasTeedOff && player.liveScore ? (
+                              <span className="text-casino-gray-dark">—</span>
+                            ) : (
+                              <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
+                                {formatCurrency(player.winnings)}
+                              </span>
+                            )}
                           </td>
                         ) : (
                           <>
                             <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-right">
-                              <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
-                                {formatCurrency(player.winnings)}
-                              </span>
+                              {!player.hasTeedOff && player.liveScore ? (
+                                <span className="text-casino-gray-dark">—</span>
+                              ) : (
+                                <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
+                                  {formatCurrency(player.winnings)}
+                                </span>
+                              )}
                             </td>
                             <td className="px-1 sm:px-4 py-1 sm:py-1.5" />
                           </>

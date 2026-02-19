@@ -5,7 +5,11 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
-import { convertESTtoLocal } from '@/lib/timezone';
+import { LocalTeeTime } from '@/components/leaderboard/LocalTeeTime';
+import {
+  processLiveScoresForPrizes,
+  normalizeNameForLookup,
+} from '@/lib/live-scores-prizes';
 
 interface LiveScore {
   player: string;
@@ -80,6 +84,7 @@ export function LivePersonalLeaderboard({
       : null;
   const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>([]);
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
+  const [liveSource, setLiveSource] = useState<'espn' | 'rapidapi'>('rapidapi');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -138,56 +143,45 @@ export function LivePersonalLeaderboard({
     return undefined;
   }, [playerScoreMap]);
 
-  // Count players at each position to detect ties
-  const positionCounts = useMemo(() => {
-    const counts = new Map<number, number>();
-    liveScores.forEach((score) => {
-      const position = score.positionValue;
-      if (position && position > 0) {
-        counts.set(position, (counts.get(position) || 0) + 1);
-      }
+  // Shared prize logic: position-from-score (ESPN), tie split, exclude non-teed-off
+  const prizeDataByPlayer = useMemo(() => {
+    if (!liveScores.length) return new Map<string, { winnings: number; hasTeedOff: boolean; positionDisplay: string }>();
+    const processed = processLiveScoresForPrizes(
+      liveScores,
+      liveSource,
+      prizeMap
+    );
+    const byPlayer = new Map<string, { winnings: number; hasTeedOff: boolean; positionDisplay: string }>();
+    processed.forEach((data, key) => {
+      byPlayer.set(key, {
+        winnings: data.winnings,
+        hasTeedOff: data.hasTeedOff,
+        positionDisplay: data.positionDisplay,
+      });
     });
-    return counts;
-  }, [liveScores]);
+    return byPlayer;
+  }, [liveScores, liveSource, prizeMap]);
 
-  // Helper to calculate prize money with proper tie handling
-  const calculateTiePrizeMoney = useCallback((position: number | null): number => {
-    if (!position || position < 1) return 0;
-    
-    const tieCount = positionCounts.get(position) || 1;
-    
-    // Sum prize money for positions position through position + tieCount - 1
-    let totalPrize = 0;
-    for (let i = 0; i < tieCount; i++) {
-      const pos = position + i;
-      totalPrize += prizeMap.get(pos) || 0;
-    }
-    
-    // Split evenly among tied players
-    return Math.round(totalPrize / tieCount);
-  }, [positionCounts, prizeMap]);
-
-  // Calculate winnings for each player based on live scores
+  // Calculate winnings for each player based on live scores (uses shared prize logic)
   const playersWithLiveData = useMemo(() => {
     return rosterPlayers.map((player) => {
-      // Use fuzzy matching to find live score
       const liveScore = findLiveScore(player.playerName);
-      
-      const position = liveScore?.positionValue;
-      const isAmateur = liveScore?.isAmateur === true;
-      
-      // Calculate winnings with proper tie handling
-      // Amateurs cannot collect prize money
-      const winnings = isAmateur ? 0 : calculateTiePrizeMoney(position || null);
+      const lookupKey = liveScore ? normalizeNameForLookup(liveScore.player) : null;
+      const prizeData = lookupKey ? prizeDataByPlayer.get(lookupKey) : null;
+      const winnings = prizeData?.winnings ?? 0;
+      const hasTeedOff = prizeData?.hasTeedOff ?? false;
+      const positionDisplay = prizeData?.positionDisplay ?? '';
 
       return {
         ...player,
         liveScore,
         winnings,
-        isAmateur,
+        isAmateur: liveScore?.isAmateur === true,
+        hasTeedOff,
+        positionDisplay,
       };
     }).sort((a, b) => b.winnings - a.winnings);
-  }, [rosterPlayers, findLiveScore, calculateTiePrizeMoney]);
+  }, [rosterPlayers, findLiveScore, prizeDataByPlayer]);
 
   // Calculate total winnings
   const totalWinnings = useMemo(() => {
@@ -245,6 +239,7 @@ export function LivePersonalLeaderboard({
       }
 
       setLiveScores(result.data);
+      setLiveSource(result.source === 'espn' ? 'espn' : 'rapidapi');
     } catch (error) {
       setSyncError('Network error - unable to refresh scores');
       console.error('[LivePersonalLeaderboard] Error:', error);
@@ -341,16 +336,16 @@ export function LivePersonalLeaderboard({
                       {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
                     </td>
                     <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
-                      {player.liveScore?.position ? (
+                      {player.positionDisplay ? (
                         <span className={`font-medium ${
-                          player.liveScore.positionValue === 1 ? 'text-casino-gold' :
-                          (player.liveScore.positionValue || 999) <= 10 ? 'text-casino-green' :
+                          player.positionDisplay === '1' || player.positionDisplay === 'T1' ? 'text-casino-gold' :
+                          parseInt(player.positionDisplay.replace('T', '')) <= 10 ? 'text-casino-green' :
                           'text-casino-text'
                         }`}>
-                          {player.liveScore.position}
+                          {player.positionDisplay}
                         </span>
                       ) : (
-                        <span className="text-casino-gray-dark">-</span>
+                        <span className="text-casino-gray-dark">{player.liveScore ? '' : '-'}</span>
                       )}
                     </td>
                     <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
@@ -402,20 +397,24 @@ export function LivePersonalLeaderboard({
                         if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
                           return <span className="text-casino-blue">{player.liveScore.thru}</span>;
                         }
-                        // Player hasn't started - primary: RapidAPI tee time, fallback: DB tee time
+                        // Player hasn't started - primary: cache tee time (EST), fallback: DB tee time
                         if (player.liveScore?.teeTime) {
-                          return <span className="text-casino-gray">{player.liveScore.teeTime}</span>;
+                          return <LocalTeeTime teeTime={player.liveScore.teeTime} className="text-casino-gray" />;
                         }
                         if (teeTime) {
-                          return <span className="text-casino-gray">{convertESTtoLocal(teeTime)}</span>;
+                          return <LocalTeeTime teeTime={teeTime} className="text-casino-gray" />;
                         }
                         return <span className="text-casino-gray-dark">-</span>;
                       })()}
                     </td>
                     <td className="px-2 sm:px-4 py-2 text-right whitespace-nowrap">
-                      <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
-                        {formatCurrency(player.winnings)}
-                      </span>
+                      {!player.hasTeedOff && player.liveScore ? (
+                        <span className="text-casino-gray-dark">—</span>
+                      ) : (
+                        <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
+                          {formatCurrency(player.winnings)}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))

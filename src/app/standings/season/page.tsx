@@ -83,7 +83,7 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
   // Get all tournaments (completed and active)
   const { data: tournaments, error: tournamentsError } = await supabase
     .from('tournaments')
-    .select('id, name, status, rapidapi_tourn_id')
+    .select('id, name, status, rapidapi_tourn_id, espn_event_id')
     .in('status', ['completed', 'active']);
 
   if (tournamentsError) {
@@ -265,10 +265,12 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
   );
 
   // Prepare active tournament info
-  const activeTournament = activeTournamentData && activeTournamentData.rapidapi_tourn_id ? {
+  const activeTournament = activeTournamentData && (activeTournamentData.rapidapi_tourn_id || activeTournamentData.espn_event_id) ? {
     id: activeTournamentData.id,
     name: activeTournamentData.name,
     liveGolfAPITournamentId: activeTournamentData.rapidapi_tourn_id,
+    espnEventId: activeTournamentData.espn_event_id,
+    scorecardSource: activeTournamentData.espn_event_id ? 'espn' as const : 'rapidapi' as const,
   } : undefined;
 
   return (

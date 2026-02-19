@@ -7,6 +7,10 @@ import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import {
+  processLiveScoresForPrizes,
+  normalizeNameForLookup,
+} from '@/lib/live-scores-prizes';
 
 interface CompletedStanding {
   user_id: string;
@@ -63,6 +67,8 @@ interface LiveSeasonStandingsProps {
     id: string;
     name: string;
     liveGolfAPITournamentId: string;
+    espnEventId?: string | null;
+    scorecardSource?: 'espn' | 'rapidapi';
   };
   prizeDistributions: Array<{
     position: number;
@@ -96,6 +102,9 @@ export function LiveSeasonStandings({
   segmentDefinitions = [],
 }: LiveSeasonStandingsProps) {
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
+  const [liveSource, setLiveSource] = useState<'espn' | 'rapidapi'>(
+    activeTournament?.scorecardSource ?? 'rapidapi'
+  );
   const [activeRosters, setActiveRosters] = useState<Map<string, { rosterId: string; rosterName: string; playerNames: string[] }>>(new Map());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
@@ -155,51 +164,27 @@ export function LiveSeasonStandings({
     return undefined;
   }, [playerScoreMap]);
 
-  // Count players at each position to detect ties
-  const positionCounts = useMemo(() => {
-    const counts = new Map<number, number>();
-    liveScores.forEach((score) => {
-      const position = score.positionValue;
-      if (position && position > 0) {
-        counts.set(position, (counts.get(position) || 0) + 1);
-      }
+  // Shared prize logic: position-from-score (ESPN), tie split, exclude non-teed-off
+  const prizeDataByPlayer = useMemo(() => {
+    if (!liveScores.length) return new Map<string, number>();
+    const processed = processLiveScoresForPrizes(liveScores, liveSource, prizeMap);
+    const byPlayer = new Map<string, number>();
+    processed.forEach((data, key) => {
+      byPlayer.set(key, data.winnings);
     });
-    return counts;
-  }, [liveScores]);
+    return byPlayer;
+  }, [liveScores, liveSource, prizeMap]);
 
-  // Helper to calculate prize money with proper tie handling
-  const calculateTiePrizeMoney = useCallback((position: number | null): number => {
-    if (!position || position < 1) return 0;
-    
-    const tieCount = positionCounts.get(position) || 1;
-    
-    // Sum prize money for positions position through position + tieCount - 1
-    let totalPrize = 0;
-    for (let i = 0; i < tieCount; i++) {
-      const pos = position + i;
-      totalPrize += prizeMap.get(pos) || 0;
-    }
-    
-    // Split evenly among tied players
-    return Math.round(totalPrize / tieCount);
-  }, [positionCounts, prizeMap]);
-
-  // Calculate live winnings for a roster
+  // Calculate live winnings for a roster (uses shared prize logic)
   const calculateLiveWinnings = useCallback((playerNames: string[]): number => {
     let total = 0;
     playerNames.forEach((name) => {
-      // Use fuzzy matching to find live score
       const liveScore = findLiveScore(name);
-      const position = liveScore?.positionValue;
-      const isAmateur = liveScore?.isAmateur === true;
-      // Amateurs cannot collect prize money
-      if (position && position > 0 && !isAmateur) {
-        // Use tie-aware prize calculation
-        total += calculateTiePrizeMoney(position);
-      }
+      const lookupKey = liveScore ? normalizeNameForLookup(liveScore.player) : null;
+      total += lookupKey ? (prizeDataByPlayer.get(lookupKey) ?? 0) : 0;
     });
     return total;
-  }, [findLiveScore, calculateTiePrizeMoney]);
+  }, [findLiveScore, prizeDataByPlayer]);
 
   // Combined standings with live data, filtered by selected period
   const combinedStandings = useMemo(() => {
@@ -305,16 +290,23 @@ export function LiveSeasonStandings({
 
   // Fetch live scores from API
   const fetchLiveScores = useCallback(async () => {
-    if (!activeTournament?.liveGolfAPITournamentId || isRefreshing) return;
+    const useEspn = activeTournament?.scorecardSource === 'espn' && activeTournament?.espnEventId;
+    const url = useEspn
+      ? `/api/scores/live?source=espn&eventId=${encodeURIComponent(activeTournament!.espnEventId!)}`
+      : activeTournament?.liveGolfAPITournamentId
+        ? `/api/scores/live?eventId=${activeTournament.liveGolfAPITournamentId}`
+        : null;
+    if (!url || isRefreshing) return;
 
     setIsRefreshing(true);
 
     try {
-      const response = await fetch(`/api/scores/live?eventId=${activeTournament.liveGolfAPITournamentId}`);
+      const response = await fetch(url);
       const result = await response.json();
 
       if (result.data) {
         setLiveScores(result.data);
+        setLiveSource(result.source === 'espn' ? 'espn' : 'rapidapi');
       }
     } catch (error) {
       console.error('[LiveSeasonStandings] Error:', error);

@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from 'rea
 import { formatScore, getScoreColor, formatShortName } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
+import { assignPositionsByScore } from '@/lib/leaderboard-positions';
 import { ScorecardModal } from './ScorecardModal';
-import { convertESTtoLocal } from '@/lib/timezone';
+import { LocalTeeTime } from './LocalTeeTime';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 interface LeaderboardRow {
@@ -21,6 +22,7 @@ interface LeaderboardRow {
   roundComplete?: boolean; // Whether player finished current round
   is_amateur?: boolean; // Amateurs cannot collect prize money
   teeTime?: string; // Tee time from RapidAPI (e.g., "11:35am")
+  hasTeedOff?: boolean; // false when THRU shows tee time, haven't started yet
 }
 
 interface TeeTimeData {
@@ -71,6 +73,17 @@ interface LiveLeaderboardProps {
   initialCutLine?: CutLineData | null;
 }
 
+/** Player has teed off if thru shows holes played (1, 2, F) not a tee time (1:39 PM) */
+const hasTeedOff = (thru: string | number | undefined): boolean => {
+  if (thru === undefined || thru === null) return false;
+  const s = String(thru).trim();
+  if (s === '-' || s === '' || s === '0') return false;
+  if (s === 'F' || s === '18') return true;
+  if (s.includes(':') || s.includes('AM') || s.includes('PM')) return false; // tee time
+  const n = parseInt(s.replace('*', ''), 10);
+  return !Number.isNaN(n) && n > 0;
+};
+
 // Helper to parse scores from API
 const parseScore = (score: string | number | null): number => {
   if (score === null || score === undefined) return 0;
@@ -102,8 +115,8 @@ function getTeeTimeForRound(teeTime: TeeTimeData | undefined, currentRound?: num
     estTime = teeTime.tee_time_r4;
   }
   
-  // Convert EST to local timezone
-  return estTime ? convertESTtoLocal(estTime) : null;
+  // Return raw EST string; caller uses LocalTeeTime for client-side conversion
+  return estTime ?? null;
 }
 
 // Normalize name for matching: trim, lowercase, strip accents, replace ø/ö/å etc. with ASCII
@@ -259,50 +272,64 @@ export function LiveLeaderboard({
       // Transform API data directly to display format
       const scores = result.data;
       
-      // First pass: count players at each position to detect ties
-      const positionCounts = new Map<number, number>();
-      scores.forEach((scorecard: APIScorecard) => {
-        const position = scorecard.positionValue || 
-          (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null);
-        if (position && position > 0) {
-          positionCounts.set(position, (positionCounts.get(position) || 0) + 1);
-        }
-      });
-      
       // Helper to calculate prize money with proper tie handling
       const calculateTiePrizeMoney = (position: number | null, tieCount: number): number => {
         if (!position || position < 1 || tieCount < 1) return 0;
-        
-        // Sum prize money for positions position through position + tieCount - 1
         let totalPrize = 0;
         for (let i = 0; i < tieCount; i++) {
-          const pos = position + i;
-          totalPrize += prizeDistributionMap.get(pos) || 0;
+          totalPrize += prizeDistributionMap.get(position + i) || 0;
         }
-        
-        // Split evenly among tied players
         return Math.round(totalPrize / tieCount);
       };
+
+      // ESPN: derive position from total score; exclude players who haven't teed off
+      let positionByIndex: Map<number, { position: number; tieCount: number }> | null = null;
+      if (result.source === 'espn' && Array.isArray(scores) && scores.length > 0) {
+        const withScores = scores
+          .map((s: APIScorecard, i: number) => ({
+            index: i,
+            total_score: parseScore(s.total),
+            today_score: parseScore(s.currentRoundScore ?? s.total),
+            thru: s.thru ?? '-',
+          }))
+          .filter((r) => hasTeedOff(r.thru));
+        const positionResults = assignPositionsByScore(withScores);
+        positionByIndex = new Map();
+        for (const { item, position, tieCount } of positionResults) {
+          positionByIndex.set(item.index, { position, tieCount });
+        }
+      }
+
+      // Fallback: count by positionValue (RapidAPI sends correct T1, T1, T1)
+      const positionCounts = new Map<number, number>();
+      if (!positionByIndex) {
+        scores.forEach((scorecard: APIScorecard) => {
+          const position = scorecard.positionValue ||
+            (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null);
+          if (position && position > 0) {
+            positionCounts.set(position, (positionCounts.get(position) || 0) + 1);
+          }
+        });
+      }
       
-      const transformed: LeaderboardRow[] = scores.map((scorecard: APIScorecard) => {
-        // Handle both RapidAPI and LiveGolfAPI formats
-        const position = scorecard.positionValue || 
-          (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null);
-        const tieCount = position ? (positionCounts.get(position) || 1) : 1;
+      const transformed: LeaderboardRow[] = scores.map((scorecard: APIScorecard, idx: number) => {
+        const teedOff = hasTeedOff(scorecard.thru ?? scorecard.teeTime);
+        const fromScore = positionByIndex?.get(idx);
+        const position = teedOff
+          ? (fromScore
+            ? fromScore.position
+            : (scorecard.positionValue ?? (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null)))
+          : null;
+        const tieCount = fromScore ? fromScore.tieCount : (position ? (positionCounts.get(position) || 1) : 1);
         const isTied = tieCount > 1;
-        
-        // Get today's score - RapidAPI provides currentRoundScore directly
-        const todayScore = scorecard.currentRoundScore 
+        const todayScore = scorecard.currentRoundScore
           ? parseScore(scorecard.currentRoundScore)
           : parseScore(scorecard.total);
-        
-        // Calculate prize money with proper tie handling
-        // Amateurs cannot collect prize money
         const isAmateur = scorecard.isAmateur === true;
-        const prizeMoney = isAmateur ? 0 : calculateTiePrizeMoney(position, tieCount);
+        const prizeMoney = teedOff && !isAmateur ? calculateTiePrizeMoney(position, tieCount) : 0;
 
         return {
-          position,
+          position: position ?? null,
           is_tied: isTied,
           tied_with_count: tieCount,
           total_score: parseScore(scorecard.total),
@@ -310,18 +337,20 @@ export function LiveLeaderboard({
           thru: scorecard.thru || '-',
           prize_money: prizeMoney,
           name: scorecard.player || 'Unknown',
-          apiPlayerId: scorecard.playerId, // Store API player ID for scorecard lookup
-          roundComplete: scorecard.roundComplete === true, // Whether player finished current round
+          apiPlayerId: scorecard.playerId,
+          roundComplete: scorecard.roundComplete === true,
           is_amateur: isAmateur,
-          teeTime: scorecard.teeTime, // Carry through RapidAPI tee time
+          teeTime: scorecard.teeTime,
+          hasTeedOff: teedOff,
         };
       });
 
-      // Sort by position
+      // Sort by position then total score
       transformed.sort((a, b) => {
         if (a.position === null) return 1;
         if (b.position === null) return -1;
-        return a.position - b.position;
+        if (a.position !== b.position) return a.position - b.position;
+        return a.total_score - b.total_score;
       });
 
       setLeaderboardData(transformed);
@@ -542,9 +571,12 @@ export function LiveLeaderboard({
             const isUserPlayer = playerId && userRosterPlayerIds.includes(playerId);
             const playerCost = playerCostMap?.get(matchedMapName);
 
-            const pos = row.position
-              ? `${row.is_tied ? 'T' : ''}${row.position}`
-              : 'CUT';
+            const teedOff = row.hasTeedOff ?? hasTeedOff(row.thru ?? row.teeTime);
+            const pos = !teedOff
+              ? ''
+              : row.position
+                ? `${row.is_tied ? 'T' : ''}${row.position}`
+                : 'CUT';
             const totalClass = getScoreColor(row.total_score);
             const todayClass = getScoreColor(row.today_score);
 
@@ -556,11 +588,10 @@ export function LiveLeaderboard({
             const isRound3OrLater = (currentRound || 1) >= 3;
             const isBelowProjectedCut = !isRound3OrLater && cutLine && row.position !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
             const isCut = row.position === null;
-            const prizeAmount = (row.is_amateur || isCut || isBelowProjectedCut) ? 0 : (
-              row.prize_money ||
-              (row.position ? prizeDistributionMap.get(row.position) : 0) ||
-              0
-            );
+            const showPrizeDash = !teedOff;
+            const prizeAmount = showPrizeDash || row.is_amateur || isCut || isBelowProjectedCut
+              ? 0
+              : (row.prize_money || (row.position ? prizeDistributionMap.get(row.position) : 0) || 0);
 
             const prevRow = idx > 0 ? leaderboardData[idx - 1] : null;
             
@@ -632,22 +663,22 @@ export function LiveLeaderboard({
                     /* Player is on course - show holes completed */
                     <span className="text-casino-blue">{row.thru}</span>
                   ) : (() => {
-                    // Primary: use teeTime directly from RapidAPI cached data
+                    // Primary: use teeTime from cache (stored in EST); convert on client to user's local
                     if (row.teeTime) {
-                      return <span className="text-casino-gray">{row.teeTime}</span>;
+                      return <LocalTeeTime teeTime={row.teeTime} className="text-casino-gray" />;
                     }
                     // Fallback: look up from DB tee time map
                     const teeTimeData = getTeeTimeDataForPlayer(teeTimeMap, row.name);
                     const teeTimeStr = getTeeTimeForRound(teeTimeData, currentRound);
                     return teeTimeStr ? (
-                      <span className="text-casino-gray">{teeTimeStr}</span>
+                      <LocalTeeTime teeTime={teeTimeStr} className="text-casino-gray" />
                     ) : null;
                   })() ?? (
                     <span className="text-casino-gray-dark">-</span>
                   )}
                 </td>
                 <td className="px-0.5 sm:px-4 py-2 text-right text-xs sm:text-sm text-casino-gold whitespace-nowrap">
-                  {formatCurrency(prizeAmount || 0)}
+                  {showPrizeDash ? '—' : formatCurrency(prizeAmount || 0)}
                 </td>
               </tr>
               </Fragment>

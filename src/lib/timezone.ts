@@ -1,7 +1,39 @@
 /**
  * Timezone conversion utilities
- * Tee times are stored in EST and converted to user's local timezone for display
+ * - ESPN: full datetimes (e.g. "Thu Feb 19 08:03:00 PST 2026") — parse and display in user's local
+ * - RapidAPI/DB: time-only (e.g. "11:35 AM") assumed Eastern — convert to user's local
  */
+
+/**
+ * Format a tee time for display in the user's local timezone.
+ * Handles both full datetimes (ESPN) and time-only strings (RapidAPI/DB, assumed Eastern).
+ */
+export function formatTeeTimeForDisplay(teeTime: string): string {
+  if (!teeTime) return teeTime;
+
+  // Full datetime: contains timezone (PST/EST/CST/etc), ISO "T", or explicit date
+  const isFullDatetime =
+    /PST|PDT|EST|EDT|CST|CDT|MST|MDT|GMT|UTC|-\d{4}|\+\d{4}/i.test(teeTime) ||
+    /^\d{4}-\d{2}-\d{2}T/.test(teeTime) ||
+    /[A-Za-z]{3}\s+[A-Za-z]{3}\s+\d{1,2}\s+\d{1,2}:\d{2}:\d{2}/.test(teeTime);
+
+  if (isFullDatetime) {
+    try {
+      const d = new Date(teeTime);
+      if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+      }
+    } catch {
+      /* fall through to EST handling */
+    }
+  }
+
+  return convertESTtoLocal(teeTime);
+}
 
 /**
  * Convert a time string from Eastern (ET) to the user's local timezone.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { shouldPollNow } from '@/lib/polling-config';
+import { assignPositionsByScore } from '@/lib/leaderboard-positions';
 
 const ESPN_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard';
 
@@ -38,21 +39,17 @@ function normalizeRoundDisplay(raw: unknown): string | null {
 }
 
 /**
- * ESPN sends datetime strings in the tournament's timezone (e.g. "Thu Feb 12 11:45:00 PST 2026"
- * for Pebble Beach). Parse and convert to Eastern for storage; display then converts to user's local.
+ * ESPN sends full datetime strings in the tournament's timezone (e.g. "Thu Feb 19 10:15:00 PST 2026").
+ * Store the raw string so the client can parse and display in the user's local timezone without
+ * losing timezone info. Returns raw if it parses as a valid date; otherwise returns null.
  */
-function formatTeeTimeToEST(raw: string): string {
+function normalizeTeeTimeFromESPN(raw: string): string | null {
   try {
     const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return raw;
-    return d.toLocaleTimeString('en-US', {
-      timeZone: 'America/New_York',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    if (Number.isNaN(d.getTime())) return null;
+    return raw; // Keep raw so client gets "Thu Feb 19 08:03:00 PST 2026" for accurate display
   } catch {
-    return raw;
+    return null;
   }
 }
 
@@ -237,7 +234,7 @@ export async function POST(request: NextRequest) {
         if (thru !== 'F' && startedBackNine) thru += '*';
         const stats = roundLines?.statistics?.categories?.[0]?.stats;
         const teeTimeRaw = stats?.length ? stats[stats.length - 1]?.displayValue : null;
-        const teeTime = teeTimeRaw ? formatTeeTimeToEST(teeTimeRaw) : null;
+        const teeTime = teeTimeRaw ? normalizeTeeTimeFromESPN(teeTimeRaw) : null;
         // Today's score: round displayValue (to par), then round value, then derived from holes
         const roundDisplay = normalizeRoundDisplay(
           (roundLines as Record<string, unknown> | undefined)?.displayValue
@@ -267,6 +264,30 @@ export async function POST(request: NextRequest) {
           linescores: c.linescores ?? [],
         };
       });
+
+      // Derive position from score (same as RapidAPI: tied players share position for prize split)
+      const parseScore = (s: string | number | null): number => {
+        if (s === null || s === undefined) return 0;
+        if (typeof s === 'number') return s;
+        if (s === 'E') return 0;
+        const t = String(s).trim();
+        if (t.startsWith('+')) return parseInt(t.slice(1), 10) || 0;
+        if (t.startsWith('-')) return -(parseInt(t.slice(1), 10) || 0);
+        return parseInt(t, 10) || 0;
+      };
+      const withScores = transformedData.map((row, index) => ({
+        ...row,
+        index,
+        total_score: parseScore(row.total),
+        today_score: parseScore(row.currentRoundScore),
+        thru: row.thru ?? 'F',
+      }));
+      const positionResults = assignPositionsByScore(withScores);
+      for (const { item, position, tieCount } of positionResults) {
+        const row = transformedData[item.index];
+        row.position = tieCount > 1 ? `T${position}` : String(position);
+        row.positionValue = position;
+      }
 
       const status = competition.status?.type?.description || event.status?.type?.description || 'Unknown';
       const cacheKey = `espn-${eventId}`;
