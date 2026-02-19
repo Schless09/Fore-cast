@@ -139,7 +139,54 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Get tournaments that have espn_event_id set
+    /** Normalize name for matching: lowercase, remove leading "The ", collapse spaces. */
+    const normalizeName = (s: string) =>
+      (s || '').replace(/^the\s+/i, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+    /** Auto-link: set espn_event_id on tournaments that match an ESPN event by date + name. */
+    const eventDates = new Set(
+      events.map((e: { date?: string; startDate?: string }) =>
+        (e.date || e.startDate || '').slice(0, 10)
+      )
+    );
+    const eventDateList = [...eventDates].filter(Boolean);
+    if (eventDateList.length > 0) {
+      const { data: candidates } = await supabase
+        .from('tournaments')
+        .select('id, name, start_date, espn_event_id')
+        .in('start_date', eventDateList);
+
+      const eventsByDate = new Map<string, Array<{ id: string; name?: string }>>();
+      for (const e of events as { id: string; name?: string; date?: string; startDate?: string }[]) {
+        const date = (e.date || e.startDate || '').slice(0, 10);
+        if (!date) continue;
+        if (!eventsByDate.has(date)) eventsByDate.set(date, []);
+        eventsByDate.get(date)!.push({ id: e.id, name: e.name });
+      }
+
+      for (const t of candidates || []) {
+        const dateStr = (t.start_date as string)?.slice(0, 10);
+        const tName = normalizeName(t.name || '');
+        if (!dateStr) continue;
+        const dayEvents = eventsByDate.get(dateStr) || [];
+        for (const ev of dayEvents) {
+          const eName = normalizeName(ev.name || '');
+          const nameMatch =
+            eName.includes(tName) || tName.includes(eName) || eName === tName;
+          if (nameMatch) {
+            const newId = String(ev.id);
+            if (t.espn_event_id === newId) break;
+            await supabase
+              .from('tournaments')
+              .update({ espn_event_id: newId })
+              .eq('id', t.id);
+            break;
+          }
+        }
+      }
+    }
+
+    // Get tournaments that have espn_event_id set (including newly auto-linked)
     const { data: tournamentsWithEspn, error: tError } = await supabase
       .from('tournaments')
       .select('id, name, espn_event_id')
