@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
@@ -76,7 +76,7 @@ export default async function PlayerProfilePage({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900 py-8">
+    <div className="min-h-screen bg-linear-to-br from-gray-900 via-slate-900 to-gray-900 py-8">
       <div className="max-w-6xl mx-auto px-4">
         {/* Header */}
         <div className="mb-6">
@@ -92,6 +92,7 @@ export default async function PlayerProfilePage({
           <CardHeader>
             <div className="flex items-center gap-4">
               {player.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element -- external player image URL
                 <img
                   src={player.image_url}
                   alt={player.name}

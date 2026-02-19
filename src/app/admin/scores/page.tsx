@@ -40,7 +40,7 @@ export default function AdminScoresPage() {
         if (defaultTournament) {
           setSelectedTournament(defaultTournament);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching tournaments:', err);
         setError('Failed to load tournaments');
       } finally {
@@ -108,8 +108,41 @@ export default function AdminScoresPage() {
       setMessage(
         `✅ ${result.message || 'Winnings calculated successfully!'} Total Purse: $${result.totalPurse?.toLocaleString() || '0'}`
       );
-    } catch (err: any) {
-      setError(err.message || 'Failed to calculate winnings');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to calculate winnings');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSendWouldaCoulda = async () => {
+    if (!selectedTournament) {
+      setError('Please select a tournament');
+      return;
+    }
+
+    setIsUpdating(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/rosters/send-woulda-coulda', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tournamentId: selectedTournament.id }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send woulda-coulda emails');
+      }
+
+      setMessage(
+        `✅ Sent ${result.recipientsCount ?? 0} woulda-coulda email(s) for ${selectedTournament.name}.`
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send woulda-coulda emails');
     } finally {
       setIsUpdating(false);
     }
@@ -150,14 +183,14 @@ export default function AdminScoresPage() {
               </Link>
             </li>
             <li>
-              <strong>Select Tournament</strong> below and click "🔄 Sync Scores"
+              <strong>Select Tournament</strong> below and click &quot;🔄 Sync Scores&quot;
             </li>
             <li>
-              <strong>Click "💰 Calculate Winnings"</strong> to update Team Standings
+              <strong>Click &quot;💰 Calculate Winnings&quot;</strong> to update Team Standings
             </li>
           </ol>
           <p className="text-xs text-blue-700 mt-3">
-            ⚠️ Winnings won't show in Team Standings until all three steps are complete.
+            ⚠️ Winnings won&apos;t show in Team Standings until all three steps are complete.
           </p>
         </CardContent>
       </Card>
@@ -240,6 +273,16 @@ export default function AdminScoresPage() {
             >
               💰 Calculate Winnings
             </Button>
+            <Button
+              variant="outline"
+              onClick={handleSendWouldaCoulda}
+              isLoading={isUpdating}
+              disabled={!selectedTournament}
+              className="flex-1 bg-amber-50 border-amber-600 text-amber-700 hover:bg-amber-100"
+              title="Send 'woulda coulda' emails to users who edited their roster and would have finished in the money (top 4) with a previous lineup"
+            >
+              🤔 Send Woulda-Coulda Emails
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -254,6 +297,9 @@ export default function AdminScoresPage() {
             </li>
             <li>
               <strong>Calculate Winnings:</strong> Calculates prize money for each player based on their position and updates roster totals
+            </li>
+            <li>
+              <strong>Send Woulda-Coulda Emails:</strong> Run <em>after</em> winnings are calculated. Sends an email only to users who (1) edited their roster during the tournament, (2) their <strong>current</strong> lineup’s total purse is <strong>lower</strong> than a previous version, and (3) that previous lineup would have placed them <strong>strictly higher</strong> (e.g. 6th → would’ve been 2nd, or 4th → would’ve been 1st).
             </li>
             <li>
               <strong>Team Standings:</strong> Visit{' '}

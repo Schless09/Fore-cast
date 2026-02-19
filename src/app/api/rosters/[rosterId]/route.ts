@@ -32,10 +32,10 @@ export async function PUT(
     return NextResponse.json({ success: false, error: 'Profile not found' }, { status: 404 });
   }
 
-  // Get the roster to determine the owner and tournament
+  // Get the roster with current players (for snapshot before overwrite)
   const { data: roster } = await supabase
     .from('user_rosters')
-    .select('id, user_id, tournament_id')
+    .select('id, user_id, tournament_id, roster_name, budget_spent')
     .eq('id', rosterId)
     .single();
 
@@ -65,6 +65,39 @@ export async function PUT(
 
   if (!player_ids || !Array.isArray(player_ids)) {
     return NextResponse.json({ success: false, error: 'player_ids is required' }, { status: 400 });
+  }
+
+  // Snapshot current roster to version history (for post-tournament "woulda coulda" email)
+  const { data: currentPlayers } = await supabase
+    .from('roster_players')
+    .select('tournament_player_id')
+    .eq('roster_id', rosterId);
+
+  if (currentPlayers && currentPlayers.length > 0) {
+    const { data: version, error: versionError } = await supabase
+      .from('roster_versions')
+      .insert({
+        roster_id: rosterId,
+        tournament_id: roster.tournament_id,
+        user_id: roster.user_id,
+        budget_spent: roster.budget_spent ?? undefined,
+        roster_name: roster.roster_name ?? undefined,
+      })
+      .select('id')
+      .single();
+
+    if (!versionError && version) {
+      await supabase.from('roster_version_players').insert(
+        currentPlayers.map((p) => ({
+          roster_version_id: version.id,
+          tournament_player_id: p.tournament_player_id,
+        }))
+      );
+    }
+    // Non-fatal: log but don't block the edit if versioning fails
+    if (versionError) {
+      console.warn('Roster version snapshot failed:', versionError.message);
+    }
   }
 
   // Update roster metadata
