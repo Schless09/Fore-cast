@@ -471,7 +471,7 @@ export function LiveLeaderboard({
             <col style={{ width: '42px' }} />
             <col style={{ width: '42px' }} />
             <col style={{ width: '42px' }} />
-            <col style={{ width: '68px' }} />
+            <col style={{ width: '82px' }} />
           </colgroup>
         )}
         <thead>
@@ -679,7 +679,7 @@ export function LiveLeaderboard({
                     <span className="text-casino-gray-dark">-</span>
                   )}
                 </td>
-                <td className="px-0.5 sm:px-4 py-2 text-right text-xs sm:text-sm whitespace-nowrap">
+                <td className="px-0.5 sm:px-4 py-2 text-right text-xs sm:text-sm whitespace-nowrap tabular-nums">
                   {rightColumnMode === 'Picks' ? (
                     (() => {
                       const pickCount = picksByPlayer[name] ?? picksByPlayer[matchedMapName] ?? 0;
