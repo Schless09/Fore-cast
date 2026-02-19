@@ -171,3 +171,24 @@ export function processLiveScoresForPrizes(
   });
   return result;
 }
+
+/** Look up prize data by player name (DB format). Handles fuzzy match for Matti/Matthias etc. */
+export function getPrizeDataForPlayer(
+  processedMap: Map<string, ProcessedPrizeData>,
+  playerName: string
+): ProcessedPrizeData | undefined {
+  const key = normalizeNameForLookup(playerName);
+  const exact = processedMap.get(key);
+  if (exact) return exact;
+  const parts = key.split(/\s+/);
+  if (parts.length < 2) return undefined;
+  const lastName = parts[parts.length - 1];
+  const firstName = parts[0];
+  for (const [mapKey, data] of processedMap) {
+    const mapParts = mapKey.split(/\s+/);
+    if (mapParts.length >= 2 && mapParts[mapParts.length - 1] === lastName && firstNamesMatchForLiveScores(firstName, mapParts[0])) {
+      return data;
+    }
+  }
+  return undefined;
+}

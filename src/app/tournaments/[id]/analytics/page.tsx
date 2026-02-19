@@ -3,6 +3,7 @@ import { getProfile } from '@/lib/auth/profile';
 import { createServiceClient } from '@/lib/supabase/service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { InsideTheFieldTable } from '@/components/tournaments/InsideTheFieldTable';
+import { processLiveScoresForPrizes, getPrizeDataForPlayer, type ProcessedPrizeData } from '@/lib/live-scores-prizes';
 import Link from 'next/link';
 
 interface AnalyticsPageProps {
@@ -27,11 +28,11 @@ interface CachedPlayer {
   positionValue?: number;
   position?: string;
   earnings?: number;
-}
-
-interface PrizeDistributionRow {
-  position: number;
-  amount: number;
+  total?: string | number;
+  thru?: string;
+  teeTime?: string;
+  isAmateur?: boolean;
+  currentRoundScore?: string | number;
 }
 
 export const revalidate = 0;
@@ -47,10 +48,10 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
 
   const supabase = createServiceClient();
 
-  // Get tournament info
+  // Get tournament info (including espn_event_id for ESPN cache)
   const { data: tournament } = await supabase
     .from('tournaments')
-    .select('id, name, status')
+    .select('id, name, status, espn_event_id')
     .eq('id', id)
     .single();
 
@@ -131,56 +132,63 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
     .eq('tournament_id', id)
     .order('position', { ascending: true });
 
-  const prizeDistributionMap = new Map<number, PrizeDistributionRow>(
-    (prizeDistributions || []).map((p) => [p.position, p])
+  const prizeMap = new Map<number, number>(
+    (prizeDistributions || []).map((p) => [p.position, p.amount ?? 0])
   );
 
-  // Helper to calculate prize money with tie handling
-  const calculateTiePrizeMoney = (position: number | null, tieCount: number): number => {
-    if (!position || position < 1 || tieCount < 1) return 0;
-    let totalPrize = 0;
-    for (let i = 0; i < tieCount; i++) {
-      const pos = position + i;
-      const dist = prizeDistributionMap.get(pos);
-      totalPrize += dist?.amount || 0;
+  // Get live earnings: prefer ESPN cache (tie-aware, position-from-score, exclude non-teed-off)
+  // then fall back to RapidAPI live_scores_cache
+  let processedPrizeMap = new Map<string, ProcessedPrizeData>();
+
+  if (tournament.espn_event_id) {
+    const { data: espnCached } = await supabase
+      .from('espn_cache')
+      .select('data')
+      .eq('cache_key', `espn-${tournament.espn_event_id}`)
+      .maybeSingle();
+
+    if (espnCached?.data?.data && Array.isArray(espnCached.data.data)) {
+      const scores = (espnCached.data.data as CachedPlayer[]).map((p) => ({
+        player: p.player || (p.firstName && p.lastName ? `${p.firstName} ${p.lastName}` : ''),
+        positionValue: p.positionValue,
+        position: p.position,
+        total: p.total,
+        thru: p.thru,
+        teeTime: p.teeTime,
+        isAmateur: p.isAmateur,
+        currentRoundScore: p.currentRoundScore,
+      }));
+      processedPrizeMap = processLiveScoresForPrizes(scores, 'espn', prizeMap);
     }
-    return Math.round(totalPrize / tieCount);
-  };
-
-  // Get live earnings from cache (this is where live positions/earnings are stored)
-  const { data: cachedData } = await supabase
-    .from('live_scores_cache')
-    .select('data')
-    .eq('tournament_id', id)
-    .single();
-
-  // Build a map of player name to their live earnings and position
-  const playerLiveDataMap = new Map<string, { prizeMoney: number; position: string | null }>();
-  
-  if (cachedData?.data?.data && Array.isArray(cachedData.data.data)) {
-    const leaderboard = cachedData.data.data as CachedPlayer[];
-    
-    // Count positions for tie handling
-    const positionCounts = new Map<number, number>();
-    leaderboard.forEach((player) => {
-      const posNum = player.positionValue || parseInt(String(player.position)?.replace('T', '') || '') || null;
-      if (posNum && posNum > 0) {
-        positionCounts.set(posNum, (positionCounts.get(posNum) || 0) + 1);
-      }
-    });
-
-    leaderboard.forEach((player) => {
-      const name = player.player || (player.firstName && player.lastName ? `${player.firstName} ${player.lastName}` : null);
-      if (!name) return;
-
-      const posNum = player.positionValue || parseInt(String(player.position)?.replace('T', '') || '') || null;
-      const tieCount = posNum ? (positionCounts.get(posNum) || 1) : 1;
-      const prizeMoney = player.earnings || calculateTiePrizeMoney(posNum, tieCount);
-      const posDisplay = posNum ? (tieCount > 1 ? `T${posNum}` : String(posNum)) : null;
-
-      playerLiveDataMap.set(name, { prizeMoney, position: posDisplay });
-    });
   }
+
+  if (processedPrizeMap.size === 0) {
+    const { data: cachedData } = await supabase
+      .from('live_scores_cache')
+      .select('data')
+      .eq('tournament_id', id)
+      .single();
+
+    if (cachedData?.data?.data && Array.isArray(cachedData.data.data)) {
+      const scores = (cachedData.data.data as CachedPlayer[]).map((p) => ({
+        player: p.player || (p.firstName && p.lastName ? `${p.firstName} ${p.lastName}` : ''),
+        positionValue: p.positionValue,
+        position: p.position,
+        total: p.total,
+        thru: p.thru,
+        teeTime: p.teeTime,
+        isAmateur: p.isAmateur,
+        currentRoundScore: p.currentRoundScore,
+      }));
+      processedPrizeMap = processLiveScoresForPrizes(scores, 'rapidapi', prizeMap);
+    }
+  }
+
+  const getLiveDataForPlayer = (playerName: string): { prizeMoney: number; position: string | null } => {
+    const data = getPrizeDataForPlayer(processedPrizeMap, playerName);
+    if (data) return { prizeMoney: data.winnings, position: data.positionDisplay || null };
+    return { prizeMoney: 0, position: null };
+  };
 
   // Get player costs from tournament_players
   const { data: tournamentPlayers } = await supabase
@@ -256,7 +264,7 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
       // Convert to array and sort by selection count
       playerStats = Array.from(playerCounts.entries())
         .map(([playerName, selectionCount]) => {
-          const liveData = playerLiveDataMap.get(playerName) || { prizeMoney: 0, position: null };
+          const liveData = getLiveDataForPlayer(playerName);
           return {
             playerName,
             selectionCount,
