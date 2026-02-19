@@ -70,7 +70,7 @@ export async function PUT(
   // Snapshot current roster to version history (for post-tournament "woulda coulda" email)
   const { data: currentPlayers } = await supabase
     .from('roster_players')
-    .select('tournament_player_id')
+    .select('tournament_player_id, player_cost')
     .eq('roster_id', rosterId);
 
   if (currentPlayers && currentPlayers.length > 0) {
@@ -91,6 +91,7 @@ export async function PUT(
         currentPlayers.map((p) => ({
           roster_version_id: version.id,
           tournament_player_id: p.tournament_player_id,
+          player_cost: p.player_cost ?? undefined,
         }))
       );
     }
