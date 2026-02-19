@@ -102,6 +102,7 @@ export function LiveTeamStandings({
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [expandedRosterIds, setExpandedRosterIds] = useState<Set<string>>(new Set());
+  const [selectedPlayerNames, setSelectedPlayerNames] = useState<Set<string>>(new Set());
   const hasInitialLoaded = useRef(false);
   const hasSetDefaultUserExpand = useRef(false);
 
@@ -263,6 +264,63 @@ export function LiveTeamStandings({
       return 0;
     });
   }, [rosters, findLiveScore, prizeDataByPlayer, isCompleted]);
+
+  // Map: normalized player name -> roster IDs that have that player
+  const playerNameToRosterIds = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const roster of rostersWithLiveWinnings) {
+      if (roster.noLineup) continue;
+      for (const p of roster.playersWithScores) {
+        const key = normalizeName(p.playerName);
+        if (!map.has(key)) map.set(key, new Set());
+        map.get(key)!.add(roster.id);
+      }
+    }
+    return map;
+  }, [rostersWithLiveWinnings]);
+
+  // When user clicks a player name: toggle selection and expand/collapse rosters accordingly
+  const handlePlayerNameClick = useCallback(
+    (e: React.MouseEvent, playerName: string) => {
+      e.stopPropagation();
+      const key = normalizeName(playerName);
+      setSelectedPlayerNames((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
+        // Compute which roster IDs to expand: intersection of roster sets for each selected player
+        if (next.size === 0) {
+          setExpandedRosterIds(new Set());
+          return next;
+        }
+        const sets = Array.from(next)
+          .map((n) => playerNameToRosterIds.get(n))
+          .filter(Boolean) as Set<string>[];
+        if (sets.length === 0) {
+          setExpandedRosterIds(new Set());
+          return next;
+        }
+        const intersection = sets.reduce((acc, s) => {
+          const result = new Set<string>();
+          for (const id of acc) {
+            if (s.has(id)) result.add(id);
+          }
+          return result;
+        });
+        setExpandedRosterIds(intersection);
+        return next;
+      });
+    },
+    [playerNameToRosterIds]
+  );
+
+  const clearPlayerFilter = useCallback(() => {
+    setSelectedPlayerNames(new Set());
+    setExpandedRosterIds(new Set());
+  }, []);
 
   // Fetch rosters from database
   const fetchRosters = useCallback(async () => {
@@ -507,8 +565,26 @@ export function LiveTeamStandings({
         </div>
       </div>
 
-      {/* Expand/Collapse Toggle */}
-      <div className="flex justify-end mb-3">
+      {/* Expand/Collapse + Player Filter */}
+      <div className="flex flex-wrap items-center justify-end gap-2 mb-3">
+        {selectedPlayerNames.size > 0 && (
+          <button
+            onClick={clearPlayerFilter}
+            className="text-xs px-3 py-1 bg-casino-gold/20 text-casino-gold hover:bg-casino-gold/30 border border-casino-gold/40 rounded transition-colors"
+          >
+            Clear filter
+            <span className="ml-1">
+              ({Array.from(selectedPlayerNames)
+                .map((n) => {
+                  const roster = rostersWithLiveWinnings.find((r) =>
+                    r.playersWithScores.some((p) => normalizeName(p.playerName) === n)
+                  );
+                  return roster?.playersWithScores.find((p) => normalizeName(p.playerName) === n)?.playerName ?? n;
+                })
+                .join(', ')})
+            </span>
+          </button>
+        )}
         <button
           onClick={expandedRosterIds.size === rosters.length ? collapseAll : expandAll}
           className="text-xs px-3 py-1 bg-casino-card hover:bg-casino-elevated text-casino-gray hover:text-casino-text border border-casino-gold/20 rounded transition-colors"
@@ -633,7 +709,13 @@ export function LiveTeamStandings({
                         {/* Rank + Team columns merged for golfer rows */}
                         <td colSpan={2} className="px-px sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text">
                           <span className="block border-l-2 border-casino-gold/20 truncate pl-1 sm:pl-2">
-                            {isMobile ? formatShortName(player.playerName) : player.playerName}
+                            <button
+                              type="button"
+                              onClick={(e) => handlePlayerNameClick(e, player.playerName)}
+                              className={`text-left hover:underline focus:outline-none focus:ring-1 focus:ring-casino-gold rounded px-0.5 -mx-0.5 ${selectedPlayerNames.has(normalizeName(player.playerName)) ? 'text-casino-gold font-semibold ring-1 ring-casino-gold/50 rounded' : ''}`}
+                            >
+                              {isMobile ? formatShortName(player.playerName) : player.playerName}
+                            </button>
                             {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
                             {player.cost !== undefined && player.cost !== null && (
                               <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
