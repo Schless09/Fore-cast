@@ -758,7 +758,7 @@ export function LiveTeamStandings({
                             {!player.hasTeedOff && player.liveScore ? (
                               <span className="text-casino-gray-dark">—</span>
                             ) : (
-                              <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
+                              <span className={player.winnings > 0 ? 'text-casino-text' : 'text-casino-gray-dark'}>
                                 {formatCurrency(player.winnings)}
                               </span>
                             )}
@@ -769,7 +769,7 @@ export function LiveTeamStandings({
                               {!player.hasTeedOff && player.liveScore ? (
                                 <span className="text-casino-gray-dark">—</span>
                               ) : (
-                                <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
+                                <span className={player.winnings > 0 ? 'text-casino-text' : 'text-casino-gray-dark'}>
                                   {formatCurrency(player.winnings)}
                                 </span>
                               )}
