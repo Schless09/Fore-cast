@@ -26,28 +26,22 @@ interface SuspendedStatusBannerProps {
 export function SuspendedStatusBanner({ isSuspended, statusDetail }: SuspendedStatusBannerProps) {
   const [tweets, setTweets] = useState<TweetItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSuspended) {
       setTweets([]);
-      setError(null);
       return;
     }
 
     const doFetch = (isInitial = false) => {
       if (isInitial) setLoading(true);
-      setError(null);
       fetch('/api/tournament-status/pga-comms?limit=3')
         .then((res) => res.json())
         .then((data: ApiResponse) => {
           setTweets(data.items || []);
-          if (data.message && !data.items?.length) {
-            setError(data.message);
-          }
         })
         .catch(() => {
-          setError('Could not load updates.');
+          setTweets([]);
         })
         .finally(() => {
           if (isInitial) setLoading(false);
@@ -89,16 +83,15 @@ export function SuspendedStatusBanner({ isSuspended, statusDetail }: SuspendedSt
           {loading && (
             <p className="mt-2 text-xs text-casino-gray">Loading updates…</p>
           )}
-          {error && !tweets.length && (
+          {!loading && tweets.length === 0 && (
             <p className="mt-2 text-xs text-casino-gray">
-              {error}{' '}
               <a
                 href="https://x.com/PGATOURComms"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-casino-gold hover:underline"
               >
-                View on X →
+                For live updates, check @PGATOURComms on X →
               </a>
             </p>
           )}
@@ -110,7 +103,10 @@ export function SuspendedStatusBanner({ isSuspended, statusDetail }: SuspendedSt
                       try {
                         const d = new Date(t.pubDate);
                         if (!Number.isNaN(d.getTime())) {
-                          return formatDistanceToNow(d, { addSuffix: true });
+                          const year = d.getFullYear();
+                          if (year >= 2020 && year <= new Date().getFullYear() + 1) {
+                            return formatDistanceToNow(d, { addSuffix: true });
+                          }
                         }
                       } catch {
                         /* ignore */
