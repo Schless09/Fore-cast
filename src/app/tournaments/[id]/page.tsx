@@ -113,7 +113,10 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   }
 
   // Run remaining queries in parallel for faster page load
-  const [allTournamentsResult, existingRosterResult, coMemberRosterResult, teeTimeResult] = await Promise.all([
+  const cacheKeyRapidAPI = tournament.rapidapi_tourn_id && tournament.start_date
+    ? `${new Date(tournament.start_date as string).getFullYear()}-${tournament.rapidapi_tourn_id}`
+    : null;
+  const [allTournamentsResult, existingRosterResult, coMemberRosterResult, teeTimeResult, espnCacheResult, liveScoresCacheResult] = await Promise.all([
     // Get all tournaments for selector
     supabase
       .from('tournaments')
@@ -162,6 +165,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       .select('tee_time_r1, tee_time_r2, tee_time_r3, tee_time_r4, starting_tee_r1, starting_tee_r2, pga_players(name)')
       .eq('tournament_id', id)
       .limit(200),
+    // ESPN cache has live current_round (updated every 2 min) — reflects actual play status (e.g. R1 suspended)
+    tournament.espn_event_id
+      ? supabase.from('espn_cache').select('current_round').eq('cache_key', `espn-${tournament.espn_event_id}`).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    // RapidAPI cache when no ESPN
+    cacheKeyRapidAPI && !tournament.espn_event_id
+      ? supabase.from('live_scores_cache').select('current_round').eq('cache_key', cacheKeyRapidAPI).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const allTournaments = allTournamentsResult.data;
@@ -169,6 +180,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   const existingRoster = existingRosterResult.data || coMemberRosterResult.data;
   const isViewingCoMemberRoster = !existingRosterResult.data && !!coMemberRosterResult.data;
   const teeTimeData = teeTimeResult.data;
+  const espnCache = espnCacheResult.data;
+  const liveScoresCache = liveScoresCacheResult.data;
 
   const tournamentIncluded = await isTournamentIncludedInLeague(
     supabase,
@@ -284,13 +297,15 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     }
   }
 
-  // Calculate display round - switch to next round 5 hours before first tee time of that round
-  // R2/R3/R4 tee times are time-of-day only; use round date (start_date + 1/2/3 days) so we don't advance on Thursday when R2 is Friday
-  const rawRound = tournament.current_round as unknown;
+  // Calculate display round — prefer live cache (ESPN or RapidAPI) over tournament record; cache reflects actual play status (e.g. R1 suspended = round 1)
+  // When cache has round, do NOT advance based on tee times — that would show R2 on Friday even when R1 was suspended
+  const roundSource = espnCache?.current_round ?? liveScoresCache?.current_round ?? tournament.current_round;
+  const rawRound = roundSource as unknown;
   let displayRound = typeof rawRound === 'object' && rawRound !== null && '$numberInt' in rawRound
     ? parseInt((rawRound as { $numberInt: string }).$numberInt, 10) 
     : (typeof rawRound === 'number' ? rawRound : 1);
-  if (teeTimeData && teeTimeData.length > 0 && displayRound < 4) {
+  const hasLiveRound = espnCache?.current_round != null || liveScoresCache?.current_round != null;
+  if (!hasLiveRound && teeTimeData && teeTimeData.length > 0 && displayRound < 4) {
     const parseTime = (timeStr: string): number => {
       const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (!match) return 9999;

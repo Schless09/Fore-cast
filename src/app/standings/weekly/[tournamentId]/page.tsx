@@ -79,7 +79,10 @@ export default async function WeeklyStandingsByTournamentPage({
   }
 
   // Run remaining queries in parallel for faster page load (skip rosters if tournament not in league)
-  const [prizeDistributionsResult, rostersResult, allTournamentsResult, teeTimeResult, leagueProfilesResult, espnCacheResult] = await Promise.all([
+  const cacheKeyRapidAPI = tournament.rapidapi_tourn_id && tournament.start_date
+    ? `${new Date(tournament.start_date as string).getFullYear()}-${tournament.rapidapi_tourn_id}`
+    : null;
+  const [prizeDistributionsResult, rostersResult, allTournamentsResult, teeTimeResult, leagueProfilesResult, espnCacheResult, liveScoresCacheResult] = await Promise.all([
     // Get prize distributions for live calculations
     supabase
       .from('prize_money_distributions')
@@ -126,6 +129,10 @@ export default async function WeeklyStandingsByTournamentPage({
     tournament.espn_event_id
       ? supabase.from('espn_cache').select('current_round').eq('cache_key', `espn-${tournament.espn_event_id}`).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    // RapidAPI cache when no ESPN — used for display round
+    cacheKeyRapidAPI && !tournament.espn_event_id
+      ? supabase.from('live_scores_cache').select('current_round').eq('cache_key', cacheKeyRapidAPI).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const prizeDistributions = prizeDistributionsResult.data;
@@ -134,6 +141,7 @@ export default async function WeeklyStandingsByTournamentPage({
   const teeTimeData = teeTimeResult.data;
   const leagueProfiles = leagueProfilesResult.data ?? [];
   const espnCache = espnCacheResult.data;
+  const liveScoresCache = liveScoresCacheResult.data;
 
   // For upcoming tournaments: all league members with "Picks In" / "Not Submitted Yet" and roster when set
   const rosterUserIds = new Set((rosters ?? []).map((r: { user_id: string }) => r.user_id));
@@ -159,15 +167,16 @@ export default async function WeeklyStandingsByTournamentPage({
     console.error('Error loading rosters:', rostersResult.error);
   }
 
-  // Calculate display round — prefer ESPN cache (live, every 2 min) over tournament record (may be stale)
-  // Handle MongoDB extended JSON format {$numberInt: "1"} that may come from RapidAPI
-  const roundSource = espnCache?.current_round ?? tournament.current_round;
+  // Calculate display round — prefer live cache (ESPN or RapidAPI) over tournament record; cache reflects actual play status (e.g. R1 suspended = round 1)
+  // When cache has round, do NOT advance based on tee times — that would show R2 on Friday even when R1 was suspended
+  const roundSource = espnCache?.current_round ?? liveScoresCache?.current_round ?? tournament.current_round;
   const rawRound = roundSource as unknown;
   let displayRound = typeof rawRound === 'object' && rawRound !== null && '$numberInt' in rawRound
     ? parseInt((rawRound as { $numberInt: string }).$numberInt, 10) 
     : (typeof rawRound === 'number' ? rawRound : 1);
+  const hasLiveRound = espnCache?.current_round != null || liveScoresCache?.current_round != null;
   let earliestR1TeeTime: string | null = null;
-  if (teeTimeData && teeTimeData.length > 0 && displayRound < 4) {
+  if (!hasLiveRound && teeTimeData && teeTimeData.length > 0 && displayRound < 4) {
     const parseTime = (timeStr: string): number => {
       const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (!match) return 9999;
