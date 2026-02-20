@@ -1,58 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-
-interface TweetItem {
-  title: string;
-  link: string;
-  description: string;
-  pubDate: string;
-}
-
-interface ApiResponse {
-  items: TweetItem[];
-  account?: string;
-  message?: string;
-}
-
 interface SuspendedStatusBannerProps {
-  /** When true, fetches and shows PGA TOUR Comms tweets */
+  /** When true, shows the suspended banner with link to @PGATOURComms */
   isSuspended: boolean;
   /** Optional status detail from ESPN (e.g. "Round 1 - Suspended") */
   statusDetail?: string | null;
 }
 
 export function SuspendedStatusBanner({ isSuspended, statusDetail }: SuspendedStatusBannerProps) {
-  const [tweets, setTweets] = useState<TweetItem[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isSuspended) {
-      setTweets([]);
-      return;
-    }
-
-    const doFetch = (isInitial = false) => {
-      if (isInitial) setLoading(true);
-      fetch('/api/tournament-status/pga-comms?limit=3')
-        .then((res) => res.json())
-        .then((data: ApiResponse) => {
-          setTweets(data.items || []);
-        })
-        .catch(() => {
-          setTweets([]);
-        })
-        .finally(() => {
-          if (isInitial) setLoading(false);
-        });
-    };
-
-    doFetch(true);
-    const interval = setInterval(() => doFetch(false), 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [isSuspended]);
-
   if (!isSuspended) return null;
 
   return (
@@ -68,72 +23,16 @@ export function SuspendedStatusBanner({ isSuspended, statusDetail }: SuspendedSt
               <span className="ml-1 font-normal text-yellow-300/90">— {statusDetail}</span>
             )}
           </p>
-          <p className="mt-1 text-xs text-casino-gray">
-            Latest from{' '}
+          <p className="mt-2 text-xs text-casino-gray">
             <a
               href="https://x.com/PGATOURComms"
               target="_blank"
               rel="noopener noreferrer"
               className="text-casino-gold hover:underline"
             >
-              @PGATOURComms
+              Latest from @PGATOURComms on X →
             </a>
-            :
           </p>
-          {loading && (
-            <p className="mt-2 text-xs text-casino-gray">Loading updates…</p>
-          )}
-          {!loading && tweets.length === 0 && (
-            <p className="mt-2 text-xs text-casino-gray">
-              <a
-                href="https://x.com/PGATOURComms"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-casino-gold hover:underline"
-              >
-                For live updates, check @PGATOURComms on X →
-              </a>
-            </p>
-          )}
-          {tweets.length > 0 && (
-            <ul className="mt-2 space-y-2">
-              {tweets.map((t, i) => {
-                const timeAgo = t.pubDate
-                  ? (() => {
-                      try {
-                        const d = new Date(t.pubDate);
-                        if (!Number.isNaN(d.getTime())) {
-                          const year = d.getFullYear();
-                          if (year >= 2020 && year <= new Date().getFullYear() + 1) {
-                            return formatDistanceToNow(d, { addSuffix: true });
-                          }
-                        }
-                      } catch {
-                        /* ignore */
-                      }
-                      return null;
-                    })()
-                  : null;
-                return (
-                  <li key={i} className="text-xs">
-                    <a
-                      href={t.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-casino-text hover:text-casino-gold hover:underline line-clamp-2"
-                    >
-                      {t.title || t.description}
-                    </a>
-                    {timeAgo && (
-                      <span className="block mt-0.5 text-casino-gray-dark text-[11px]" title={t.pubDate}>
-                        {timeAgo}
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
         </div>
       </div>
     </div>

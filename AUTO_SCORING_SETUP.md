@@ -16,12 +16,7 @@ See **[PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md)** for full context.
 
 ## Suspended play & PGA TOUR Comms
 
-When ESPN reports `STATUS_SUSPENDED` (e.g. rain delay), the live leaderboard shows a banner with recent tweets from [@PGATOURComms](https://x.com/PGATOURComms). Tweets are fetched via Nitter RSS (public instances often block server requests).
-
-- **Optional**: `NITTER_BASE_URL` — Prefer a specific Nitter instance (e.g. your own instance).
-- **Optional**: `RSSHUB_BASE_URL` — If you self-host [RSSHub](https://github.com/DIYgod/RSSHub) with Twitter configured, set the base URL (e.g. `https://rsshub.yourdomain.com`) to use it as a fallback for @PGATOURComms.
-
-If all sources fail, the banner shows a clean link to @PGATOURComms on X (no error message).
+When ESPN reports `STATUS_SUSPENDED` (e.g. rain delay), the live leaderboard shows a banner with a link to [@PGATOURComms](https://x.com/PGATOURComms) on X for live updates.
 
 ## Required environment variables
 

@@ -19,7 +19,7 @@ Tap the **Today** column cell for any golfer to open their **scorecard**:
 - Current round and all completed rounds
 
 ### Suspended Play Updates
-When play is suspended (rain, darkness, etc.), a banner appears with recent updates from **@PGATOURComms** so you stay in the loop without leaving the app.
+When play is suspended (rain, darkness, etc.), a banner appears with a link to **@PGATOURComms** on X for live updates.
 
 ### Real-Time Refresh
 Scores auto-update every 2 minutes. A countdown shows when the next refresh runs; you can also hit **Refresh** for an immediate update.
