@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import Image from 'next/image';
 import { PGAPlayer } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 
@@ -267,13 +268,30 @@ export function PlayerDetailsModal({
         {/* Header */}
         <div className="bg-gradient-to-r from-casino-dark to-casino-elevated px-5 py-4 border-b border-casino-gold/20">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-casino-text">{player.name}</h2>
-              <div className="flex items-center gap-3 mt-1">
-                {player.country && (
-                  <span className="text-sm text-casino-gray">{player.country}</span>
-                )}
-                <span className="text-lg font-bold text-casino-green">${cost.toFixed(2)}</span>
+            <div className="flex items-center gap-4">
+              {player.image_url ? (
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden shrink-0 border-2 border-casino-gold/40 bg-casino-elevated">
+                  <Image
+                    src={player.image_url}
+                    alt={player.name}
+                    width={80}
+                    height={80}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full shrink-0 border-2 border-casino-gold/40 bg-casino-elevated flex items-center justify-center text-casino-gold text-2xl font-bold">
+                  {(player.name || '?').charAt(0)}
+                </div>
+              )}
+              <div>
+                <h2 className="text-xl font-bold text-casino-text">{player.name}</h2>
+                <div className="flex items-center gap-3 mt-1">
+                  {player.country && (
+                    <span className="text-sm text-casino-gray">{player.country}</span>
+                  )}
+                  <span className="text-lg font-bold text-casino-green">${cost.toFixed(2)}</span>
+                </div>
               </div>
             </div>
             <button

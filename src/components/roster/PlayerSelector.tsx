@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { TournamentPlayer, PGAPlayer } from '@/lib/types';
 import { PlayerDetailsModal } from './PlayerDetailsModal';
 
@@ -170,6 +171,21 @@ export function PlayerSelector({
                               <div className="text-xs text-casino-gray w-5 text-right shrink-0">
                                 {rank}
                               </div>
+                              {pgaPlayer.image_url ? (
+                                <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-casino-elevated border border-casino-gold/20">
+                                  <Image
+                                    src={pgaPlayer.image_url}
+                                    alt={pgaPlayer.name}
+                                    width={32}
+                                    height={32}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-8 h-8 rounded-full shrink-0 bg-casino-elevated border border-casino-gold/20 flex items-center justify-center text-casino-gray text-xs font-medium">
+                                  {(pgaPlayer.name || '?').charAt(0)}
+                                </div>
+                              )}
                               <div className="flex-1 min-w-0 flex items-center gap-1.5">
                                 <span className="truncate font-medium text-casino-text">
                                   {pgaPlayer.name}

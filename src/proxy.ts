@@ -15,13 +15,24 @@ const isProtectedRoute = createRouteMatcher([
 const ADMIN_UNLOCK_COOKIE = 'admin_unlocked';
 
 export default clerkMiddleware(async (auth, req) => {
+  const pathname = req.nextUrl.pathname;
+
+  // Allow cron-style auth for sync-player-headshots (Bearer CRON_SECRET or dev) — no sign-in or admin cookie
+  if (pathname === '/api/admin/sync-player-headshots') {
+    const authHeader = req.headers.get('authorization');
+    const cronSecret = process.env.CRON_SECRET;
+    const isDev = process.env.NODE_ENV === 'development';
+    if (isDev || (cronSecret && authHeader === `Bearer ${cronSecret}`)) {
+      return NextResponse.next();
+    }
+  }
+
   if (isProtectedRoute(req)) {
     await auth.protect();
   }
 
   // Require admin code cookie for /admin and /api/admin (except unlock page and unlock API)
   // Also protect sensitive score endpoints that modify data
-  const pathname = req.nextUrl.pathname;
   const isUnlockPage = pathname === '/admin/unlock';
   const isUnlockApi = pathname === '/api/admin/unlock';
   

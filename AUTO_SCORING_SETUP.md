@@ -84,4 +84,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/scores/es
 
 # RapidAPI full run (activation + tee times + leaderboard + wrap-up)
 curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/scores/auto-sync?force=true"
+
+# Mass-save player headshots to pga_players from ESPN cache (run ESPN sync first; dev: no auth needed)
+# curl -X POST http://localhost:3000/api/admin/sync-player-headshots
 ```

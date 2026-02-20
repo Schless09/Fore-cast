@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import Image from 'next/image';
 import { formatScore, getScoreColor } from '@/lib/utils';
 
 interface Hole {
@@ -114,6 +115,7 @@ export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId,
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
+  const [headshotUrl, setHeadshotUrl] = useState<string | null>(null);
 
   // Use provided year or default to current year (RapidAPI only)
   const tournamentYear = year || new Date().getFullYear().toString();
@@ -163,6 +165,33 @@ export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId,
       fetchScorecard();
     }
   }, [isOpen, playerId, fetchScorecard]);
+
+  // Fetch player headshot when modal opens (ESPN source only). Prefer our DB (fast) then ESPN API.
+  useEffect(() => {
+    if (!isOpen || source !== 'espn' || !playerId) {
+      setHeadshotUrl(null);
+      return;
+    }
+    let cancelled = false;
+    // 1) Try our DB first — one quick lookup, image loads from CDN
+    fetch(`/api/scores/player-image?espnPlayerId=${encodeURIComponent(playerId)}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { image_url?: string | null } | null) => {
+        if (cancelled) return;
+        if (data?.image_url) {
+          setHeadshotUrl(data.image_url);
+          return;
+        }
+        // 2) Not in DB — fetch from ESPN, then we save to DB for next time
+        return fetch(`/api/scores/espn-athlete?playerId=${encodeURIComponent(playerId)}`)
+          .then((r) => r.ok ? r.json() : null)
+          .then((athlete: { headshot?: { href: string } } | null) => {
+            if (!cancelled && athlete?.headshot?.href) setHeadshotUrl(athlete.headshot.href);
+          });
+      })
+      .catch(() => { /* ignore */ });
+    return () => { cancelled = true; };
+  }, [isOpen, source, playerId]);
 
   // Close on escape key and lock body scroll
   useEffect(() => {
@@ -232,13 +261,25 @@ export function ScorecardModal({ isOpen, onClose, playerId, playerName, eventId,
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-casino-gold/20">
-          <div>
-            <h2 className="text-lg font-bold text-casino-gold">{playerName}</h2>
-            {scorecard && (
-              <p className="text-xs text-casino-gray">
-                Total: <span className={getScoreColor(parseScoreString(scorecard.totalScore))}>{scorecard.totalScore}</span>
-              </p>
+          <div className="flex items-center gap-3">
+            {headshotUrl && (
+              <Image
+                src={headshotUrl}
+                alt={playerName}
+                width={64}
+                height={64}
+                sizes="(max-width: 640px) 56px, 64px"
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-casino-gold/40 bg-casino-elevated"
+              />
             )}
+            <div>
+              <h2 className="text-lg font-bold text-casino-gold">{playerName}</h2>
+              {scorecard && (
+                <p className="text-xs text-casino-gray">
+                  Total: <span className={getScoreColor(parseScoreString(scorecard.totalScore))}>{scorecard.totalScore}</span>
+                </p>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
