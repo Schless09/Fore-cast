@@ -295,12 +295,12 @@ export function LivePersonalLeaderboard({
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
-          <div className="flex-1">
-            <CardTitle className="text-lg sm:text-xl text-casino-text">{rosterName}</CardTitle>
-            <p className="text-xs sm:text-sm text-casino-gray mt-1">{tournamentName}</p>
+        <div className="flex flex-row items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-lg sm:text-xl text-casino-text truncate">{rosterName}</CardTitle>
+            <p className="text-xs sm:text-sm text-casino-gray mt-1 truncate">{tournamentName}</p>
           </div>
-          <div className="text-left sm:text-right">
+          <div className="shrink-0 text-right">
             <p className="text-xs sm:text-sm text-casino-gray">Total Winnings</p>
             <p className="text-2xl sm:text-3xl font-bold text-casino-green">
               {formatCurrency(totalWinnings)}
