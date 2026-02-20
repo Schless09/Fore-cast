@@ -12,6 +12,7 @@ import {
 } from '@/lib/live-scores-prizes';
 import { formatTeeTimeDisplay } from '@/lib/timezone';
 import { formatShortName } from '@/lib/utils';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 interface LiveScore {
   player: string;
@@ -103,6 +104,7 @@ export function LivePersonalLeaderboard({
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
   const [syncError, setSyncError] = useState<string | null>(null);
   const hasInitialLoaded = useRef(false);
+  const isMobile = useMediaQuery('(max-width: 639px)');
 
   // Prize distribution map
   const prizeMap = useMemo(
@@ -327,22 +329,32 @@ export function LivePersonalLeaderboard({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className={`w-full text-sm ${isMobile ? 'table-fixed' : ''}`}>
+            {isMobile && (
+              <colgroup>
+                <col style={{ width: '30px' }} />
+                <col />
+                <col style={{ width: '42px' }} />
+                <col style={{ width: '42px' }} />
+                <col style={{ width: '42px' }} />
+                <col style={{ width: '82px' }} />
+              </colgroup>
+            )}
             <thead>
-              <tr className="border-b border-casino-gold/30">
-                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-10 sm:w-12">Pos</th>
-                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase w-12 sm:w-16">Total</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase w-12 sm:w-16">Today</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase min-w-16 sm:min-w-18">Thru</th>
-                <th className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase min-w-18 sm:w-20">Prize</th>
+              <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
+                <th className="px-0.5 sm:px-3 py-2">Pos</th>
+                <th className="px-0.5 sm:px-3 py-2">Golfer</th>
+                <th className="px-0.5 sm:px-4 py-2 text-center">Total</th>
+                <th className="px-0.5 sm:px-4 py-2 text-center">Today</th>
+                <th className="px-0.5 sm:px-4 py-2 text-center">Thru</th>
+                <th className="px-0.5 sm:px-4 py-2 text-right">Prize</th>
               </tr>
             </thead>
             <tbody>
               {playersWithLiveData.length > 0 ? (
                 playersWithLiveData.map((player, index) => (
                   <tr key={index} className="border-b border-casino-gold/10 hover:bg-casino-elevated transition-colors">
-                    <td className="px-1 sm:px-3 py-2 whitespace-nowrap">
+                    <td className="px-0.5 sm:px-3 py-2 font-medium text-casino-text text-xs sm:text-sm whitespace-nowrap">
                       {player.positionDisplay ? (
                         <span className={`font-medium ${
                           player.positionDisplay === '1' || player.positionDisplay === 'T1' ? 'text-casino-gold' :
@@ -355,41 +367,42 @@ export function LivePersonalLeaderboard({
                         <span className="text-casino-gray-dark">{player.liveScore ? '' : '-'}</span>
                       )}
                     </td>
-                    <td className="px-1 sm:px-3 py-2 text-casino-text">
-                      <span className="sm:hidden">{formatShortName(player.playerName)}</span>
-                      <span className="hidden sm:inline">{player.playerName}</span>
-                      {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
+                    <td className="px-0.5 sm:px-3 py-2 text-xs sm:text-sm text-casino-text">
+                      <span className="truncate block">
+                        {isMobile ? formatShortName(player.playerName) : player.playerName}
+                        {player.isAmateur && <span className="text-casino-gray font-normal ml-1">(a)</span>}
+                      </span>
                     </td>
-                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
+                    <td className={`px-0.5 sm:px-4 py-2 font-semibold text-xs sm:text-sm whitespace-nowrap text-center ${
+                      player.liveScore
+                        ? parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
+                          parseScore(player.liveScore.total) > 0 ? 'text-casino-red' : 'text-casino-gray'
+                        : ''
+                    }`}>
                       {player.liveScore ? (
-                        <span className={
-                          parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
-                          parseScore(player.liveScore.total) > 0 ? 'text-casino-red' :
-                          'text-casino-gray'
-                        }>
-                          {player.liveScore.total}
-                        </span>
+                        player.liveScore.total
                       ) : (
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
+                    <td className={`px-0.5 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap text-center ${
+                      !player.liveScore?.roundComplete && (!player.liveScore?.thru || player.liveScore?.thru === '-' || player.liveScore?.thru === '0')
+                        ? 'text-casino-gray-dark'
+                        : player.liveScore
+                          ? parseScore(player.liveScore.currentRoundScore) < 0 ? 'text-casino-green' :
+                            parseScore(player.liveScore.currentRoundScore) > 0 ? 'text-casino-red' : 'text-casino-gray'
+                          : 'text-casino-gray-dark'
+                    }`}>
                       {/* If player hasn't started current round, show dash */}
                       {!player.liveScore?.roundComplete && (!player.liveScore?.thru || player.liveScore?.thru === '-' || player.liveScore?.thru === '0') ? (
-                        <span className="text-casino-gray-dark">-</span>
+                        <span>-</span>
                       ) : player.liveScore ? (
-                        <span className={
-                          parseScore(player.liveScore.currentRoundScore) < 0 ? 'text-casino-green' :
-                          parseScore(player.liveScore.currentRoundScore) > 0 ? 'text-casino-red' :
-                          'text-casino-gray'
-                        }>
-                          {player.liveScore.currentRoundScore}
-                        </span>
+                        player.liveScore.currentRoundScore
                       ) : (
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
+                    <td className="px-0.5 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap text-center">
                       {(() => {
                         // Helper to get tee time for current display round
                         const getTeeTimeForRound = () => {
@@ -419,11 +432,11 @@ export function LivePersonalLeaderboard({
                         return <span className="text-casino-gray-dark">-</span>;
                       })()}
                     </td>
-                    <td className="px-2 sm:px-4 py-2 text-right whitespace-nowrap">
+                    <td className="px-0.5 sm:px-4 py-2 text-right text-xs sm:text-sm whitespace-nowrap tabular-nums">
                       {!player.hasTeedOff && player.liveScore ? (
                         <span className="text-casino-gray-dark">—</span>
                       ) : (
-                        <span className={player.winnings > 0 ? 'text-casino-green font-semibold' : 'text-casino-gray-dark'}>
+                        <span className={player.winnings > 0 ? 'text-casino-gold' : 'text-casino-gray-dark'}>
                           {formatCurrency(player.winnings)}
                         </span>
                       )}
