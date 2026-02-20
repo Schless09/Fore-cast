@@ -11,6 +11,7 @@ import {
   firstNamesMatchForLiveScores,
 } from '@/lib/live-scores-prizes';
 import { formatTeeTimeDisplay } from '@/lib/timezone';
+import { formatShortName } from '@/lib/utils';
 
 interface LiveScore {
   player: string;
@@ -45,6 +46,18 @@ interface LivePersonalLeaderboardProps {
     amount: number;
   }>;
   displayRound?: number;
+}
+
+// Type for roster_players query result (Supabase join)
+interface RosterPlayerRow {
+  tournament_player: {
+    pga_player_id?: string;
+    tee_time_r1?: string | null;
+    tee_time_r2?: string | null;
+    tee_time_r3?: string | null;
+    tee_time_r4?: string | null;
+    pga_players?: { name?: string } | null;
+  } | null;
 }
 
 // Helper to parse scores
@@ -210,7 +223,8 @@ export function LivePersonalLeaderboard({
       return;
     }
 
-    const players: RosterPlayer[] = (data || []).map((rp: any) => ({
+    const rows = (data || []) as unknown as RosterPlayerRow[];
+    const players: RosterPlayer[] = rows.map((rp) => ({
       playerName: rp.tournament_player?.pga_players?.name || 'Unknown',
       teeTimeR1: rp.tournament_player?.tee_time_r1,
       teeTimeR2: rp.tournament_player?.tee_time_r2,
@@ -316,9 +330,8 @@ export function LivePersonalLeaderboard({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-casino-gold/30">
-                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-6 sm:w-8">#</th>
+                <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-10 sm:w-12">Pos</th>
                 <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase w-10 sm:w-12">Pos</th>
                 <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase w-12 sm:w-16">Total</th>
                 <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase hidden sm:table-cell w-12 sm:w-16">Today</th>
                 <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase min-w-16 sm:min-w-18">Thru</th>
@@ -329,12 +342,7 @@ export function LivePersonalLeaderboard({
               {playersWithLiveData.length > 0 ? (
                 playersWithLiveData.map((player, index) => (
                   <tr key={index} className="border-b border-casino-gold/10 hover:bg-casino-elevated transition-colors">
-                    <td className="px-1 sm:px-3 py-2 text-casino-gray">{index + 1}</td>
-                    <td className="px-1 sm:px-3 py-2 text-casino-text">
-                      {player.playerName}
-                      {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
-                    </td>
-                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
+                    <td className="px-1 sm:px-3 py-2 whitespace-nowrap">
                       {player.positionDisplay ? (
                         <span className={`font-medium ${
                           player.positionDisplay === '1' || player.positionDisplay === 'T1' ? 'text-casino-gold' :
@@ -346,6 +354,11 @@ export function LivePersonalLeaderboard({
                       ) : (
                         <span className="text-casino-gray-dark">{player.liveScore ? '' : '-'}</span>
                       )}
+                    </td>
+                    <td className="px-1 sm:px-3 py-2 text-casino-text">
+                      <span className="sm:hidden">{formatShortName(player.playerName)}</span>
+                      <span className="hidden sm:inline">{player.playerName}</span>
+                      {player.isAmateur && <span className="text-casino-gray ml-1">(a)</span>}
                     </td>
                     <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
                       {player.liveScore ? (
@@ -419,7 +432,7 @@ export function LivePersonalLeaderboard({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-casino-gray">
+                  <td colSpan={6} className="px-4 py-8 text-center text-casino-gray">
                     No players in this roster yet.
                   </td>
                 </tr>
