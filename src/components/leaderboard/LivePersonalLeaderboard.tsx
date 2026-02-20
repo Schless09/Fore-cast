@@ -433,13 +433,9 @@ export function LivePersonalLeaderboard({
                       })()}
                     </td>
                     <td className="px-0.5 sm:px-4 py-2 text-right text-xs sm:text-sm whitespace-nowrap tabular-nums">
-                      {!player.hasTeedOff && player.liveScore ? (
-                        <span className="text-casino-gray-dark">—</span>
-                      ) : (
-                        <span className={player.winnings > 0 ? 'text-casino-gold' : 'text-casino-gray-dark'}>
-                          {formatCurrency(player.winnings)}
-                        </span>
-                      )}
+                      <span className={player.winnings > 0 ? 'text-casino-gold' : 'text-casino-gray-dark'}>
+                        {formatCurrency(player.winnings)}
+                      </span>
                     </td>
                   </tr>
                 ))

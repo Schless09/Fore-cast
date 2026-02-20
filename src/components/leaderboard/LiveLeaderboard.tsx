@@ -287,17 +287,15 @@ export function LiveLeaderboard({
         return Math.round(totalPrize / tieCount);
       };
 
-      // ESPN: derive position from total score; exclude players who haven't teed off
+      // Derive position from total score for ALL players; prize calculated for all
       let positionByIndex: Map<number, { position: number; tieCount: number }> | null = null;
       if (result.source === 'espn' && Array.isArray(scores) && scores.length > 0) {
-        const withScores = scores
-          .map((s: APIScorecard, i: number) => ({
-            index: i,
-            total_score: parseScore(s.total),
-            today_score: parseScore(s.currentRoundScore ?? s.total),
-            thru: s.thru ?? '-',
-          }))
-          .filter((r) => hasTeedOff(r.thru));
+        const withScores = scores.map((s: APIScorecard, i: number) => ({
+          index: i,
+          total_score: parseScore(s.total),
+          today_score: parseScore(s.currentRoundScore ?? s.total),
+          thru: s.thru ?? '-',
+        }));
         const positionResults = assignPositionsByScore(withScores);
         positionByIndex = new Map();
         for (const { item, position, tieCount } of positionResults) {
@@ -320,21 +318,21 @@ export function LiveLeaderboard({
       const transformed: LeaderboardRow[] = scores.map((scorecard: APIScorecard, idx: number) => {
         const teedOff = hasTeedOff(scorecard.thru ?? scorecard.teeTime);
         const fromScore = positionByIndex?.get(idx);
-        const position = teedOff
-          ? (fromScore
-            ? fromScore.position
-            : (scorecard.positionValue ?? (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null)))
-          : null;
+        const position = fromScore
+          ? fromScore.position
+          : (scorecard.positionValue ?? (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null));
         const tieCount = fromScore ? fromScore.tieCount : (position ? (positionCounts.get(position) || 1) : 1);
         const isTied = tieCount > 1;
         const todayScore = scorecard.currentRoundScore
           ? parseScore(scorecard.currentRoundScore)
           : parseScore(scorecard.total);
         const isAmateur = scorecard.isAmateur === true;
-        const prizeMoney = teedOff && !isAmateur ? calculateTiePrizeMoney(position, tieCount) : 0;
+        // R1: only teed-off players have prize. R2+: everyone with a position gets prize (they've played at least R1).
+        const round = currentRound ?? 1;
+        const prizeMoney = (teedOff || round >= 2) && position && !isAmateur ? calculateTiePrizeMoney(position, tieCount) : 0;
 
         return {
-          position: position ?? null,
+          position: position && position > 0 ? position : null,
           is_tied: isTied,
           tied_with_count: tieCount,
           total_score: parseScore(scorecard.total),
@@ -377,7 +375,7 @@ export function LiveLeaderboard({
       setNextRefreshIn(REFRESH_INTERVAL_MS / 1000);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveRefreshUrl, prizeDistributionMap, isCompleted]);
+  }, [liveRefreshUrl, prizeDistributionMap, isCompleted, currentRound]);
 
   // Trigger initial fetch on mount - but skip for completed tournaments
   useEffect(() => {
@@ -583,11 +581,9 @@ export function LiveLeaderboard({
             const playerCost = playerCostMap?.get(matchedMapName);
 
             const teedOff = row.hasTeedOff ?? hasTeedOff(row.thru ?? row.teeTime);
-            const pos = !teedOff
-              ? ''
-              : row.position
-                ? `${row.is_tied ? 'T' : ''}${row.position}`
-                : 'CUT';
+            const pos = row.position
+              ? `${row.is_tied ? 'T' : ''}${row.position}`
+              : 'CUT';
             const totalClass = getScoreColor(row.total_score);
             const todayClass = getScoreColor(row.today_score);
 
@@ -599,7 +595,7 @@ export function LiveLeaderboard({
             const isRound3OrLater = (currentRound || 1) >= 3;
             const isBelowProjectedCut = !isRound3OrLater && cutLine && row.position !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
             const isCut = row.position === null;
-            const showPrizeDash = !teedOff;
+            const showPrizeDash = false; // Prize calculated for all
             const prizeAmount = showPrizeDash || row.is_amateur || isCut || isBelowProjectedCut
               ? 0
               : (row.prize_money || (row.position ? prizeDistributionMap.get(row.position) : 0) || 0);

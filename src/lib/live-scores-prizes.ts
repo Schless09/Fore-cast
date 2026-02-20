@@ -1,6 +1,7 @@
 /**
  * Shared prize money logic for live leaderboard, personal leaderboard, and standings.
- * Handles: position-from-score (ESPN), tie split, exclude players who haven't teed off.
+ * Handles: position-from-score (ESPN/RapidAPI), tie split.
+ * All players get position and prize calculated from total score; hasTeedOff retained for UI (Today dash, Thru).
  */
 
 import { assignPositionsByScore } from './leaderboard-positions';
@@ -85,8 +86,8 @@ export interface ProcessedPrizeData {
 
 /**
  * Process live scores and return prize data keyed by normalized player name.
- * ESPN: derives position from total score, excludes non-teed-off from position calc.
- * RapidAPI: uses positionValue, same tie/hasTeedOff handling.
+ * All players get position (from total score) and prize calculated.
+ * hasTeedOff retained for UI (Today dash when not started, Thru tee time vs holes).
  */
 export function processLiveScoresForPrizes(
   scores: LiveScoreLike[],
@@ -104,14 +105,13 @@ export function processLiveScoresForPrizes(
   };
 
   if (source === 'espn' && scores.length > 0) {
-    const withScores = scores
-      .map((s, i) => ({
-        index: i,
-        total_score: parseScore(s.total ?? 0),
-        today_score: parseScore(s.currentRoundScore ?? s.total ?? 0),
-        thru: s.thru ?? '-',
-      }))
-      .filter((r) => hasTeedOff(r.thru));
+    // Derive position from total score for ALL players
+    const withScores = scores.map((s, i) => ({
+      index: i,
+      total_score: parseScore(s.total ?? 0),
+      today_score: parseScore(s.currentRoundScore ?? s.total ?? 0),
+      thru: s.thru ?? '-',
+    }));
     const positionResults = assignPositionsByScore(withScores);
     const positionByIndex = new Map<number, { position: number; tieCount: number }>();
     for (const { item, position, tieCount } of positionResults) {
@@ -122,13 +122,10 @@ export function processLiveScoresForPrizes(
       const key = normalizeNameForLookup(score.player);
       const teedOff = hasTeedOff(score.thru ?? score.teeTime);
       const fromScore = positionByIndex.get(idx);
-      const position = teedOff && fromScore ? fromScore.position : null;
+      const position = fromScore ? fromScore.position : null;
       const tieCount = fromScore?.tieCount ?? 1;
-      const winnings =
-        teedOff && !score.isAmateur && position
-          ? calculateTiePrize(position, tieCount)
-          : 0;
-      const positionDisplay = !teedOff ? '' : position ? (tieCount > 1 ? `T${position}` : String(position)) : '';
+      const winnings = !score.isAmateur && position ? calculateTiePrize(position, tieCount) : 0;
+      const positionDisplay = position ? (tieCount > 1 ? `T${position}` : String(position)) : '';
       result.set(key, {
         position,
         tieCount,
@@ -140,7 +137,7 @@ export function processLiveScoresForPrizes(
     return result;
   }
 
-  // RapidAPI: count by positionValue for ties
+  // RapidAPI: use positionValue; count by position for ties; all get prize
   const positionCounts = new Map<number, number>();
   scores.forEach((s) => {
     const pos = s.positionValue ?? (s.position ? parseInt(String(s.position).replace('T', '')) : null);
@@ -152,15 +149,10 @@ export function processLiveScoresForPrizes(
   scores.forEach((score) => {
     const key = normalizeNameForLookup(score.player);
     const teedOff = hasTeedOff(score.thru ?? score.teeTime);
-    const position = teedOff
-      ? (score.positionValue ?? (score.position ? parseInt(String(score.position).replace('T', '')) : null))
-      : null;
+    const position = score.positionValue ?? (score.position ? parseInt(String(score.position).replace('T', '')) : null);
     const tieCount = position ? (positionCounts.get(position) || 1) : 1;
-    const winnings =
-      teedOff && !score.isAmateur && position
-        ? calculateTiePrize(position, tieCount)
-        : 0;
-    const positionDisplay = !teedOff ? '' : position ? (tieCount > 1 ? `T${position}` : String(position)) : '';
+    const winnings = !score.isAmateur && position ? calculateTiePrize(position, tieCount) : 0;
+    const positionDisplay = position ? (tieCount > 1 ? `T${position}` : String(position)) : '';
     result.set(key, {
       position,
       tieCount,

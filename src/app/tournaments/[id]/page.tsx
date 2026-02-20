@@ -480,16 +480,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           return !Number.isNaN(n) && n > 0;
         };
 
-        // Derive position from total score; exclude players who haven't teed off
-        const withScores = scores
-          .map((player, index) => ({
-            ...player,
-            index,
-            total_score: parseScore(player.total ?? 0),
-            today_score: player.currentRoundScore ? parseScore(player.currentRoundScore) : 0,
-            thru: player.thru ?? '-',
-          }))
-          .filter((r) => hasTeedOff(r.thru));
+        // Derive position from total score for ALL players; prize for all
+        const withScores = scores.map((player, index) => ({
+          ...player,
+          index,
+          total_score: parseScore(player.total ?? 0),
+          today_score: player.currentRoundScore ? parseScore(player.currentRoundScore) : 0,
+          thru: player.thru ?? '-',
+        }));
         const positionResults = assignPositionsByScore(withScores);
         const positionByIndex = new Map<number, { position: number; tieCount: number }>();
         for (const { item, position, tieCount } of positionResults) {
@@ -504,13 +502,13 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           };
           const isTied = tieCount > 1;
           return {
-            position: teedOff && actualPosition > 0 ? actualPosition : null,
+            position: actualPosition > 0 ? actualPosition : null,
             is_tied: isTied,
             tied_with_count: tieCount,
             total_score: parseScore(player.total ?? 0),
             today_score: player.currentRoundScore ? parseScore(player.currentRoundScore) : 0,
             thru: player.thru || 'F',
-            prize_money: teedOff ? calculateTiePrizeMoney(actualPosition > 0 ? actualPosition : null, tieCount) : 0,
+            prize_money: actualPosition > 0 ? calculateTiePrizeMoney(actualPosition, tieCount) : 0,
             name: player.player || 'Unknown',
             tee_time: player.teeTime || null,
             teeTime: player.teeTime || undefined,
@@ -544,7 +542,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       if (cachedData?.data?.data && Array.isArray(cachedData.data.data) && cachedData.data.data.length > 0) {
         leaderboardSource = 'cache';
         const scores = cachedData.data.data;
-        
+        const hasTeedOffRapid = (thru: string | undefined): boolean => {
+          if (!thru || thru === '-' || thru === '' || thru === '0') return false;
+          if (thru === 'F' || thru === '18') return true;
+          if (thru.includes(':') || thru.includes('AM') || thru.includes('PM')) return false;
+          const n = parseInt(thru.replace('*', ''), 10);
+          return !Number.isNaN(n) && n > 0;
+        };
+
         // Count players at each position to detect ties
         const positionCounts = new Map<number, number>();
         scores.forEach((player: CachedLeaderboardPlayer) => {
@@ -559,6 +564,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           const actualPosition = (posNum && posNum < 900) ? posNum : null;
           const tieCount = actualPosition ? (positionCounts.get(actualPosition) || 1) : 1;
           const isTied = tieCount > 1;
+          const teedOff = hasTeedOffRapid(player.thru ?? player.teeTime);
 
           return {
             position: actualPosition,
@@ -567,14 +573,16 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             total_score: parseScore(player.total ?? 0),
             today_score: player.currentRoundScore ? parseScore(player.currentRoundScore) : 0,
             thru: player.thru || 'F',
-            prize_money: calculateTiePrizeMoney(actualPosition, tieCount),
+            prize_money: actualPosition ? calculateTiePrizeMoney(actualPosition, tieCount) : 0,
             name: player.player || 'Unknown',
             tee_time: player.teeTime || null,
+            teeTime: player.teeTime || undefined,
             starting_tee: null,
             prize_distribution: actualPosition && prizeDistributionMap.has(actualPosition)
               ? prizeDistributionMap.get(actualPosition)
               : undefined,
             apiPlayerId: player.playerId,
+            hasTeedOff: teedOff,
           };
         });
 

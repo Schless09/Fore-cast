@@ -755,24 +755,16 @@ export function LiveTeamStandings({
                         {/* Winnings */}
                         {isMobile ? (
                           <td colSpan={2} className="px-px py-1 sm:py-1.5 text-xs text-right">
-                            {!player.hasTeedOff && player.liveScore ? (
-                              <span className="text-casino-gray-dark">—</span>
-                            ) : (
-                              <span className={player.winnings > 0 ? 'text-casino-text' : 'text-casino-gray-dark'}>
-                                {formatCurrency(player.winnings)}
-                              </span>
-                            )}
+                            <span className={player.winnings > 0 ? 'text-casino-text' : 'text-casino-gray-dark'}>
+                              {formatCurrency(player.winnings)}
+                            </span>
                           </td>
                         ) : (
                           <>
                             <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-right">
-                              {!player.hasTeedOff && player.liveScore ? (
-                                <span className="text-casino-gray-dark">—</span>
-                              ) : (
-                                <span className={player.winnings > 0 ? 'text-casino-text' : 'text-casino-gray-dark'}>
-                                  {formatCurrency(player.winnings)}
-                                </span>
-                              )}
+                              <span className={player.winnings > 0 ? 'text-casino-text' : 'text-casino-gray-dark'}>
+                                {formatCurrency(player.winnings)}
+                              </span>
                             </td>
                             <td className="px-1 sm:px-4 py-1 sm:py-1.5" />
                           </>
