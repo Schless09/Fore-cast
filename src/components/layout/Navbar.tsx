@@ -164,8 +164,8 @@ export function Navbar() {
         {/* Mobile menu button */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden text-casino-gold p-2"
-          aria-label="Toggle menu"
+          className="md:hidden text-casino-gold p-2 relative"
+          aria-label={unreadCount > 0 ? `Toggle menu (${unreadCount} unread messages)` : 'Toggle menu'}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isMobileMenuOpen ? (
@@ -174,6 +174,11 @@ export function Navbar() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             )}
           </svg>
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </button>
       </div>
       

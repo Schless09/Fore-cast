@@ -38,6 +38,15 @@ export function LeagueChat({ leagueId, leagueName }: LeagueChatProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  // Mark league chat as read when user views it (updates unread badge)
+  useEffect(() => {
+    fetch('/api/chat/league-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leagueId }),
+    }).catch(() => {});
+  }, [leagueId]);
+
   // Fetch initial messages
   useEffect(() => {
     async function fetchMessages() {
