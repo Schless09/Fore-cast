@@ -1047,6 +1047,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 amount: p.amount || 0,
               }))}
               displayRound={displayRound}
+              cutLine={cutLine}
             />
             </Link>
           ) : (

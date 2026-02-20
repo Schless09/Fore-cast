@@ -67,6 +67,8 @@ interface LiveTeamStandingsProps {
   /** When provided, filter rosters by league membership (not active_league_id) so multi-league users show in each league's standings */
   leagueMemberIds?: string[];
   displayRound?: number;
+  /** In R1/R2, zero winnings for players below this cut (projected cut). */
+  cutLine?: { cutScore: string; cutCount: number } | null;
 }
 
 // Helper to parse scores
@@ -92,6 +94,7 @@ export function LiveTeamStandings({
   userLeagueId,
   leagueMemberIds,
   displayRound = 1,
+  cutLine,
 }: LiveTeamStandingsProps) {
   const isCompleted = tournamentStatus === 'completed';
   const isMobile = useMediaQuery('(max-width: 639px)');
@@ -192,16 +195,19 @@ export function LiveTeamStandings({
     return undefined;
   }, [playerScoreMap]);
 
-  // Shared prize logic: position-from-score (ESPN), tie split, exclude non-teed-off
+  // Shared prize logic: position-from-score (ESPN), tie split; in R1/R2 zero winnings below cut
   const prizeDataByPlayer = useMemo(() => {
     if (!liveScores.length) return new Map<string, { winnings: number; hasTeedOff: boolean }>();
-    const processed = processLiveScoresForPrizes(liveScores, liveSource, prizeMap);
+    const processed = processLiveScoresForPrizes(liveScores, liveSource, prizeMap, {
+      cutLine: cutLine ?? undefined,
+      currentRound: displayRound,
+    });
     const byPlayer = new Map<string, { winnings: number; hasTeedOff: boolean }>();
     processed.forEach((data, key) => {
       byPlayer.set(key, { winnings: data.winnings, hasTeedOff: data.hasTeedOff });
     });
     return byPlayer;
-  }, [liveScores, liveSource, prizeMap]);
+  }, [liveScores, liveSource, prizeMap, cutLine, displayRound]);
 
   // Calculate winnings for each roster based on live scores OR stored final data
   const rostersWithLiveWinnings = useMemo(() => {

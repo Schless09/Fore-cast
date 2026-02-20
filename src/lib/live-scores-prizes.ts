@@ -84,17 +84,29 @@ export interface ProcessedPrizeData {
   positionDisplay: string; // "T1", "5", or ""
 }
 
+/** Cut line: only applied in R1/R2 to zero winnings for players below projected cut */
+export interface CutLineLike {
+  cutScore: string;
+  cutCount: number;
+}
+
 /**
  * Process live scores and return prize data keyed by normalized player name.
  * All players get position (from total score) and prize calculated.
+ * In R1/R2 when cutLine is provided, winnings are zeroed for players below the cut (by score).
  * hasTeedOff retained for UI (Today dash when not started, Thru tee time vs holes).
  */
 export function processLiveScoresForPrizes(
   scores: LiveScoreLike[],
   source: 'espn' | 'rapidapi',
-  prizeMap: Map<number, number>
+  prizeMap: Map<number, number>,
+  options?: { cutLine?: CutLineLike | null; currentRound?: number }
 ): Map<string, ProcessedPrizeData> {
   const result = new Map<string, ProcessedPrizeData>();
+  const cutLine = options?.cutLine ?? null;
+  const currentRound = options?.currentRound ?? 1;
+  const applyCut = cutLine != null && currentRound <= 2;
+  const cutScoreNum = applyCut && cutLine.cutScore != null ? parseScore(cutLine.cutScore) : null;
 
   const calculateTiePrize = (position: number, tieCount: number): number => {
     let total = 0;
@@ -102,6 +114,11 @@ export function processLiveScoresForPrizes(
       total += prizeMap.get(position + i) || 0;
     }
     return Math.round(total / tieCount);
+  };
+
+  const zeroIfBelowCut = (totalScore: number, winnings: number): number => {
+    if (!applyCut || cutScoreNum === null) return winnings;
+    return totalScore > cutScoreNum ? 0 : winnings;
   };
 
   if (source === 'espn' && scores.length > 0) {
@@ -124,7 +141,9 @@ export function processLiveScoresForPrizes(
       const fromScore = positionByIndex.get(idx);
       const position = fromScore ? fromScore.position : null;
       const tieCount = fromScore?.tieCount ?? 1;
-      const winnings = !score.isAmateur && position ? calculateTiePrize(position, tieCount) : 0;
+      const totalScore = parseScore(score.total ?? 0);
+      let winnings = !score.isAmateur && position ? calculateTiePrize(position, tieCount) : 0;
+      winnings = zeroIfBelowCut(totalScore, winnings);
       const positionDisplay = position ? (tieCount > 1 ? `T${position}` : String(position)) : '';
       result.set(key, {
         position,
@@ -151,7 +170,9 @@ export function processLiveScoresForPrizes(
     const teedOff = hasTeedOff(score.thru ?? score.teeTime);
     const position = score.positionValue ?? (score.position ? parseInt(String(score.position).replace('T', '')) : null);
     const tieCount = position ? (positionCounts.get(position) || 1) : 1;
-    const winnings = !score.isAmateur && position ? calculateTiePrize(position, tieCount) : 0;
+    const totalScore = parseScore(score.total ?? 0);
+    let winnings = !score.isAmateur && position ? calculateTiePrize(position, tieCount) : 0;
+    winnings = zeroIfBelowCut(totalScore, winnings);
     const positionDisplay = position ? (tieCount > 1 ? `T${position}` : String(position)) : '';
     result.set(key, {
       position,

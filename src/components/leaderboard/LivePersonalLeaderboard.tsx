@@ -47,6 +47,8 @@ interface LivePersonalLeaderboardProps {
     amount: number;
   }>;
   displayRound?: number;
+  /** In R1/R2, zero winnings for players below this cut (projected cut). */
+  cutLine?: { cutScore: string; cutCount: number } | null;
 }
 
 // Type for roster_players query result (Supabase join)
@@ -91,6 +93,7 @@ export function LivePersonalLeaderboard({
   scorecardSource = 'rapidapi',
   prizeDistributions,
   displayRound = 1,
+  cutLine,
 }: LivePersonalLeaderboardProps) {
   const liveUrl = scorecardSource === 'espn' && espnEventId
     ? `/api/scores/live?source=espn&eventId=${encodeURIComponent(espnEventId)}`
@@ -157,13 +160,14 @@ export function LivePersonalLeaderboard({
     return undefined;
   }, [playerScoreMap]);
 
-  // Shared prize logic: position-from-score (ESPN), tie split, exclude non-teed-off
+  // Shared prize logic: position-from-score (ESPN), tie split; in R1/R2 zero winnings below cut
   const prizeDataByPlayer = useMemo(() => {
     if (!liveScores.length) return new Map<string, { winnings: number; hasTeedOff: boolean; positionDisplay: string }>();
     const processed = processLiveScoresForPrizes(
       liveScores,
       liveSource,
-      prizeMap
+      prizeMap,
+      { cutLine: cutLine ?? undefined, currentRound: displayRound }
     );
     const byPlayer = new Map<string, { winnings: number; hasTeedOff: boolean; positionDisplay: string }>();
     processed.forEach((data, key) => {
@@ -174,7 +178,7 @@ export function LivePersonalLeaderboard({
       });
     });
     return byPlayer;
-  }, [liveScores, liveSource, prizeMap]);
+  }, [liveScores, liveSource, prizeMap, cutLine, displayRound]);
 
   // Calculate winnings for each player based on live scores (uses shared prize logic)
   const playersWithLiveData = useMemo(() => {

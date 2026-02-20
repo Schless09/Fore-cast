@@ -125,13 +125,13 @@ export default async function WeeklyStandingsByTournamentPage({
     tournamentIncludedInLeague && leagueMemberIds.length > 0
       ? supabase.from('profiles').select('id, username').in('id', leagueMemberIds)
       : Promise.resolve({ data: [] as { id: string; username: string | null }[], error: null }),
-    // ESPN cache has live current_round (updated every 2 min) — prefer over stale tournament.current_round
+    // ESPN cache has live current_round and cutLine (updated every 2 min) — prefer over stale tournament.current_round
     tournament.espn_event_id
-      ? supabase.from('espn_cache').select('current_round').eq('cache_key', `espn-${tournament.espn_event_id}`).maybeSingle()
+      ? supabase.from('espn_cache').select('current_round, data').eq('cache_key', `espn-${tournament.espn_event_id}`).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    // RapidAPI cache when no ESPN — used for display round
+    // RapidAPI cache when no ESPN — used for display round and cutLine
     cacheKeyRapidAPI && !tournament.espn_event_id
-      ? supabase.from('live_scores_cache').select('current_round').eq('cache_key', cacheKeyRapidAPI).maybeSingle()
+      ? supabase.from('live_scores_cache').select('current_round, data').eq('cache_key', cacheKeyRapidAPI).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ]);
 
@@ -248,6 +248,11 @@ export default async function WeeklyStandingsByTournamentPage({
   // Check if we should use live standings (active or completed tournament with API ID)
   // For completed tournaments, the component will use stored final data instead of polling
   const useLiveStandings = (tournament.status === 'active' || tournament.status === 'completed') && tournament.rapidapi_tourn_id;
+
+  // Cut line from live cache (ESPN or RapidAPI) for R1/R2 — zero winnings below cut in standings
+  const cacheDataWithCut = (espnCache?.data as { cutLine?: { cutScore: string; cutCount: number } } | undefined)
+    ?? (liveScoresCache?.data as { cutLine?: { cutScore: string; cutCount: number } } | undefined);
+  const cutLineForStandings = cacheDataWithCut?.cutLine ?? null;
 
   // Get user's roster rank
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -422,6 +427,7 @@ export default async function WeeklyStandingsByTournamentPage({
                 userLeagueId={userLeagueId || undefined}
                 leagueMemberIds={leagueMemberIds}
                 displayRound={displayRound}
+                cutLine={cutLineForStandings}
               />
             ) : tournament.status === 'upcoming' && upcomingStandingsRows.length > 0 ? (
               <>
