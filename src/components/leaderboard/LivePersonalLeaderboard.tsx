@@ -333,7 +333,7 @@ export function LivePersonalLeaderboard({
                 <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase w-10 sm:w-12">Pos</th>
                 <th className="px-1 sm:px-3 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
                 <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase w-12 sm:w-16">Total</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase hidden sm:table-cell w-12 sm:w-16">Today</th>
+                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase w-12 sm:w-16">Today</th>
                 <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase min-w-16 sm:min-w-18">Thru</th>
                 <th className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase min-w-18 sm:w-20">Prize</th>
               </tr>
@@ -373,7 +373,7 @@ export function LivePersonalLeaderboard({
                         <span className="text-casino-gray-dark">-</span>
                       )}
                     </td>
-                    <td className="px-2 sm:px-4 py-2 hidden sm:table-cell whitespace-nowrap">
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
                       {/* If player hasn't started current round, show dash */}
                       {!player.liveScore?.roundComplete && (!player.liveScore?.thru || player.liveScore?.thru === '-' || player.liveScore?.thru === '0') ? (
                         <span className="text-casino-gray-dark">-</span>
