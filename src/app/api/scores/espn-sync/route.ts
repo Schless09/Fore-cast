@@ -31,6 +31,34 @@ function formatToPar(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
+/** Cut: top N and ties after 36 holes. Compute projected cut score from sorted leaderboard. */
+function computeProjectedCut(
+  withScores: Array<{ total_score: number; thru: string }>,
+  currentRound: number,
+  cutCount: number = 65
+): { cutScore: string; cutCount: number } | null {
+  if (currentRound > 2) return null; // Cut already made after R2
+  const n = Math.max(1, cutCount);
+  // Only players who have teed off
+  const played = withScores.filter((r) => {
+    const t = String(r.thru ?? '').trim();
+    if (!t || t === '-' || t === '0') return false;
+    if (t === 'F' || t === '18') return true;
+    if (t.includes(':') || t.includes('AM') || t.includes('PM')) return false;
+    const num = parseInt(t.replace('*', ''), 10);
+    return !Number.isNaN(num) && num > 0;
+  });
+  if (played.length < n) return null;
+  const sorted = [...played].sort((a, b) => a.total_score - b.total_score);
+  const cutPosition = n - 1; // 0-based index for Nth player
+  const cutScoreNum = sorted[cutPosition]?.total_score;
+  if (cutScoreNum === undefined) return null;
+  return {
+    cutScore: formatToPar(cutScoreNum),
+    cutCount: n,
+  };
+}
+
 /** Normalize round displayValue from API (string or number) to display string. */
 function normalizeRoundDisplay(raw: unknown): string | null {
   if (typeof raw === 'string') return raw;
@@ -186,7 +214,7 @@ export async function POST(request: NextRequest) {
     // Get tournaments that have espn_event_id set (including newly auto-linked)
     const { data: tournamentsWithEspn, error: tError } = await supabase
       .from('tournaments')
-      .select('id, name, espn_event_id')
+      .select('id, name, espn_event_id, cut_count')
       .not('espn_event_id', 'is', null);
 
     if (tError || !tournamentsWithEspn?.length) {
@@ -292,6 +320,9 @@ export async function POST(request: NextRequest) {
       const status = competition.status?.type?.description || event.status?.type?.description || 'Unknown';
       const cacheKey = `espn-${eventId}`;
 
+      const cutCount = tournament.cut_count != null ? tournament.cut_count : 65;
+      const projectedCut = computeProjectedCut(withScores, currentRoundNum, cutCount);
+
       const cacheData = {
         data: transformedData,
         source: 'espn',
@@ -299,7 +330,7 @@ export async function POST(request: NextRequest) {
         tournamentStatus: status,
         currentRound: currentRoundNum,
         lastUpdated: new Date().toISOString(),
-        cutLine: null,
+        cutLine: projectedCut,
       };
 
       const { error: upsertError } = await supabase.from('espn_cache').upsert(

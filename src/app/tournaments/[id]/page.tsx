@@ -471,6 +471,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       if (espnCached?.data?.data && Array.isArray(espnCached.data.data) && espnCached.data.data.length > 0) {
         useEspnForLeaderboard = true;
         leaderboardSource = 'espn';
+        cutLine = espnCached.data.cutLine ?? null;
         const scores = espnCached.data.data as CachedLeaderboardPlayer[];
         const hasTeedOff = (thru: string | undefined): boolean => {
           if (!thru || thru === '-' || thru === '' || thru === '0') return false;
