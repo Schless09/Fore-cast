@@ -281,18 +281,25 @@ export function LiveLeaderboard({
       // Transform API data directly to display format
       const scores = result.data;
       
-      // Helper to calculate prize money with proper tie handling
-      const calculateTiePrizeMoney = (position: number | null, tieCount: number): number => {
-        if (!position || position < 1 || tieCount < 1) return 0;
+      /** Prize split by proCount so amateurs don't reduce pros' share. */
+      const calculateTiePrizeMoney = (
+        position: number | null,
+        tieCount: number,
+        proCount: number
+      ): number => {
+        if (!position || position < 1 || proCount < 1) return 0;
         let totalPrize = 0;
         for (let i = 0; i < tieCount; i++) {
           totalPrize += prizeDistributionMap.get(position + i) || 0;
         }
-        return Math.round(totalPrize / tieCount);
+        return Math.round(totalPrize / proCount);
       };
 
       // Derive position from total score for ALL players; prize calculated for all
-      let positionByIndex: Map<number, { position: number; tieCount: number }> | null = null;
+      let positionByIndex: Map<
+        number,
+        { position: number; tieCount: number; proCount: number }
+      > | null = null;
       if (result.source === 'espn' && Array.isArray(scores) && scores.length > 0) {
         const withScores = scores.map((s: APIScorecard, i: number) => ({
           index: i,
@@ -303,12 +310,24 @@ export function LiveLeaderboard({
         const positionResults = assignPositionsByScore(withScores);
         positionByIndex = new Map();
         for (const { item, position, tieCount } of positionResults) {
-          positionByIndex.set(item.index, { position, tieCount });
+          const indicesInGroup = positionResults
+            .filter((r) => r.position === position && r.tieCount === tieCount)
+            .map((r) => r.item.index);
+          const proCount = indicesInGroup.filter(
+            (i) => !(scores[i] as APIScorecard)?.isAmateur
+          ).length;
+          positionByIndex.set(item.index, { position, tieCount, proCount });
         }
       }
 
       // Fallback: count by positionValue (RapidAPI sends correct T1, T1, T1)
       const positionCounts = new Map<number, number>();
+      const getProCountAtPosition = (pos: number): number =>
+        scores.filter(
+          (s: APIScorecard) =>
+            (s.positionValue ?? (s.position ? parseInt(s.position.replace('T', '')) : null)) ===
+              pos && !s.isAmateur
+        ).length;
       if (!positionByIndex) {
         scores.forEach((scorecard: APIScorecard) => {
           const position = scorecard.positionValue ||
@@ -326,6 +345,7 @@ export function LiveLeaderboard({
           ? fromScore.position
           : (scorecard.positionValue ?? (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null));
         const tieCount = fromScore ? fromScore.tieCount : (position ? (positionCounts.get(position) || 1) : 1);
+        const proCount = fromScore ? fromScore.proCount : (position ? getProCountAtPosition(position) : 0);
         const isTied = tieCount > 1;
         const todayScore = scorecard.currentRoundScore
           ? parseScore(scorecard.currentRoundScore)
@@ -333,7 +353,10 @@ export function LiveLeaderboard({
         const isAmateur = scorecard.isAmateur === true;
         // R1: only teed-off players have prize. R2+: everyone with a position gets prize (they've played at least R1).
         const round = currentRound ?? 1;
-        const prizeMoney = (teedOff || round >= 2) && position && !isAmateur ? calculateTiePrizeMoney(position, tieCount) : 0;
+        const prizeMoney =
+          (teedOff || round >= 2) && position && !isAmateur && proCount > 0
+            ? calculateTiePrizeMoney(position, tieCount, proCount)
+            : 0;
 
         return {
           position: position && position > 0 ? position : null,

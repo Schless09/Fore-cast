@@ -19,7 +19,57 @@ interface CachedScoreData {
 }
 
 /**
- * Sync scores and positions from the Supabase cache (populated by RapidAPI cron) 
+ * Sync scores and positions from ESPN cache to tournament_players.
+ * Uses espn_cache keyed by tournament_id. Matches by espn_athlete_id (playerId) or name.
+ */
+export async function syncTournamentScoresFromESPN(
+  supabase: SupabaseClient,
+  tournamentId: string
+): Promise<SyncScoresResult> {
+  console.log(`[SYNC] 🔄 Starting ESPN sync for tournament: ${tournamentId}`);
+
+  const { data: cached, error } = await supabase
+    .from('espn_cache')
+    .select('data, updated_at')
+    .eq('tournament_id', tournamentId)
+    .single();
+
+  if (error || !cached?.data?.data || !Array.isArray(cached.data.data)) {
+    return {
+      success: false,
+      message: `No ESPN cache found for tournament ${tournamentId}. Ensure espn_event_id is set and espn-sync has run.`,
+      error: 'NO_ESPN_CACHE',
+    };
+  }
+
+  const cacheAge = Math.round((Date.now() - new Date(cached.updated_at).getTime()) / 1000);
+  console.log(`[SYNC] Found ${cached.data.data.length} players in ESPN cache (${cacheAge}s old)`);
+
+  const result = await syncPositionsFromCachedData(
+    supabase,
+    tournamentId,
+    cached.data.data as CachedScoreData[],
+    { source: 'espn' }
+  );
+
+  if (result.success) {
+    return {
+      success: true,
+      message: `Synced ${result.playersUpdated} player positions from ESPN cache`,
+      playersUpdated: result.playersUpdated,
+      source: 'espn_cache',
+    };
+  }
+
+  return {
+    success: false,
+    message: 'Failed to sync positions from ESPN cache',
+    error: 'SYNC_FAILED',
+  };
+}
+
+/**
+ * Sync scores and positions from the Supabase cache (populated by RapidAPI cron)
  * to the tournament_players table. This ensures positions are populated before
  * calculating winnings.
  */
@@ -71,7 +121,8 @@ export async function syncTournamentScores(
   const positionResult = await syncPositionsFromCachedData(
     supabase,
     tournamentId,
-    cached.data.data as CachedScoreData[]
+    cached.data.data as CachedScoreData[],
+    { source: 'rapidapi' }
   );
 
   if (positionResult.success) {
@@ -145,19 +196,28 @@ function normalizeName(name: string): string {
   return NICKNAME_MAP[normalized] || normalized;
 }
 
+interface SyncPositionsOptions {
+  source: 'espn' | 'rapidapi';
+}
+
 /**
  * Sync positions from cached live scores data to tournament_players.
  * Handles name matching with accent normalization for international players.
+ * For ESPN: also matches by pga_players.espn_athlete_id to score.playerId.
  */
 async function syncPositionsFromCachedData(
   supabase: SupabaseClient,
   tournamentId: string,
-  cachedData: CachedScoreData[]
+  cachedData: CachedScoreData[],
+  options: SyncPositionsOptions
 ): Promise<{ success: boolean; playersUpdated: number }> {
-  // Get all tournament_players with their pga_player names for matching
+  const select = options.source === 'espn'
+    ? 'id, pga_player_id, pga_players(name, espn_athlete_id)'
+    : 'id, pga_player_id, pga_players(name)';
+
   const { data: tournamentPlayers, error: tpError } = await supabase
     .from('tournament_players')
-    .select('id, pga_player_id, pga_players(name)')
+    .select(select)
     .eq('tournament_id', tournamentId);
 
   if (tpError || !tournamentPlayers) {
@@ -165,18 +225,25 @@ async function syncPositionsFromCachedData(
     return { success: false, playersUpdated: 0 };
   }
 
-  // Create a map of player name (normalized) to tournament_player id
   const normalizedNameToId = new Map<string, string>();
   const playerIdToTPId = new Map<string, string>();
-  
+  const espnAthleteIdToTPId = new Map<string, string>();
+  const tpIdToPgaPlayerId = new Map<string, string>();
+
   for (const tp of tournamentPlayers) {
-    const pgaPlayer = tp.pga_players as { name?: string } | null;
+    const pgaPlayer = tp.pga_players as { name?: string; espn_athlete_id?: string } | null;
     if (pgaPlayer?.name) {
       const normalized = normalizeName(pgaPlayer.name);
       normalizedNameToId.set(normalized, tp.id);
     }
     if (tp.pga_player_id) {
       playerIdToTPId.set(tp.pga_player_id, tp.id);
+    }
+    if (options.source === 'espn' && pgaPlayer?.espn_athlete_id) {
+      espnAthleteIdToTPId.set(String(pgaPlayer.espn_athlete_id), tp.id);
+    }
+    if (tp.pga_player_id) {
+      tpIdToPgaPlayerId.set(tp.id, tp.pga_player_id);
     }
   }
 
@@ -190,13 +257,22 @@ async function syncPositionsFromCachedData(
     return parseInt(cleaned, 10) || null;
   };
 
-  // Prepare updates from cached data
-  const updates: Array<{ id: string; position: number | null; is_tied: boolean; total_score: number | null }> = [];
-  
+  const updates: Array<{
+    id: string;
+    position: number | null;
+    is_tied: boolean;
+    total_score: number | null;
+    is_amateur?: boolean;
+  }> = [];
+
   for (const score of cachedData) {
-    // Try to match by playerId first, then by normalized name
-    let tpId = playerIdToTPId.get(score.playerId);
-    
+    let tpId: string | undefined;
+    if (options.source === 'espn' && score.playerId) {
+      tpId = espnAthleteIdToTPId.get(score.playerId);
+    }
+    if (!tpId) {
+      tpId = playerIdToTPId.get(score.playerId);
+    }
     if (!tpId && score.player) {
       const normalized = normalizeName(score.player);
       tpId = normalizedNameToId.get(normalized);
@@ -210,6 +286,7 @@ async function syncPositionsFromCachedData(
         position: score.positionValue,
         is_tied: isTied,
         total_score: totalScore,
+        is_amateur: score.isAmateur,
       });
     } else if (!tpId && score.positionValue !== null && score.positionValue <= 70) {
       // Log unmatched players who finished in money positions
@@ -219,13 +296,12 @@ async function syncPositionsFromCachedData(
 
   console.log(`[SYNC] Matched ${updates.length} players from cached data`);
 
-  // Update tournament_players with positions and scores
   if (updates.length > 0) {
     for (const update of updates) {
       const { error } = await supabase
         .from('tournament_players')
-        .update({ 
-          position: update.position, 
+        .update({
+          position: update.position,
           is_tied: update.is_tied,
           total_score: update.total_score,
           updated_at: new Date().toISOString(),
@@ -234,6 +310,19 @@ async function syncPositionsFromCachedData(
 
       if (error) {
         console.error('[SYNC] Error updating player position:', error);
+      }
+
+      // Persist ESPN amateur status to pga_players for final winnings calculation
+      if (
+        options.source === 'espn' &&
+        update.is_amateur !== undefined &&
+        tpIdToPgaPlayerId.has(update.id)
+      ) {
+        const pgaId = tpIdToPgaPlayerId.get(update.id)!;
+        await supabase
+          .from('pga_players')
+          .update({ is_amateur: update.is_amateur })
+          .eq('id', pgaId);
       }
     }
   }

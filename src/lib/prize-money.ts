@@ -36,35 +36,37 @@ export interface PlayerForPrizeCalc {
 /**
  * Calculate adjusted prize positions accounting for amateurs.
  * Amateurs can't collect prize money, so pros below them move up in the payout.
- * Returns a map of original position -> adjusted payout position
+ * Returns a map of original position -> adjusted payout position (for pros; amateurs get 0 via isAmateur)
  */
 export function calculateAdjustedPrizePositions(
   players: PlayerForPrizeCalc[]
 ): Map<number, number> {
   const adjustedPositions = new Map<number, number>();
-  
-  // Sort players by position
+
+  // Sort by position, with amateurs first within same position so amateurCount is correct
   const sortedPlayers = [...players]
-    .filter(p => p.position && p.position > 0)
-    .sort((a, b) => (a.position || 0) - (b.position || 0));
-  
-  // Count amateurs ahead of each position
+    .filter((p) => p.position && p.position > 0)
+    .sort((a, b) => {
+      const posA = a.position || 0;
+      const posB = b.position || 0;
+      if (posA !== posB) return posA - posB;
+      return (a.is_amateur ? 0 : 1) - (b.is_amateur ? 0 : 1); // amateurs first
+    });
+
   let amateurCount = 0;
-  
+
   for (const player of sortedPlayers) {
     if (!player.position) continue;
-    
+
     if (player.is_amateur) {
-      // Amateurs don't get prize money, increment count for those below
       amateurCount++;
-      adjustedPositions.set(player.position, 0); // 0 means no prize
+      adjustedPositions.set(player.position, 0);
     } else {
-      // Pros move up by the number of amateurs ahead of them
       const adjustedPosition = player.position - amateurCount;
       adjustedPositions.set(player.position, adjustedPosition);
     }
   }
-  
+
   return adjustedPositions;
 }
 
@@ -72,6 +74,7 @@ export function calculateAdjustedPrizePositions(
  * Calculate prize money for a player based on their position
  * Handles ties by splitting the combined prize money of tied positions
  * @param adjustedPosition - Position after accounting for amateurs (use calculateAdjustedPrizePositions)
+ * @param proCountInTie - When amateurs are in a tie, only pros split; use this instead of tiedCount
  */
 export function calculatePlayerPrizeMoney(
   position: number | null,
@@ -79,7 +82,8 @@ export function calculatePlayerPrizeMoney(
   tiedCount: number,
   prizeStructure: TournamentPrizeStructure,
   isAmateur: boolean = false,
-  adjustedPosition?: number
+  adjustedPosition?: number,
+  proCountInTie?: number
 ): number {
   // Amateurs cannot collect prize money
   if (isAmateur) {
@@ -113,7 +117,21 @@ export function calculatePlayerPrizeMoney(
 
   // Handle ties (note: tie amounts may need recalculation if amateurs are in the tie)
   if (isTied && tiedCount > 1) {
-    // Use pre-calculated tie amounts from the distribution table
+    const divisor = proCountInTie ?? tiedCount;
+    if (divisor <= 0) return 0;
+
+    // When amateurs are in the tie, always use manual sum/proCount (can't use tied_N)
+    if (proCountInTie !== undefined && proCountInTie < tiedCount) {
+      let totalTiedMoney = 0;
+      for (let i = 0; i < tiedCount; i++) {
+        const pos = effectivePosition + i;
+        const dist = prizeStructure.distributions.find((d) => d.position === pos);
+        if (dist) totalTiedMoney += dist.amount;
+      }
+      return Math.round(totalTiedMoney / proCountInTie);
+    }
+
+    // Use pre-calculated tie amounts when all tie members are pros
     const tieField = `tied_${tiedCount}` as keyof PrizeMoneyDistribution;
     let tieAmount = distribution[tieField] as number | string | undefined;
 
@@ -161,30 +179,37 @@ export function calculateAllPlayerPrizeMoney(
   prizeStructure: TournamentPrizeStructure
 ): Map<string, number> {
   const results = new Map<string, number>();
-  
-  // Calculate adjusted positions accounting for amateurs
   const adjustedPositions = calculateAdjustedPrizePositions(players);
-  
+
+  const proCountByPosition = new Map<number, number>();
+  for (const p of players) {
+    if (p.position && p.position > 0 && !p.is_amateur) {
+      proCountByPosition.set(p.position, (proCountByPosition.get(p.position) || 0) + 1);
+    }
+  }
+
   for (const player of players) {
     if (!player.position || player.position < 1) {
       results.set(player.id, 0);
       continue;
     }
-    
-    const adjustedPos = adjustedPositions.get(player.position) || 0;
-    
+
+    const adjustedPos = adjustedPositions.get(player.position) ?? 0;
+    const proCountInTie = proCountByPosition.get(player.position);
+
     const prizeMoney = calculatePlayerPrizeMoney(
       player.position,
       player.is_tied || false,
       player.tied_with_count || 1,
       prizeStructure,
       player.is_amateur || false,
-      adjustedPos
+      adjustedPos,
+      proCountInTie
     );
-    
+
     results.set(player.id, prizeMoney);
   }
-  
+
   return results;
 }
 

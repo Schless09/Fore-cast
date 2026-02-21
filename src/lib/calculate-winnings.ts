@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  calculateAdjustedPrizePositions,
   calculatePlayerPrizeMoney,
   detectTies,
   parsePrizeMoneyTable,
@@ -58,10 +59,10 @@ export async function calculateTournamentWinnings(
     }))
   );
 
-  // Get all tournament players with their final positions
+  // Get all tournament players with positions and pga_players.is_amateur (from ESPN/DB)
   const { data: tournamentPlayers, error: tpError } = await supabase
     .from('tournament_players')
-    .select('id, position, made_cut')
+    .select('id, position, made_cut, pga_players(is_amateur)')
     .eq('tournament_id', tournamentId);
 
   console.log(`[PRIZE MONEY] Found ${tournamentPlayers?.length || 0} tournament players`);
@@ -77,20 +78,43 @@ export async function calculateTournamentWinnings(
     };
   }
 
-  // Detect ties
   const ties = detectTies(tournamentPlayers || []);
+  const playersForCalc = (tournamentPlayers || []).map((tp) => ({
+    position: tp.position,
+    is_amateur: (tp.pga_players as { is_amateur?: boolean } | null)?.is_amateur ?? false,
+    is_tied: ties.has(tp.position || 0),
+    tied_with_count: ties.has(tp.position || 0) ? ties.get(tp.position || 0) || 1 : 1,
+  }));
 
-  // Calculate prize money for each player
+  const adjustedPositions = calculateAdjustedPrizePositions(playersForCalc);
+
+  // Count pros per position (for amateurs-in-tie split)
+  const proCountByPosition = new Map<number, number>();
+  for (const tp of tournamentPlayers || []) {
+    const pos = tp.position;
+    if (!pos || pos < 1) continue;
+    const isAm = (tp.pga_players as { is_amateur?: boolean } | null)?.is_amateur ?? false;
+    if (!isAm) {
+      proCountByPosition.set(pos, (proCountByPosition.get(pos) || 0) + 1);
+    }
+  }
+
   const updates = (tournamentPlayers || []).map((tp) => {
     const position = tp.position;
+    const isAmateur = (tp.pga_players as { is_amateur?: boolean } | null)?.is_amateur ?? false;
     const isTied = ties.has(position || 0);
     const tiedCount = isTied ? ties.get(position || 0) || 1 : 1;
+    const adjustedPos = adjustedPositions.get(position || 0);
+    const proCountInTie = position ? proCountByPosition.get(position) : tiedCount;
 
     const prizeMoney = calculatePlayerPrizeMoney(
       position,
       isTied,
       tiedCount,
-      prizeStructure
+      prizeStructure,
+      isAmateur,
+      adjustedPos,
+      proCountInTie
     );
 
     return {

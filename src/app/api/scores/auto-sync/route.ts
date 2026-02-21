@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { shouldPollNow } from '@/lib/polling-config';
-import { syncTournamentScores } from '@/lib/sync-scores';
+import { syncTournamentScores, syncTournamentScoresFromESPN } from '@/lib/sync-scores';
 import { calculateTournamentWinnings } from '@/lib/calculate-winnings';
 import * as cheerio from 'cheerio';
 
@@ -528,7 +528,7 @@ export async function GET(request: NextRequest) {
     // Get all active tournaments
     const { data: tournaments, error: tournamentsError } = await supabase
       .from('tournaments')
-      .select('id, name, rapidapi_tourn_id, start_date, end_date, current_round')
+      .select('id, name, rapidapi_tourn_id, espn_event_id, start_date, end_date, current_round')
       .eq('status', 'active')
       .not('rapidapi_tourn_id', 'is', null);
 
@@ -787,14 +787,18 @@ export async function GET(request: NextRequest) {
             .eq('status', 'active');
           console.log(`[AUTO-SYNC] ✅ Marked ${tournament.name} as completed`);
 
-          // Sync final scores/positions from cache
-          if (tournament.rapidapi_tourn_id) {
-            const syncResult = await syncTournamentScores(supabase, tournament.id, tournament.rapidapi_tourn_id);
-            if (syncResult.success) {
-              console.log(`[AUTO-SYNC] ✅ Synced final scores for ${tournament.name} (${syncResult.playersUpdated} players)`);
-            } else {
-              console.error(`[AUTO-SYNC] ⚠️ Failed to sync scores for ${tournament.name}: ${syncResult.message}`);
-            }
+          // Sync final scores/positions (ESPN preferred, fallback to RapidAPI)
+          let syncResult = null;
+          if (tournament.espn_event_id) {
+            syncResult = await syncTournamentScoresFromESPN(supabase, tournament.id);
+          }
+          if (!syncResult?.success && tournament.rapidapi_tourn_id) {
+            syncResult = await syncTournamentScores(supabase, tournament.id, tournament.rapidapi_tourn_id);
+          }
+          if (syncResult?.success) {
+            console.log(`[AUTO-SYNC] ✅ Synced final scores for ${tournament.name} from ${syncResult.source} (${syncResult.playersUpdated} players)`);
+          } else if (tournament.espn_event_id || tournament.rapidapi_tourn_id) {
+            console.error(`[AUTO-SYNC] ⚠️ Failed to sync scores for ${tournament.name}: ${syncResult?.message}`);
           }
 
           // Calculate and save winnings

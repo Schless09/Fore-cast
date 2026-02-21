@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { logger } from '@/lib/logger';
-import { syncTournamentScores } from '@/lib/sync-scores';
+import { syncTournamentScores, syncTournamentScoresFromESPN } from '@/lib/sync-scores';
 import { calculateTournamentWinnings } from '@/lib/calculate-winnings';
 
 /**
@@ -76,31 +76,37 @@ export async function PUT(
     let winningsResult = null;
     
     if (status === 'completed') {
-      // Step 1: Sync final scores/positions from API (if tournament has API ID)
-      if (tournament.rapidapi_tourn_id) {
-        logger.info('Auto-syncing final scores for completed tournament', {
+      // Step 1: Sync final scores/positions (ESPN preferred, fallback to RapidAPI)
+      if (tournament.espn_event_id) {
+        logger.info('Auto-syncing final scores from ESPN for completed tournament', {
           tournamentId: id,
           tournamentName: tournament.name,
+          espnEventId: tournament.espn_event_id,
+        });
+        syncResult = await syncTournamentScoresFromESPN(supabase, id);
+      }
+      if (!syncResult?.success && tournament.rapidapi_tourn_id) {
+        logger.info('Falling back to RapidAPI for final scores', {
+          tournamentId: id,
           apiId: tournament.rapidapi_tourn_id,
         });
-
         syncResult = await syncTournamentScores(supabase, id, tournament.rapidapi_tourn_id);
-
-        if (syncResult.success) {
-          logger.info('Scores synced successfully', {
-            tournamentId: id,
-            playersUpdated: syncResult.playersUpdated,
-          });
-        } else {
-          logger.warn('Failed to sync scores (continuing with winnings calculation)', {
-            tournamentId: id,
-            error: syncResult.message,
-          });
-        }
-      } else {
-        logger.warn('Tournament has no API ID, skipping score sync', {
+      }
+      if (syncResult?.success) {
+        logger.info('Scores synced successfully', {
+          tournamentId: id,
+          playersUpdated: syncResult.playersUpdated,
+          source: syncResult.source,
+        });
+      } else if (!tournament.espn_event_id && !tournament.rapidapi_tourn_id) {
+        logger.warn('Tournament has no ESPN or RapidAPI ID, skipping score sync', {
           tournamentId: id,
           tournamentName: tournament.name,
+        });
+      } else {
+        logger.warn('Failed to sync scores (continuing with winnings calculation)', {
+          tournamentId: id,
+          error: syncResult?.message,
         });
       }
 

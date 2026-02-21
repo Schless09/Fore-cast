@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { shouldPollNow } from '@/lib/polling-config';
 import { assignPositionsByScore } from '@/lib/leaderboard-positions';
+import { syncTournamentScoresFromESPN } from '@/lib/sync-scores';
+import { calculateTournamentWinnings } from '@/lib/calculate-winnings';
 
 const ESPN_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard';
+const ESPN_ATHLETE_BASE = 'https://sports.core.api.espn.com/v2/sports/golf/leagues/pga/seasons';
 
 /** Derive round score to par from hole-by-hole scoreType displayValues (E, -1, +1, etc.) */
 function deriveRoundScoreFromHoles(
@@ -79,6 +82,83 @@ function normalizeTeeTimeFromESPN(raw: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** Fetch amateur status from ESPN athlete API. Returns undefined on fetch error. */
+async function fetchAmateurFromAthleteApi(athleteId: string, year: number): Promise<boolean | undefined> {
+  try {
+    const url = `${ESPN_ATHLETE_BASE}/${year}/athletes/${athleteId}`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+    if (!res.ok) return undefined;
+    const data = (await res.json()) as { amateur?: boolean };
+    return data.amateur === true;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Normalize name for DB lookup: lowercase, collapse spaces, strip diacritics. */
+function normalizeNameForLookup(s: string): string {
+  return (s || '')
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+/** Load amateur status: pga_players first, then ESPN athlete API for missing. Max 5 concurrent API requests. */
+async function loadAmateurMap(
+  competitors: Array<{ id: string; name: string }>,
+  supabase: ReturnType<typeof createServiceClient>,
+  year: number
+): Promise<Map<string, boolean>> {
+  const map = new Map<string, boolean>();
+  const uniqueIds = [...new Set(competitors.map((c) => c.id))];
+
+  const { data: players } = await supabase
+    .from('pga_players')
+    .select('espn_athlete_id, is_amateur')
+    .in('espn_athlete_id', uniqueIds);
+  for (const p of players ?? []) {
+    if (p.espn_athlete_id != null) {
+      map.set(String(p.espn_athlete_id), p.is_amateur === true);
+    }
+  }
+
+  const missing = competitors.filter((c) => !map.has(c.id));
+  const BATCH = 5;
+  for (let i = 0; i < missing.length; i += BATCH) {
+    const batch = missing.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map((c) => fetchAmateurFromAthleteApi(c.id, year)));
+    batch.forEach((c, j) => {
+      const val = results[j];
+      if (val !== undefined) map.set(c.id, val);
+      else map.set(c.id, false); // default to pro on API error
+    });
+    if (i + BATCH < missing.length) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+
+  // Persist amateur to pga_players when we find a name match (backfill espn_athlete_id + is_amateur)
+  if (missing.length > 0) {
+    const { data: allPlayers } = await supabase.from('pga_players').select('id, name, espn_athlete_id');
+    for (const c of missing) {
+      const isAm = map.get(c.id) ?? false;
+      const norm = normalizeNameForLookup(c.name);
+      const match = (allPlayers ?? []).find(
+        (p) => !p.espn_athlete_id && normalizeNameForLookup(p.name ?? '') === norm
+      );
+      if (match) {
+        await supabase
+          .from('pga_players')
+          .update({ espn_athlete_id: c.id, is_amateur: isAm })
+          .eq('id', match.id);
+      }
+    }
+  }
+  return map;
 }
 
 interface ESPNCompetitor {
@@ -214,7 +294,7 @@ export async function POST(request: NextRequest) {
     // Get tournaments that have espn_event_id set (including newly auto-linked)
     const { data: tournamentsWithEspn, error: tError } = await supabase
       .from('tournaments')
-      .select('id, name, espn_event_id, cut_count')
+      .select('id, name, espn_event_id, cut_count, status')
       .not('espn_event_id', 'is', null);
 
     if (tError || !tournamentsWithEspn?.length) {
@@ -244,6 +324,13 @@ export async function POST(request: NextRequest) {
       const competitors = competition.competitors as ESPNCompetitor[];
       const currentRoundNum = Number(competition.status?.period ?? event.status?.period ?? 1) || 1;
       const roundIndex = Math.max(0, currentRoundNum - 1);
+
+      const year = now.getFullYear();
+      const competitorMeta = competitors.map((c) => {
+        const name = c.athlete?.displayName || c.athlete?.fullName || c.athlete?.shortName || 'Unknown';
+        return { id: String(c.id), name };
+      });
+      const amateurMap = await loadAmateurMap(competitorMeta, supabase, year);
 
       const transformedData = competitors.map((c) => {
         const name = c.athlete?.displayName || c.athlete?.fullName || c.athlete?.shortName || 'Unknown';
@@ -288,7 +375,7 @@ export async function POST(request: NextRequest) {
           currentRoundScore: todayScore,
           teeTime,
           roundComplete: false,
-          isAmateur: false,
+          isAmateur: amateurMap.get(String(c.id)) ?? false,
           linescores: c.linescores ?? [],
         };
       });
@@ -349,6 +436,23 @@ export async function POST(request: NextRequest) {
 
       if (!upsertError) {
         syncedCount++;
+      }
+
+      // When ESPN signals tournament complete, mark completed and finalize prize money
+      const statusCompleted =
+        (competition.status?.type as { completed?: boolean } | undefined)?.completed === true ||
+        (event.status?.type as { completed?: boolean } | undefined)?.completed === true ||
+        /final|official/i.test(status || '');
+      if (statusCompleted && tournament.status === 'active') {
+        await supabase
+          .from('tournaments')
+          .update({ status: 'completed' })
+          .eq('id', tournament.id)
+          .eq('status', 'active');
+        const syncResult = await syncTournamentScoresFromESPN(supabase, tournament.id);
+        if (syncResult.success) {
+          await calculateTournamentWinnings(supabase, tournament.id);
+        }
       }
     }
 
