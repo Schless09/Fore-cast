@@ -616,14 +616,15 @@ export function LiveLeaderboard({
             // Use prize_money from row, or look up from prize distribution
             // Amateurs cannot collect prize money
             // R1/R2: zero prize if score is worse than projected cut
-            // R3+: zero if CUT (position null) or position > cutCount (missed cut)
+            // R3+: zero if CUT (position null from cache). Cache has correct MC; no position > cutCount override.
             const positionNum = typeof row.position === 'number' ? row.position : (row as { positionValue?: number }).positionValue ?? (typeof row.position === 'string' ? parseInt(String(row.position).replace(/^T/, ''), 10) : null);
             const cutScoreNum = cutLine ? parseScore(cutLine.cutScore) : null;
             const isRound3OrLater = effectiveCurrentRound >= 3;
             const isBelowProjectedCut = !isRound3OrLater && cutLine && positionNum !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
             const isCut = positionNum === null;
-            // MC = Missed Cut; only after cut is made (R3+). Use position null (from 36-hole cut) or position > cutCount
-            const missedCutByPosition = isRound3OrLater && cutLine && cutLine.cutCount > 0 && (positionNum === null || positionNum > cutLine.cutCount);
+            // MC = Missed Cut; cache already has correct status (position null = MC). Do NOT use position > cutCount —
+            // made-cut players can be T51, T52, etc. (tied at cut line); they have position from cache = made cut.
+            const missedCutByPosition = isRound3OrLater && cutLine && positionNum === null;
             const pos = missedCutByPosition
               ? 'MC'
               : (row.position ? `${row.is_tied ? 'T' : ''}${row.position}` : '-');

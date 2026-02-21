@@ -124,9 +124,15 @@ export function processLiveScoresForPrizes(
     return Math.round(total / proCount);
   };
 
-  const zeroIfBelowCut = (totalScore: number, position: number | null, winnings: number): number => {
+  const zeroIfBelowCut = (
+    totalScore: number,
+    position: number | null,
+    winnings: number,
+    useCachedPositions?: boolean
+  ): number => {
     if (applyCutByScore && cutScoreNum !== null && totalScore > cutScoreNum) return 0;
-    if (applyCutByPosition && cutCount > 0 && position != null && position > cutCount) return 0;
+    // When using cached positions, cache already has correct MC (position null). Don't use position > cutCount.
+    if (!useCachedPositions && applyCutByPosition && cutCount > 0 && position != null && position > cutCount) return 0;
     return winnings;
   };
 
@@ -191,11 +197,11 @@ export function processLiveScoresForPrizes(
         !score.isAmateur && position && proCount > 0
           ? calculateTiePrize(position, tieCount, proCount)
           : 0;
-      winnings = zeroIfBelowCut(totalScore, position, winnings);
-      // MC = Missed Cut; only show after cut is made (R3+). In R1/R2 show actual position.
+      winnings = zeroIfBelowCut(totalScore, position, winnings, useCachedPositions);
+      // MC = Missed Cut. When using cache, only position null = MC (cache has correct status).
       const isCut =
-        (applyCutByPosition && cutCount > 0 && position != null && position > cutCount) ||
-        (position == null && applyCutByPosition); // null position + cut made = MC
+        (!useCachedPositions && applyCutByPosition && cutCount > 0 && position != null && position > cutCount) ||
+        (position == null && applyCutByPosition);
       const positionDisplay = isCut ? 'MC' : (position ? (tieCount > 1 ? `T${position}` : String(position)) : '');
       result.set(key, {
         position,

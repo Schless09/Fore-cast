@@ -96,11 +96,20 @@ function computeActualCutScore(
   return sorted[n - 1]?.score_36 ?? null;
 }
 
-/** Player has valid R3 score (actively playing round 3) — definitive made-cut signal. */
-function hasValidR3Score(linescores: Array<{ period?: number; displayValue?: string | null }> | undefined): boolean {
-  if (!linescores) return false;
-  const r3 = linescores.find((r) => Number(r.period) === 3);
-  return r3 != null && r3.displayValue != null && r3.displayValue !== '-' && r3.displayValue !== '';
+/** Player has valid score for round N (actively playing) — definitive made-cut signal. */
+function hasPlayingRoundData(
+  linescores: Array<{ period?: number; displayValue?: string | null; linescores?: unknown[] }> | undefined,
+  roundNum: number
+): boolean {
+  if (!linescores || roundNum < 3) return false;
+  const round = linescores.find((r) => Number(r.period) === roundNum);
+  if (!round) return false;
+  // displayValue is a real score (not "-" or empty)
+  const dv = round.displayValue;
+  if (dv != null && dv !== '-' && String(dv).trim() !== '') return true;
+  // fallback: has hole data (playing the round)
+  const holes = round.linescores as Array<unknown> | undefined;
+  return Array.isArray(holes) && holes.length > 0;
 }
 
 /** Normalize round displayValue from API (string or number) to display string. */
@@ -453,7 +462,8 @@ export async function POST(request: NextRequest) {
       const madeCutByIndex = new Map<number, boolean>();
       if (hasCut && currentRoundNum > 2) {
         withScores.forEach((r, i) => {
-          const playingR3 = hasValidR3Score(r.linescores);
+          const playingR3 = hasPlayingRoundData(r.linescores, currentRoundNum) ||
+            (currentRoundNum >= 4 && hasPlayingRoundData(r.linescores, 3));
           const s36 = (r as { score_36?: number | null }).score_36;
           const byScore = actualCutScoreNum != null && s36 != null && s36 <= actualCutScoreNum;
           // When cut score unknown, include all (don't mark anyone MC)
