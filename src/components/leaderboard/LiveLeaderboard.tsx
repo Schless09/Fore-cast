@@ -6,6 +6,7 @@ import { formatTeeTimeDisplay } from '@/lib/timezone';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import { assignPositionsByScore } from '@/lib/leaderboard-positions';
+import { firstNamesMatchForLiveScores } from '@/lib/live-scores-prizes';
 import { ScorecardModal } from './ScorecardModal';
 import { SuspendedStatusBanner } from './SuspendedStatusBanner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -120,6 +121,28 @@ function getTeeTimeForRound(teeTime: TeeTimeData | undefined, currentRound?: num
   
   // Return raw EST string; caller uses LocalTeeTime for client-side conversion
   return estTime ?? null;
+}
+
+/** Look up pick count for a player, with fuzzy name matching (e.g. Matti vs Mattias Schmidt) */
+function getPickCountForPlayer(apiName: string, picksByPlayer: Record<string, number>): number {
+  const exact = picksByPlayer[apiName];
+  if (exact !== undefined) return exact;
+
+  const normalized = apiName.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const parts = normalized.split(/\s+/);
+  if (parts.length >= 2) {
+    const apiLast = parts[parts.length - 1];
+    const apiFirst = parts[0];
+    for (const [dbName, count] of Object.entries(picksByPlayer)) {
+      const dbParts = dbName.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/);
+      if (dbParts.length >= 2) {
+        const dbLast = dbParts[dbParts.length - 1];
+        const dbFirst = dbParts[0];
+        if (apiLast === dbLast && firstNamesMatchForLiveScores(apiFirst, dbFirst)) return count;
+      }
+    }
+  }
+  return 0;
 }
 
 // Normalize name for matching: trim, lowercase, strip accents, replace ø/ö/å etc. with ASCII
@@ -719,7 +742,7 @@ export function LiveLeaderboard({
                 <td className="px-0.5 sm:px-4 py-2 text-right text-xs sm:text-sm whitespace-nowrap tabular-nums">
                   {rightColumnMode === 'Picks' ? (
                     (() => {
-                      const pickCount = picksByPlayer[name] ?? picksByPlayer[matchedMapName] ?? 0;
+                      const pickCount = getPickCountForPlayer(name, picksByPlayer);
                       return pickCount > 0 ? (
                         <span className="text-casino-text" title={`${pickCount} team${pickCount !== 1 ? 's' : ''} picked this golfer`}>
                           {pickCount}
