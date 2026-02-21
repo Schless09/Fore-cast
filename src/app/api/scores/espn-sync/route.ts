@@ -247,8 +247,10 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date();
+    const url = request.nextUrl ?? new URL(request.url);
+    const force = url.searchParams.get('force') === 'true';
     const pollStatus = shouldPollNow(now, { intervalMinutes: 2 });
-    if (!pollStatus.shouldPoll) {
+    if (!force && !pollStatus.shouldPoll) {
       return NextResponse.json({
         success: true,
         message: `ESPN sync skipped: ${pollStatus.reason}`,
