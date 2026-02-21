@@ -83,7 +83,7 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
   // Get all tournaments (completed and active)
   const { data: tournaments, error: tournamentsError } = await supabase
     .from('tournaments')
-    .select('id, name, status, rapidapi_tourn_id, espn_event_id')
+    .select('id, name, status, rapidapi_tourn_id, espn_event_id, start_date')
     .in('status', ['completed', 'active']);
 
   if (tournamentsError) {
@@ -140,19 +140,34 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
   // Find active tournament
   const activeTournamentData = tournaments?.find(t => t.status === 'active');
   
-  // Get prize distributions for active tournament
+  // Get prize distributions and live cache (cutLine, current_round) for active tournament
   let prizeDistributions: Array<{ position: number; amount: number }> = [];
+  let cutLineForSeason: { cutScore: string; cutCount: number } | null = null;
+  let displayRoundForSeason = 1;
   if (activeTournamentData) {
-    const { data: prizeData } = await supabase
-      .from('prize_money_distributions')
-      .select('position, amount')
-      .eq('tournament_id', activeTournamentData.id)
-      .order('position', { ascending: true });
-    
+    const [prizeResult, espnCacheResult, liveScoresCacheResult] = await Promise.all([
+      supabase
+        .from('prize_money_distributions')
+        .select('position, amount')
+        .eq('tournament_id', activeTournamentData.id)
+        .order('position', { ascending: true }),
+      activeTournamentData.espn_event_id
+        ? supabase.from('espn_cache').select('current_round, data').eq('cache_key', `espn-${activeTournamentData.espn_event_id}`).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      activeTournamentData.rapidapi_tourn_id && (activeTournamentData as { start_date?: string }).start_date
+        ? supabase.from('live_scores_cache').select('current_round, data').eq('cache_key', `${new Date((activeTournamentData as { start_date: string }).start_date).getFullYear()}-${activeTournamentData.rapidapi_tourn_id}`).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+    const prizeData = prizeResult.data;
     prizeDistributions = (prizeData || []).map(p => ({
       position: p.position,
       amount: p.amount || 0,
     }));
+    const cacheDataWithCut = (espnCacheResult.data?.data as { cutLine?: { cutScore: string; cutCount: number } } | undefined)
+      ?? (liveScoresCacheResult.data?.data as { cutLine?: { cutScore: string; cutCount: number } } | undefined);
+    cutLineForSeason = cacheDataWithCut?.cutLine ?? null;
+    const rawRound = espnCacheResult.data?.current_round ?? liveScoresCacheResult.data?.current_round;
+    displayRoundForSeason = typeof rawRound === 'number' ? rawRound : (rawRound && typeof rawRound === 'object' && '$numberInt' in rawRound ? parseInt((rawRound as { $numberInt: string }).$numberInt, 10) : 1);
   }
 
   // Only query rosters if we have tournaments
@@ -264,13 +279,15 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
     (a, b) => b.completed_winnings - a.completed_winnings
   );
 
-  // Prepare active tournament info
+  // Prepare active tournament info (include cutLine and displayRound for live prize cut logic)
   const activeTournament = activeTournamentData && (activeTournamentData.rapidapi_tourn_id || activeTournamentData.espn_event_id) ? {
     id: activeTournamentData.id,
     name: activeTournamentData.name,
     liveGolfAPITournamentId: activeTournamentData.rapidapi_tourn_id,
     espnEventId: activeTournamentData.espn_event_id,
     scorecardSource: activeTournamentData.espn_event_id ? 'espn' as const : 'rapidapi' as const,
+    cutLine: cutLineForSeason,
+    displayRound: displayRoundForSeason,
   } : undefined;
 
   return (

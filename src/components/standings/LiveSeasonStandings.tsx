@@ -70,6 +70,8 @@ interface LiveSeasonStandingsProps {
     liveGolfAPITournamentId: string;
     espnEventId?: string | null;
     scorecardSource?: 'espn' | 'rapidapi';
+    cutLine?: { cutScore: string; cutCount: number } | null;
+    displayRound?: number;
   };
   prizeDistributions: Array<{
     position: number;
@@ -163,16 +165,19 @@ export function LiveSeasonStandings({
     return undefined;
   }, [playerScoreMap]);
 
-  // Shared prize logic: position-from-score (ESPN), tie split, exclude non-teed-off
+  // Shared prize logic: position-from-score (ESPN), tie split; R1/R2 projected cut by score, R3/R4 cut by position
   const prizeDataByPlayer = useMemo(() => {
     if (!liveScores.length) return new Map<string, number>();
-    const processed = processLiveScoresForPrizes(liveScores, liveSource, prizeMap);
+    const processed = processLiveScoresForPrizes(liveScores, liveSource, prizeMap, {
+      cutLine: activeTournament?.cutLine ?? undefined,
+      currentRound: activeTournament?.displayRound ?? 1,
+    });
     const byPlayer = new Map<string, number>();
     processed.forEach((data, key) => {
       byPlayer.set(key, data.winnings);
     });
     return byPlayer;
-  }, [liveScores, liveSource, prizeMap]);
+  }, [liveScores, liveSource, prizeMap, activeTournament?.cutLine, activeTournament?.displayRound]);
 
   // Calculate live winnings for a roster (uses shared prize logic)
   const calculateLiveWinnings = useCallback((playerNames: string[]): number => {

@@ -229,7 +229,11 @@ export function LiveLeaderboard({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [apiTournamentStatus, setApiTournamentStatus] = useState<string>('In Progress');
   const [cutLine, setCutLine] = useState<CutLineData | null>(initialCutLine || null);
+  const [currentRoundState, setCurrentRoundState] = useState<number>(currentRound ?? 1);
   const hasInitialSynced = useRef(false);
+
+  // Keep currentRound in sync with API so R3/R4 cut-by-position applies after round advances
+  const effectiveCurrentRound = currentRound ?? currentRoundState;
   
   // Scorecard modal state
   const [selectedPlayer, setSelectedPlayer] = useState<{ id: string; name: string } | null>(null);
@@ -360,10 +364,9 @@ export function LiveLeaderboard({
       setLastRefresh(new Date());
       setSyncError(null);
       
-      // Update cut line if available
-      if (result.cutLine) {
-        setCutLine(result.cutLine);
-      }
+      if (result.cutLine) setCutLine(result.cutLine);
+      const roundFromApi = result.currentRound ?? result.current_round;
+      if (typeof roundFromApi === 'number' && roundFromApi >= 1) setCurrentRoundState(roundFromApi);
       
       console.log('[LiveLeaderboard] Refreshed directly from API at', new Date().toLocaleTimeString());
 
@@ -590,15 +593,17 @@ export function LiveLeaderboard({
             // Use prize_money from row, or look up from prize distribution
             // Amateurs cannot collect prize money
             // R1/R2: zero prize if score is worse than projected cut
-            // R3+: only zero if CUT (position null) or amateur — everyone with a standing gets prize
+            // R3+: zero if CUT (position null) or position > cutCount (missed cut)
+            const positionNum = typeof row.position === 'number' ? row.position : (row as { positionValue?: number }).positionValue ?? (typeof row.position === 'string' ? parseInt(String(row.position).replace(/^T/, ''), 10) : null);
             const cutScoreNum = cutLine ? parseScore(cutLine.cutScore) : null;
-            const isRound3OrLater = (currentRound || 1) >= 3;
-            const isBelowProjectedCut = !isRound3OrLater && cutLine && row.position !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
-            const isCut = row.position === null;
-            const showPrizeDash = false; // Prize calculated for all
-            const prizeAmount = showPrizeDash || row.is_amateur || isCut || isBelowProjectedCut
+            const isRound3OrLater = effectiveCurrentRound >= 3;
+            const isBelowProjectedCut = !isRound3OrLater && cutLine && positionNum !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
+            const isCut = positionNum === null;
+            const missedCutByPosition = isRound3OrLater && cutLine && cutLine.cutCount > 0 && positionNum !== null && positionNum > cutLine.cutCount;
+            const showPrizeDash = false;
+            const prizeAmount = showPrizeDash || row.is_amateur || isCut || isBelowProjectedCut || missedCutByPosition
               ? 0
-              : (row.prize_money || (row.position ? prizeDistributionMap.get(row.position) : 0) || 0);
+              : (row.prize_money || (positionNum ? prizeDistributionMap.get(positionNum) : 0) || 0);
 
             const prevRow = idx > 0 ? leaderboardData[idx - 1] : null;
             

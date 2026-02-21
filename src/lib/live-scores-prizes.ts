@@ -84,7 +84,7 @@ export interface ProcessedPrizeData {
   positionDisplay: string; // "T1", "5", or ""
 }
 
-/** Cut line: only applied in R1/R2 to zero winnings for players below projected cut */
+/** Cut line: R1/R2 = projected cut (by score); R3/R4 = official cut (by position > cutCount) */
 export interface CutLineLike {
   cutScore: string;
   cutCount: number;
@@ -93,7 +93,7 @@ export interface CutLineLike {
 /**
  * Process live scores and return prize data keyed by normalized player name.
  * All players get position (from total score) and prize calculated.
- * In R1/R2 when cutLine is provided, winnings are zeroed for players below the cut (by score).
+ * Cut logic: R1/R2 zero winnings when total score below projected cut; R3/R4 zero when position > cutCount (missed cut).
  * hasTeedOff retained for UI (Today dash when not started, Thru tee time vs holes).
  */
 export function processLiveScoresForPrizes(
@@ -105,8 +105,10 @@ export function processLiveScoresForPrizes(
   const result = new Map<string, ProcessedPrizeData>();
   const cutLine = options?.cutLine ?? null;
   const currentRound = options?.currentRound ?? 1;
-  const applyCut = cutLine != null && currentRound <= 2;
-  const cutScoreNum = applyCut && cutLine.cutScore != null ? parseScore(cutLine.cutScore) : null;
+  const applyCutByScore = cutLine != null && currentRound <= 2;
+  const cutScoreNum = applyCutByScore && cutLine.cutScore != null ? parseScore(cutLine.cutScore) : null;
+  const applyCutByPosition = cutLine != null && currentRound >= 3;
+  const cutCount = cutLine?.cutCount ?? 0;
 
   const calculateTiePrize = (position: number, tieCount: number): number => {
     let total = 0;
@@ -116,9 +118,10 @@ export function processLiveScoresForPrizes(
     return Math.round(total / tieCount);
   };
 
-  const zeroIfBelowCut = (totalScore: number, winnings: number): number => {
-    if (!applyCut || cutScoreNum === null) return winnings;
-    return totalScore > cutScoreNum ? 0 : winnings;
+  const zeroIfBelowCut = (totalScore: number, position: number | null, winnings: number): number => {
+    if (applyCutByScore && cutScoreNum !== null && totalScore > cutScoreNum) return 0;
+    if (applyCutByPosition && cutCount > 0 && position != null && position > cutCount) return 0;
+    return winnings;
   };
 
   if (source === 'espn' && scores.length > 0) {
@@ -143,7 +146,7 @@ export function processLiveScoresForPrizes(
       const tieCount = fromScore?.tieCount ?? 1;
       const totalScore = parseScore(score.total ?? 0);
       let winnings = !score.isAmateur && position ? calculateTiePrize(position, tieCount) : 0;
-      winnings = zeroIfBelowCut(totalScore, winnings);
+      winnings = zeroIfBelowCut(totalScore, position, winnings);
       const positionDisplay = position ? (tieCount > 1 ? `T${position}` : String(position)) : '';
       result.set(key, {
         position,
@@ -172,7 +175,7 @@ export function processLiveScoresForPrizes(
     const tieCount = position ? (positionCounts.get(position) || 1) : 1;
     const totalScore = parseScore(score.total ?? 0);
     let winnings = !score.isAmateur && position ? calculateTiePrize(position, tieCount) : 0;
-    winnings = zeroIfBelowCut(totalScore, winnings);
+    winnings = zeroIfBelowCut(totalScore, position, winnings);
     const positionDisplay = position ? (tieCount > 1 ? `T${position}` : String(position)) : '';
     result.set(key, {
       position,

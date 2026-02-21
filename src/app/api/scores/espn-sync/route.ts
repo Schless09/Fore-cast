@@ -322,6 +322,8 @@ export async function POST(request: NextRequest) {
 
       const cutCount = tournament.cut_count != null ? tournament.cut_count : 65;
       const projectedCut = computeProjectedCut(withScores, currentRoundNum, cutCount);
+      // R3+: projectedCut is null, but we still need cutCount so client can zero prize for position > cutCount
+      const cutLine = projectedCut ?? (currentRoundNum > 2 ? { cutScore: '—', cutCount } : null);
 
       const cacheData = {
         data: transformedData,
@@ -330,7 +332,7 @@ export async function POST(request: NextRequest) {
         tournamentStatus: status,
         currentRound: currentRoundNum,
         lastUpdated: new Date().toISOString(),
-        cutLine: projectedCut,
+        cutLine,
       };
 
       const { error: upsertError } = await supabase.from('espn_cache').upsert(
