@@ -111,15 +111,17 @@ function normalizeRoundDisplay(raw: unknown): string | null {
 }
 
 /**
- * ESPN sends full datetime strings in the tournament's timezone (e.g. "Thu Feb 19 10:15:00 PST 2026").
- * Store the raw string so the client can parse and display in the user's local timezone without
- * losing timezone info. Returns raw if it parses as a valid date; otherwise returns null.
+ * ESPN sends full datetime strings but labels West Coast tournaments as PST/PDT.
+ * PGA Tour tee times are actually in Eastern (TV broadcast standard). Fix the label.
  */
 function normalizeTeeTimeFromESPN(raw: string): string | null {
   try {
-    const d = new Date(raw);
+    const fixed = raw
+      .replace(/\bPST\b/g, 'EST')
+      .replace(/\bPDT\b/g, 'EDT');
+    const d = new Date(fixed);
     if (Number.isNaN(d.getTime())) return null;
-    return raw; // Keep raw so client gets "Thu Feb 19 08:03:00 PST 2026" for accurate display
+    return fixed;
   } catch {
     return null;
   }

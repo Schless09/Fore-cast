@@ -4,8 +4,9 @@
  */
 
 /**
- * Format tee time for display. ESPN sends "Thu Feb 19 11:27:00 PST 2026" but the time is Eastern (US TV).
- * Render as "11:27 AM". Pass-through for already short formats like "11:35 AM".
+ * Format tee time for display. Extracts "11:27 AM" from ESPN datetime.
+ * ESPN labels PST/PDT but PGA times are Eastern — we fix that in espn-sync before cache.
+ * Pass-through for already short formats like "11:35 AM".
  */
 export function formatTeeTimeDisplay(teeTime: string): string {
   if (!teeTime?.trim()) return teeTime;
