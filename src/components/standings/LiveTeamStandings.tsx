@@ -34,6 +34,9 @@ interface RosterData {
     finalScore?: number | null;
     finalPrizeMoney?: number | null;
     isAmateur?: boolean | null;
+    madeCut?: boolean | null;
+    /** From processLiveScoresForPrizes (includes "MC" for cut players) */
+    positionDisplay?: string;
   }>;
 }
 
@@ -197,14 +200,14 @@ export function LiveTeamStandings({
 
   // Shared prize logic: position-from-score (ESPN), tie split; in R1/R2 zero winnings below cut
   const prizeDataByPlayer = useMemo(() => {
-    if (!liveScores.length) return new Map<string, { winnings: number; hasTeedOff: boolean }>();
+    if (!liveScores.length) return new Map<string, { winnings: number; hasTeedOff: boolean; positionDisplay?: string }>();
     const processed = processLiveScoresForPrizes(liveScores, liveSource, prizeMap, {
       cutLine: cutLine ?? undefined,
       currentRound: displayRound,
     });
-    const byPlayer = new Map<string, { winnings: number; hasTeedOff: boolean }>();
+    const byPlayer = new Map<string, { winnings: number; hasTeedOff: boolean; positionDisplay?: string }>();
     processed.forEach((data, key) => {
-      byPlayer.set(key, { winnings: data.winnings, hasTeedOff: data.hasTeedOff });
+      byPlayer.set(key, { winnings: data.winnings, hasTeedOff: data.hasTeedOff, positionDisplay: data.positionDisplay });
     });
     return byPlayer;
   }, [liveScores, liveSource, prizeMap, cutLine, displayRound]);
@@ -218,13 +221,14 @@ export function LiveTeamStandings({
         if (isCompleted) {
           const winnings = player.finalPrizeMoney || 0;
           totalWinnings += winnings;
+          const isCut = player.madeCut === false;
           return {
             ...player,
-            liveScore: player.finalPosition ? {
+            liveScore: (player.finalPosition || isCut) ? {
               player: player.playerName,
               playerId: player.playerId,
-              position: player.finalIsTied ? `T${player.finalPosition}` : String(player.finalPosition),
-              positionValue: player.finalPosition,
+              position: isCut ? 'MC' : (player.finalIsTied ? `T${player.finalPosition}` : String(player.finalPosition)),
+              positionValue: isCut ? null : player.finalPosition,
               total: player.finalScore !== null && player.finalScore !== undefined
                 ? (player.finalScore === 0 ? 'E' : (player.finalScore > 0 ? `+${player.finalScore}` : String(player.finalScore)))
                 : '-',
@@ -252,6 +256,7 @@ export function LiveTeamStandings({
           winnings,
           isAmateur: liveScore?.isAmateur === true,
           hasTeedOff: prizeData?.hasTeedOff ?? false,
+          positionDisplay: prizeData?.positionDisplay,
         };
       });
 
@@ -354,6 +359,7 @@ export function LiveTeamStandings({
             is_tied,
             total_score,
             prize_money,
+            made_cut,
             pga_players(name, is_amateur)
           )
         )
@@ -392,6 +398,7 @@ export function LiveTeamStandings({
           is_tied?: boolean | null;
           total_score?: number | null;
           prize_money?: number | null;
+          made_cut?: boolean | null;
         } | null;
       }> | null;
     };
@@ -416,6 +423,7 @@ export function LiveTeamStandings({
           finalScore: rp.tournament_player?.total_score,
           finalPrizeMoney: rp.player_winnings ?? rp.tournament_player?.prize_money,
           isAmateur: rp.tournament_player?.pga_players?.is_amateur,
+          madeCut: rp.tournament_player?.made_cut,
         })),
       };
     });
@@ -730,12 +738,13 @@ export function LiveTeamStandings({
                         </td>
                         {/* Pos */}
                         <td className="px-px sm:px-4 py-1 sm:py-1.5 text-xs text-center">
-                          {player.liveScore?.position ? (
+                          {(player.positionDisplay ?? player.liveScore?.position) ? (
                             <span className={`font-medium ${
-                              player.liveScore.positionValue === 1 ? 'text-casino-gold' :
-                              (player.liveScore.positionValue || 999) <= 10 ? 'text-casino-green' : 'text-casino-text'
+                              (player.positionDisplay ?? player.liveScore?.position) === 'MC' ? 'text-casino-red' :
+                              player.liveScore?.positionValue === 1 ? 'text-casino-gold' :
+                              (player.liveScore?.positionValue || 999) <= 10 ? 'text-casino-green' : 'text-casino-text'
                             }`}>
-                              {player.liveScore.position}
+                              {player.positionDisplay ?? player.liveScore?.position}
                             </span>
                           ) : (
                             <span className="text-casino-gray-dark">-</span>

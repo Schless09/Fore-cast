@@ -175,7 +175,11 @@ export function processLiveScoresForPrizes(
           ? calculateTiePrize(position, tieCount, proCount)
           : 0;
       winnings = zeroIfBelowCut(totalScore, position, winnings);
-      const positionDisplay = position ? (tieCount > 1 ? `T${position}` : String(position)) : '';
+      // MC = Missed Cut; only show after cut is made (R3+). In R1/R2 show actual position.
+      const isCut =
+        (applyCutByPosition && cutCount > 0 && position != null && position > cutCount) ||
+        (position == null && applyCutByPosition); // null position + cut made = MC
+      const positionDisplay = isCut ? 'MC' : (position ? (tieCount > 1 ? `T${position}` : String(position)) : '');
       result.set(key, {
         position,
         tieCount,
@@ -215,7 +219,11 @@ export function processLiveScoresForPrizes(
         ? calculateTiePrize(position, tieCount, proCount)
         : 0;
     winnings = zeroIfBelowCut(totalScore, position, winnings);
-    const positionDisplay = position ? (tieCount > 1 ? `T${position}` : String(position)) : '';
+    // MC = Missed Cut; only show after cut is made (R3+). In R1/R2 show actual position.
+    const isCut =
+      (applyCutByPosition && cutCount > 0 && position != null && position > cutCount) ||
+      (position == null && applyCutByPosition);
+    const positionDisplay = isCut ? 'MC' : (position ? (tieCount > 1 ? `T${position}` : String(position)) : '');
     result.set(key, {
       position,
       tieCount,

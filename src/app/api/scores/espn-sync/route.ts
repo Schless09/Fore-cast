@@ -407,10 +407,13 @@ export async function POST(request: NextRequest) {
       const status = competition.status?.type?.description || event.status?.type?.description || 'Unknown';
       const cacheKey = `espn-${eventId}`;
 
-      const cutCount = tournament.cut_count != null ? tournament.cut_count : 65;
-      const projectedCut = computeProjectedCut(withScores, currentRoundNum, cutCount);
-      // R3+: projectedCut is null, but we still need cutCount so client can zero prize for position > cutCount
-      const cutLine = projectedCut ?? (currentRoundNum > 2 ? { cutScore: '—', cutCount } : null);
+      // cut_count = null means no-cut event (e.g. Sentry, CJ Cup); no prize zeroing or MC
+      const cutCount = tournament.cut_count ?? 65;
+      const hasCut = tournament.cut_count != null;
+      const projectedCut = hasCut ? computeProjectedCut(withScores, currentRoundNum, cutCount) : null;
+      const cutLine = hasCut
+        ? (projectedCut ?? (currentRoundNum > 2 ? { cutScore: '—', cutCount } : null))
+        : null;
 
       const cacheData = {
         data: transformedData,

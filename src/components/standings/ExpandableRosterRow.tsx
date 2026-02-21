@@ -256,7 +256,9 @@ export function ExpandableRosterRow({
                               </div>
                             </td>
                             <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center">
-                              {tp?.position ? (
+                              {tp?.made_cut === false ? (
+                                <span className="font-medium text-casino-red">MC</span>
+                              ) : tp?.position ? (
                                 <span className={`font-medium ${
                                   tp.position === 1 ? 'text-casino-gold' :
                                   tp.position <= 10 ? 'text-casino-green' :
@@ -270,7 +272,7 @@ export function ExpandableRosterRow({
                             </td>
                             <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center hidden sm:table-cell">
                               {tp?.made_cut === false ? (
-                                <span className="text-casino-red font-medium">CUT</span>
+                                <span className="text-casino-red font-medium">MC</span>
                               ) : tp?.total_score ? (
                                 <span className={
                                   tp.total_score < 0 ? 'text-casino-green' :

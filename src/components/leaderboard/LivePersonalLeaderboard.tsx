@@ -361,6 +361,7 @@ export function LivePersonalLeaderboard({
                     <td className="px-0.5 sm:px-3 py-2 font-medium text-casino-text text-xs sm:text-sm whitespace-nowrap">
                       {player.positionDisplay ? (
                         <span className={`font-medium ${
+                          player.positionDisplay === 'MC' ? 'text-casino-red' :
                           player.positionDisplay === '1' || player.positionDisplay === 'T1' ? 'text-casino-gold' :
                           parseInt(player.positionDisplay.replace('T', '')) <= 10 ? 'text-casino-green' :
                           'text-casino-text'

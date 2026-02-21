@@ -607,9 +607,6 @@ export function LiveLeaderboard({
             const playerCost = playerCostMap?.get(matchedMapName);
 
             const teedOff = row.hasTeedOff ?? hasTeedOff(row.thru ?? row.teeTime);
-            const pos = row.position
-              ? `${row.is_tied ? 'T' : ''}${row.position}`
-              : 'CUT';
             const totalClass = getScoreColor(row.total_score);
             const todayClass = getScoreColor(row.today_score);
 
@@ -622,7 +619,11 @@ export function LiveLeaderboard({
             const isRound3OrLater = effectiveCurrentRound >= 3;
             const isBelowProjectedCut = !isRound3OrLater && cutLine && positionNum !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
             const isCut = positionNum === null;
+            // MC = Missed Cut; only after cut is made (R3+). In R1/R2 show actual position (T56, etc.)
             const missedCutByPosition = isRound3OrLater && cutLine && cutLine.cutCount > 0 && positionNum !== null && positionNum > cutLine.cutCount;
+            const pos = missedCutByPosition
+              ? 'MC'
+              : (row.position ? `${row.is_tied ? 'T' : ''}${row.position}` : '-');
             const showPrizeDash = false;
             const prizeAmount = showPrizeDash || row.is_amateur || isCut || isBelowProjectedCut || missedCutByPosition
               ? 0
@@ -658,7 +659,7 @@ export function LiveLeaderboard({
                     : 'border-casino-gold/10 hover:bg-casino-elevated'
                 }`}
               >
-                <td className="px-0.5 sm:px-3 py-2 font-medium text-casino-text text-xs sm:text-sm">
+                <td className={`px-0.5 sm:px-3 py-2 font-medium text-xs sm:text-sm ${pos === 'MC' ? 'text-casino-red' : 'text-casino-text'}`}>
                   {pos}
                 </td>
                 <td className={`px-0.5 sm:px-3 py-2 text-xs sm:text-sm ${isUserPlayer ? 'font-bold text-casino-gold' : 'text-casino-text'}`}>

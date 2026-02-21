@@ -66,9 +66,13 @@ export function PlayerRow({ player, playerWinnings, rank, currentRound }: Player
         </div>
       </td>
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-casino-text">
-        {player.position 
-          ? `${player.is_tied && player.tied_with_count > 1 ? 'T' : ''}${player.position}` 
-          : '-'}
+        {player.made_cut === false ? (
+          <span className="text-casino-red font-medium">MC</span>
+        ) : player.position ? (
+          `${player.is_tied && player.tied_with_count > 1 ? 'T' : ''}${player.position}`
+        ) : (
+          '-'
+        )}
       </td>
       <td className={`px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium ${getScoreColor(player.total_score)}`}>
         {formatScore(player.total_score)}
