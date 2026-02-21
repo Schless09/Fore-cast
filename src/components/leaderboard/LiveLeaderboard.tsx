@@ -295,29 +295,29 @@ export function LiveLeaderboard({
         return Math.round(totalPrize / proCount);
       };
 
-      // Derive position from total score for ALL players; prize calculated for all
+      // ESPN cache has correct position/positionValue (MC = null) — use them
       let positionByIndex: Map<
         number,
         { position: number; tieCount: number; proCount: number }
       > | null = null;
       if (result.source === 'espn' && Array.isArray(scores) && scores.length > 0) {
-        const withScores = scores.map((s: APIScorecard, i: number) => ({
-          index: i,
-          total_score: parseScore(s.total),
-          today_score: parseScore(s.currentRoundScore ?? s.total),
-          thru: s.thru ?? '-',
-        }));
-        const positionResults = assignPositionsByScore(withScores);
+        const posCounts = new Map<number, number[]>();
+        scores.forEach((s: APIScorecard & { position?: string; positionValue?: number }, i: number) => {
+          const pv = s.positionValue;
+          if (pv != null && pv > 0 && s.position !== 'MC') {
+            if (!posCounts.has(pv)) posCounts.set(pv, []);
+            posCounts.get(pv)!.push(i);
+          }
+        });
         positionByIndex = new Map();
-        for (const { item, position, tieCount } of positionResults) {
-          const indicesInGroup = positionResults
-            .filter((r) => r.position === position && r.tieCount === tieCount)
-            .map((r) => r.item.index);
-          const proCount = indicesInGroup.filter(
-            (i) => !(scores[i] as APIScorecard)?.isAmateur
-          ).length;
-          positionByIndex.set(item.index, { position, tieCount, proCount });
-        }
+        scores.forEach((s: APIScorecard & { position?: string; positionValue?: number }, idx: number) => {
+          const pv = s.positionValue;
+          if (pv != null && pv > 0 && s.position !== 'MC') {
+            const indices = posCounts.get(pv) ?? [idx];
+            const proCount = indices.filter((i) => !(scores[i] as APIScorecard)?.isAmateur).length;
+            positionByIndex!.set(idx, { position: pv, tieCount: indices.length, proCount });
+          }
+        });
       }
 
       // Fallback: count by positionValue (RapidAPI sends correct T1, T1, T1)
@@ -338,12 +338,15 @@ export function LiveLeaderboard({
         });
       }
       
-      const transformed: LeaderboardRow[] = scores.map((scorecard: APIScorecard, idx: number) => {
+      const transformed: LeaderboardRow[] = scores.map((scorecard: APIScorecard & { position?: string; positionValue?: number }, idx: number) => {
         const teedOff = hasTeedOff(scorecard.thru ?? scorecard.teeTime);
         const fromScore = positionByIndex?.get(idx);
+        const isMC = scorecard.position === 'MC';
         const position = fromScore
           ? fromScore.position
-          : (scorecard.positionValue ?? (scorecard.position ? parseInt(scorecard.position.replace('T', '')) : null));
+          : isMC
+            ? null
+            : (scorecard.positionValue ?? (scorecard.position ? parseInt(String(scorecard.position).replace('T', ''), 10) : null));
         const tieCount = fromScore ? fromScore.tieCount : (position ? (positionCounts.get(position) || 1) : 1);
         const proCount = fromScore ? fromScore.proCount : (position ? getProCountAtPosition(position) : 0);
         const isTied = tieCount > 1;
@@ -619,8 +622,8 @@ export function LiveLeaderboard({
             const isRound3OrLater = effectiveCurrentRound >= 3;
             const isBelowProjectedCut = !isRound3OrLater && cutLine && positionNum !== null && cutScoreNum !== null && row.total_score > cutScoreNum;
             const isCut = positionNum === null;
-            // MC = Missed Cut; only after cut is made (R3+). In R1/R2 show actual position (T56, etc.)
-            const missedCutByPosition = isRound3OrLater && cutLine && cutLine.cutCount > 0 && positionNum !== null && positionNum > cutLine.cutCount;
+            // MC = Missed Cut; only after cut is made (R3+). Use position null (from 36-hole cut) or position > cutCount
+            const missedCutByPosition = isRound3OrLater && cutLine && cutLine.cutCount > 0 && (positionNum === null || positionNum > cutLine.cutCount);
             const pos = missedCutByPosition
               ? 'MC'
               : (row.position ? `${row.is_tied ? 'T' : ''}${row.position}` : '-');

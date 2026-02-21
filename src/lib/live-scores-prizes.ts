@@ -131,42 +131,59 @@ export function processLiveScoresForPrizes(
   };
 
   if (source === 'espn' && scores.length > 0) {
-    // Derive position from total score for ALL players
-    const withScores = scores.map((s, i) => ({
-      index: i,
-      total_score: parseScore(s.total ?? 0),
-      today_score: parseScore(s.currentRoundScore ?? s.total ?? 0),
-      thru: s.thru ?? '-',
-    }));
-    const positionResults = assignPositionsByScore(withScores);
-    const positionByIndex = new Map<
-      number,
-      { position: number; tieCount: number; proCount: number }
-    >();
-    // Group by (position, tieCount) and count pros
-    const groupKey = (pos: number, tc: number) => `${pos}-${tc}`;
-    const groupProCounts = new Map<string, number>();
-    for (const { item, position, tieCount } of positionResults) {
-      const key = groupKey(position, tieCount);
-      if (!groupProCounts.has(key)) {
-        const indicesInGroup = positionResults
-          .filter((r) => r.position === position && r.tieCount === tieCount)
-          .map((r) => r.item.index);
-        const proCount = indicesInGroup.filter((i) => !scores[i]?.isAmateur).length;
-        groupProCounts.set(key, proCount);
-      }
-      positionByIndex.set(item.index, {
-        position,
-        tieCount,
-        proCount: groupProCounts.get(key)!,
+    const useCachedPositions = currentRound >= 3 && scores.some((s) => s.position === 'MC' || (s.positionValue != null && s.positionValue > 0));
+    let positionByIndex = new Map<number, { position: number; tieCount: number; proCount: number }>();
+
+    if (useCachedPositions) {
+      // R3+ cache has correct positions (MC = null) — use them
+      const posCounts = new Map<number, number[]>();
+      scores.forEach((s, i) => {
+        const pv = s.positionValue;
+        if (pv != null && pv > 0 && s.position !== 'MC') {
+          if (!posCounts.has(pv)) posCounts.set(pv, []);
+          posCounts.get(pv)!.push(i);
+        }
       });
+      scores.forEach((s, idx) => {
+        const pv = s.positionValue;
+        if (pv != null && pv > 0 && s.position !== 'MC') {
+          const indices = posCounts.get(pv) ?? [idx];
+          const proCount = indices.filter((i) => !scores[i]?.isAmateur).length;
+          positionByIndex.set(idx, { position: pv, tieCount: indices.length, proCount });
+        }
+      });
+    } else {
+      const withScores = scores.map((s, i) => ({
+        index: i,
+        total_score: parseScore(s.total ?? 0),
+        today_score: parseScore(s.currentRoundScore ?? s.total ?? 0),
+        thru: s.thru ?? '-',
+      }));
+      const positionResults = assignPositionsByScore(withScores);
+      const groupKey = (pos: number, tc: number) => `${pos}-${tc}`;
+      const groupProCounts = new Map<string, number>();
+      for (const { item, position, tieCount } of positionResults) {
+        const key = groupKey(position, tieCount);
+        if (!groupProCounts.has(key)) {
+          const indicesInGroup = positionResults
+            .filter((r) => r.position === position && r.tieCount === tieCount)
+            .map((r) => r.item.index);
+          const proCount = indicesInGroup.filter((i) => !scores[i]?.isAmateur).length;
+          groupProCounts.set(key, proCount);
+        }
+        positionByIndex.set(item.index, {
+          position,
+          tieCount,
+          proCount: groupProCounts.get(key)!,
+        });
+      }
     }
 
     scores.forEach((score, idx) => {
       const key = normalizeNameForLookup(score.player);
       const teedOff = hasTeedOff(score.thru ?? score.teeTime);
       const fromScore = positionByIndex.get(idx);
-      const position = fromScore ? fromScore.position : null;
+      const position = fromScore ? fromScore.position : (score.position === 'MC' ? null : (score.positionValue ?? null));
       const tieCount = fromScore?.tieCount ?? 1;
       const proCount = fromScore?.proCount ?? 1;
       const totalScore = parseScore(score.total ?? 0);
@@ -194,8 +211,9 @@ export function processLiveScoresForPrizes(
   // RapidAPI: use positionValue; count by position for ties; all get prize
   const positionCounts = new Map<number, number>();
   scores.forEach((s) => {
-    const pos = s.positionValue ?? (s.position ? parseInt(String(s.position).replace('T', '')) : null);
-    if (pos && pos > 0) {
+    if (s.position === 'MC') return;
+    const pos = s.positionValue ?? (s.position ? parseInt(String(s.position).replace('T', ''), 10) : null);
+    if (pos != null && pos > 0 && !Number.isNaN(pos)) {
       positionCounts.set(pos, (positionCounts.get(pos) || 0) + 1);
     }
   });
@@ -210,7 +228,7 @@ export function processLiveScoresForPrizes(
   scores.forEach((score) => {
     const key = normalizeNameForLookup(score.player);
     const teedOff = hasTeedOff(score.thru ?? score.teeTime);
-    const position = score.positionValue ?? (score.position ? parseInt(String(score.position).replace('T', '')) : null);
+    const position = score.position === 'MC' ? null : (score.positionValue ?? (score.position ? parseInt(String(score.position).replace('T', ''), 10) : null));
     const tieCount = position ? (positionCounts.get(position) || 1) : 1;
     const proCount = position ? getProCountAtPosition(position) : 0;
     const totalScore = parseScore(score.total ?? 0);

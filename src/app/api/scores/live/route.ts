@@ -31,12 +31,10 @@ export async function GET(request: NextRequest) {
 
       if (cached) {
         const cacheAge = Math.round((Date.now() - new Date(cached.updated_at).getTime()) / 1000);
-        return NextResponse.json({
-          ...cached.data,
-          source: 'espn',
-          cacheAge,
-          cacheUpdatedAt: cached.updated_at,
-        });
+        return NextResponse.json(
+          { ...cached.data, source: 'espn', cacheAge, cacheUpdatedAt: cached.updated_at },
+          { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+        );
       }
 
       return NextResponse.json({
@@ -84,12 +82,10 @@ export async function GET(request: NextRequest) {
 
     if (cached) {
       const cacheAge = Math.round((Date.now() - new Date(cached.updated_at).getTime()) / 1000);
-      return NextResponse.json({
-        ...cached.data,
-        source: 'rapidapi',
-        cacheAge,
-        cacheUpdatedAt: cached.updated_at,
-      });
+      return NextResponse.json(
+        { ...cached.data, source: 'rapidapi', cacheAge, cacheUpdatedAt: cached.updated_at },
+        { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+      );
     }
 
     return NextResponse.json({

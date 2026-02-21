@@ -34,6 +34,28 @@ function formatToPar(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
+/** Parse to-par string (E, +1, -2) to number. */
+function parseScoreToNum(s: string | number | null): number {
+  if (s === null || s === undefined) return 0;
+  if (typeof s === 'number') return s;
+  const t = String(s).trim();
+  if (t === 'E') return 0;
+  if (t.startsWith('+')) return parseInt(t.slice(1), 10) || 0;
+  if (t.startsWith('-')) return -(parseInt(t.slice(1), 10) || 0);
+  return parseInt(t, 10) || 0;
+}
+
+/** Sum round displayValues (E, +1, -2) for 36-hole to-par. */
+function sumRoundsToPar(linescores: Array<{ period?: number; displayValue?: string | null }>): number | null {
+  if (!linescores || linescores.length < 2) return null;
+  const r1 = linescores.find((r) => Number(r.period) === 1);
+  const r2 = linescores.find((r) => Number(r.period) === 2);
+  const v1 = r1?.displayValue != null && r1.displayValue !== '-' ? parseScoreToNum(r1.displayValue) : null;
+  const v2 = r2?.displayValue != null && r2.displayValue !== '-' ? parseScoreToNum(r2.displayValue) : null;
+  if (v1 === null || v2 === null) return null;
+  return v1 + v2;
+}
+
 /** Cut: top N and ties after 36 holes. Compute projected cut score from sorted leaderboard. */
 function computeProjectedCut(
   withScores: Array<{ total_score: number; thru: string }>,
@@ -60,6 +82,25 @@ function computeProjectedCut(
     cutScore: formatToPar(cutScoreNum),
     cutCount: n,
   };
+}
+
+/** R3+: Compute actual cut score from 36-hole totals (top N and ties). */
+function computeActualCutScore(
+  players: Array<{ score_36: number | null }>,
+  cutCount: number
+): number | null {
+  const n = Math.max(1, cutCount);
+  const with36 = players.filter((p) => p.score_36 != null) as Array<{ score_36: number }>;
+  if (with36.length < n) return null;
+  const sorted = [...with36].sort((a, b) => a.score_36 - b.score_36);
+  return sorted[n - 1]?.score_36 ?? null;
+}
+
+/** Player has valid R3 score (actively playing round 3) — definitive made-cut signal. */
+function hasValidR3Score(linescores: Array<{ period?: number; displayValue?: string | null }> | undefined): boolean {
+  if (!linescores) return false;
+  const r3 = linescores.find((r) => Number(r.period) === 3);
+  return r3 != null && r3.displayValue != null && r3.displayValue !== '-' && r3.displayValue !== '';
 }
 
 /** Normalize round displayValue from API (string or number) to display string. */
@@ -363,6 +404,7 @@ export async function POST(request: NextRequest) {
           (roundValue !== null ? formatToPar(roundValue) : null) ??
           deriveRoundScoreFromHoles(holeScores) ??
           null;
+        const score36 = sumRoundsToPar(c.linescores ?? []);
         return {
           player: name,
           playerId: String(c.id),
@@ -377,6 +419,7 @@ export async function POST(request: NextRequest) {
           roundComplete: false,
           isAmateur: amateurMap.get(String(c.id)) ?? false,
           linescores: c.linescores ?? [],
+          score_36: score36 ?? undefined,
         };
       });
 
@@ -396,23 +439,52 @@ export async function POST(request: NextRequest) {
         total_score: parseScore(row.total),
         today_score: parseScore(row.currentRoundScore),
         thru: row.thru ?? 'F',
+        score_36: (row as { score_36?: number }).score_36 ?? null,
       }));
-      const positionResults = assignPositionsByScore(withScores);
+      // R3+: Made cut = (a) has valid R3 score (actively playing) OR (b) 36-hole <= cut score.
+      // (a) catches players like Harman; (b) catches leaders who haven't teed off yet (R3 = "-").
+      const cutCount = tournament.cut_count ?? 65;
+      const hasCut = tournament.cut_count != null;
+      const actualCutScoreNum = hasCut && currentRoundNum > 2 ? computeActualCutScore(withScores, cutCount) : null;
+      const madeCutByIndex = new Map<number, boolean>();
+      if (hasCut && currentRoundNum > 2) {
+        withScores.forEach((r, i) => {
+          const playingR3 = hasValidR3Score(r.linescores);
+          const s36 = (r as { score_36?: number | null }).score_36;
+          const byScore = actualCutScoreNum != null && s36 != null && s36 <= actualCutScoreNum;
+          // When cut score unknown, include all (don't mark anyone MC)
+          madeCutByIndex.set(i, actualCutScoreNum == null ? true : playingR3 || byScore);
+        });
+      }
+      const toRank = hasCut && currentRoundNum > 2 && actualCutScoreNum != null
+        ? withScores.filter((_, i) => madeCutByIndex.get(i))
+        : withScores;
+      const positionResults = assignPositionsByScore(toRank);
+      const positionByIndex = new Map<number, { position: number; tieCount: number }>();
       for (const { item, position, tieCount } of positionResults) {
-        const row = transformedData[item.index];
-        row.position = tieCount > 1 ? `T${position}` : String(position);
-        row.positionValue = position;
+        positionByIndex.set(item.index, { position, tieCount });
+      }
+      for (let i = 0; i < transformedData.length; i++) {
+        const row = transformedData[i];
+        const pr = positionByIndex.get(i);
+        const madeCut = currentRoundNum <= 2 || !hasCut || madeCutByIndex.get(i) !== false;
+        if (madeCut && pr) {
+          row.position = pr.tieCount > 1 ? `T${pr.position}` : String(pr.position);
+          row.positionValue = pr.position;
+        } else if (!madeCut && hasCut && currentRoundNum > 2) {
+          row.position = 'MC';
+          (row as { positionValue?: number }).positionValue = undefined;
+        }
       }
 
       const status = competition.status?.type?.description || event.status?.type?.description || 'Unknown';
       const cacheKey = `espn-${eventId}`;
 
-      // cut_count = null means no-cut event (e.g. Sentry, CJ Cup); no prize zeroing or MC
-      const cutCount = tournament.cut_count ?? 65;
-      const hasCut = tournament.cut_count != null;
       const projectedCut = hasCut ? computeProjectedCut(withScores, currentRoundNum, cutCount) : null;
       const cutLine = hasCut
-        ? (projectedCut ?? (currentRoundNum > 2 ? { cutScore: '—', cutCount } : null))
+        ? (projectedCut ?? (currentRoundNum > 2 && actualCutScoreNum != null
+          ? { cutScore: formatToPar(actualCutScoreNum), cutCount }
+          : currentRoundNum > 2 ? { cutScore: '—', cutCount } : null))
         : null;
 
       const cacheData = {

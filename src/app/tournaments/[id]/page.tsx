@@ -34,6 +34,7 @@ interface RosterPlayerData {
 }
 
 interface CachedLeaderboardPlayer {
+  position?: string;
   positionValue?: number;
   playerId?: string;
   firstName?: string;
@@ -487,38 +488,34 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           return !Number.isNaN(n) && n > 0;
         };
 
-        // Derive position from total score for ALL players; prize for all
-        const withScores = scores.map((player, index) => ({
-          ...player,
-          index,
-          total_score: parseScore(player.total ?? 0),
-          today_score: player.currentRoundScore ? parseScore(player.currentRoundScore) : 0,
-          thru: player.thru ?? '-',
-        }));
-        const positionResults = assignPositionsByScore(withScores);
-        const positionByIndex = new Map<number, { position: number; tieCount: number; proCount: number }>();
-        for (const { item, position, tieCount } of positionResults) {
-          const indicesInGroup = positionResults
-            .filter((r) => r.position === position && r.tieCount === tieCount)
-            .map((r) => r.item.index);
-          const proCount = indicesInGroup.filter((i) => !(scores[i] as CachedLeaderboardPlayer)?.isAmateur).length;
-          positionByIndex.set(item.index, { position, tieCount, proCount });
-        }
+        // ESPN cache has position/positionValue (MC get null) — use them; compute tieCount/proCount
+        const positionCounts = new Map<number, number[]>();
+        scores.forEach((p: CachedLeaderboardPlayer, i: number) => {
+          const pv = p.positionValue;
+          if (pv != null && pv > 0 && p.position !== 'MC') {
+            if (!positionCounts.has(pv)) positionCounts.set(pv, []);
+            positionCounts.get(pv)!.push(i);
+          }
+        });
+        const getTieCount = (pos: number) => positionCounts.get(pos)?.length ?? 1;
+        const getProCount = (pos: number) =>
+          (positionCounts.get(pos) ?? []).filter((i) => !(scores[i] as CachedLeaderboardPlayer)?.isAmateur).length;
 
         tournamentLeaderboard = scores.map((player: CachedLeaderboardPlayer, index) => {
           const teedOff = hasTeedOff(player.thru ?? player.teeTime);
-          const fromPos = positionByIndex.get(index);
-          const actualPosition = fromPos ? fromPos.position : (player.positionValue ?? 0);
-          const tieCount = fromPos ? fromPos.tieCount : 1;
-          const proCount = fromPos ? fromPos.proCount : 0;
+          const isMC = player.position === 'MC';
+          const posVal = player.positionValue;
+          const actualPosition = isMC || posVal == null || posVal <= 0 ? null : posVal;
+          const tieCount = actualPosition != null ? getTieCount(actualPosition) : 1;
+          const proCount = actualPosition != null ? getProCount(actualPosition) : 0;
           const isAmateur = player.isAmateur === true;
           const isTied = tieCount > 1;
           const prizeMoney =
-            actualPosition > 0 && !isAmateur && proCount > 0
+            actualPosition != null && actualPosition > 0 && !isAmateur && proCount > 0
               ? calculateTiePrizeMoney(actualPosition, tieCount, proCount)
               : 0;
           return {
-            position: actualPosition > 0 ? actualPosition : null,
+            position: actualPosition != null && actualPosition > 0 ? actualPosition : null,
             is_tied: isTied,
             tied_with_count: tieCount,
             total_score: parseScore(player.total ?? 0),
@@ -529,7 +526,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             tee_time: player.teeTime || null,
             teeTime: player.teeTime || undefined,
             starting_tee: null,
-            prize_distribution: actualPosition > 0 && prizeDistributionMap.has(actualPosition)
+            prize_distribution: actualPosition != null && actualPosition > 0 && prizeDistributionMap.has(actualPosition)
               ? prizeDistributionMap.get(actualPosition)
               : undefined,
             apiPlayerId: player.playerId,
