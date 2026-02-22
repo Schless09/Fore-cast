@@ -45,16 +45,22 @@ function renderWouldBeRosterTable(playerWinnings: WouldaCouldaPlayerWinnings[]):
  * Sends them a lighthearted "woulda coulda" email.
  *
  * Body: { tournamentId: string }
- * Auth: CRON_SECRET (Bearer) or dev (no secret).
+ * Auth: Manual only. Requires authenticated user (admin). Explicitly rejects cron/automated calls.
  */
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const { userId: clerkUserId } = await auth();
   const cronSecret = process.env.CRON_SECRET;
-  const isDev = process.env.NODE_ENV === 'development';
   const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
-  const isAuthorized = isCron || isDev || !!clerkUserId;
-  if (!isAuthorized) {
+
+  // Never allow automated/cron triggers — manual admin only
+  if (isCron) {
+    return NextResponse.json(
+      { success: false, error: 'Woulda-coulda emails must be triggered manually by an admin. Automated calls are not allowed.' },
+      { status: 403 }
+    );
+  }
+  if (!clerkUserId) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
