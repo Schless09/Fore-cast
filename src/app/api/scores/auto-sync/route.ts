@@ -778,8 +778,9 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Auto-update tournament status if completed, then finalize scores & winnings
-        if (status === 'Official') {
+        // Auto-update tournament status if completed, then finalize scores & winnings.
+        // Guard: only mark complete when round 4+ (RapidAPI can return "Official" after R3)
+        if (status === 'Official' && roundId >= 4) {
           await supabase
             .from('tournaments')
             .update({ status: 'completed' })

@@ -527,12 +527,13 @@ export async function POST(request: NextRequest) {
         syncedCount++;
       }
 
-      // When ESPN signals tournament complete, mark completed and finalize prize money
+      // When ESPN signals tournament complete, mark completed and finalize prize money.
+      // Guard: only mark complete when we've reached round 4+ (API can report "Final" after R3)
       const statusCompleted =
         (competition.status?.type as { completed?: boolean } | undefined)?.completed === true ||
         (event.status?.type as { completed?: boolean } | undefined)?.completed === true ||
         /final|official/i.test(status || '');
-      if (statusCompleted && tournament.status === 'active') {
+      if (statusCompleted && tournament.status === 'active' && currentRoundNum >= 4) {
         await supabase
           .from('tournaments')
           .update({ status: 'completed' })
