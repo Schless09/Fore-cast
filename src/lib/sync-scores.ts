@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { firstNamesMatchForLiveScores } from './live-scores-prizes';
 
 export interface SyncScoresResult {
   success: boolean;
@@ -226,6 +227,8 @@ async function syncPositionsFromCachedData(
   }
 
   const normalizedNameToId = new Map<string, string>();
+  /** For fuzzy fallback: last name -> [{ first, tpId }] so "Matti Schmid" (API) can match "Matthias Schmid" (DB) */
+  const lastNameToCandidates = new Map<string, Array<{ first: string; tpId: string }>>();
   const playerIdToTPId = new Map<string, string>();
   const espnAthleteIdToTPId = new Map<string, string>();
   const tpIdToPgaPlayerId = new Map<string, string>();
@@ -235,6 +238,14 @@ async function syncPositionsFromCachedData(
     if (pgaPlayer?.name) {
       const normalized = normalizeName(pgaPlayer.name);
       normalizedNameToId.set(normalized, tp.id);
+      const parts = normalized.split(/\s+/);
+      const last = parts.pop() ?? '';
+      const first = parts.join(' ') || '';
+      if (last) {
+        const list = lastNameToCandidates.get(last) ?? [];
+        list.push({ first, tpId: tp.id });
+        lastNameToCandidates.set(last, list);
+      }
     }
     if (tp.pga_player_id) {
       playerIdToTPId.set(tp.pga_player_id, tp.id);
@@ -276,6 +287,14 @@ async function syncPositionsFromCachedData(
     if (!tpId && score.player) {
       const normalized = normalizeName(score.player);
       tpId = normalizedNameToId.get(normalized);
+      // Fuzzy fallback: match by last name + first-name alias (e.g. Matti/Matthias Schmid)
+      if (!tpId) {
+        const parts = normalized.split(/\s+/);
+        const last = parts.pop() ?? '';
+        const first = parts.join(' ') || '';
+        const candidates = lastNameToCandidates.get(last) ?? [];
+        tpId = candidates.find((c) => firstNamesMatchForLiveScores(first, c.first))?.tpId;
+      }
     }
     
     if (tpId && score.positionValue !== null) {
