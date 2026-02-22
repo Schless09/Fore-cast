@@ -211,17 +211,20 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
   let playerStats: PlayerSelectionStats[] = [];
 
   if (rosterIds.length > 0) {
-    // Build a map from roster_id to username
+    // Build roster_id -> username in a single query (avoid N+1)
+    const userIds = [...new Set((leagueRosters || []).map((r) => r.user_id))];
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username')
+      .in('id', userIds);
+
+    const userIdToUsername = new Map(
+      (profiles || []).map((p) => [p.id, p.username ?? ''])
+    );
     const rosterToUserMap = new Map<string, string>();
     for (const roster of leagueRosters || []) {
-      const { data: userProfile } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', roster.user_id)
-        .single();
-      if (userProfile?.username) {
-        rosterToUserMap.set(roster.id, userProfile.username);
-      }
+      const username = userIdToUsername.get(roster.user_id);
+      if (username) rosterToUserMap.set(roster.id, username);
     }
 
     const { data: selectionData, error: selectionError } = await supabase

@@ -129,7 +129,7 @@ function TournamentCardFeatured({ tournament }: { tournament: Tournament }) {
       </CardHeader>
       <CardContent className="flex flex-col sm:flex-row gap-3 sm:items-center">
         <p className="text-gray-700 flex-1">
-          Draft your roster of up to 10 golfers under the $30 cap and track live prize money standings.
+          Draft your roster of up to 10 golfers under the $30 cap and track live league standings.
         </p>
         <div className="flex gap-3">
           <Link href={`/tournaments/${tournament.id}`}>

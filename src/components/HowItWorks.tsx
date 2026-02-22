@@ -22,13 +22,13 @@ export function HowItWorks({ payoutDescription, segmentDefinitions = [] }: HowIt
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="text-white font-medium">Weekly:</span>
             <span className="text-casino-gray">
-              $30 budget, up to 10 golfers. Your team earns the purse won by each player on your roster—most total prize money wins. Rosters open <span className="text-casino-gold font-medium">Monday around noon CST</span> and lock when the tournament starts.
+              $30 budget, up to 10 golfers. Rosters are scored by PGA Tour winnings—most total wins the week. Your league commissioner handles payouts outside the platform. Rosters open <span className="text-casino-gold font-medium">Monday around noon CST</span> and lock when the tournament starts.
             </span>
           </div>
 
-          {/* Payouts */}
+          {/* Payouts (commissioner-managed) */}
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-white font-medium">Payouts:</span>
+            <span className="text-white font-medium">Payouts (commissioner-managed):</span>
             {payoutDescription ? (
               <span className="text-casino-gold">{payoutDescription}</span>
             ) : (

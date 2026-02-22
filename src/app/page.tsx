@@ -83,7 +83,7 @@ export default function Home() {
         {/* Header */}
         <div className="text-center mb-14 lg:mb-20">
           <span className="inline-block mb-5 text-casino-gold text-sm tracking-[0.3em] uppercase px-6 py-3 bg-casino-gold/10 rounded-full border border-casino-gold/20">
-            Simple • Strategic • Rewarding
+            Compete • Strategize • Track
           </span>
 
           <h2 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-5">
@@ -105,6 +105,7 @@ export default function Home() {
             </h3>
             <p className="text-gray-400 text-lg sm:text-xl mb-6">
               Draft PGA Tour pros under $30 salary cap and outsmart the field.
+              Your strategy decides the leaderboard—skills matter more than luck.
             </p>
           </div>
 
@@ -143,10 +144,11 @@ export default function Home() {
         <section className="relative grid lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-10 lg:mb-16">
           <div>
             <h3 className="text-4xl sm:text-5xl font-bold mb-5 bg-gradient-to-r from-white to-casino-gold bg-clip-text text-transparent">
-              Claim Victory
+              Climb the Leaderboard
             </h3>
             <p className="text-gray-400 text-lg sm:text-xl mb-6">
-              Win based on real PGA prize money and weekly tournaments.
+              Compete weekly, climb the leaderboard, and earn bragging rights.
+              Commissioner-managed leagues handle payouts outside the platform.
             </p>
           </div>
 
@@ -169,15 +171,23 @@ export default function Home() {
               Ready to Play?
             </h3>
 
-            <p className="text-gray-400 text-lg sm:text-xl mb-8">
-              Lock your picks before the first tee shot.
+            <p className="text-gray-400 text-lg sm:text-xl mb-6">
+              Create your own league and invite friends—or join an existing one.
+              Set your lineup, outsmart your league, and track live updates.
             </p>
 
-            <Link href="/auth/signup">
-              <button className="px-12 py-5 rounded-2xl bg-gradient-to-r from-casino-gold to-casino-gold-light text-black text-lg font-bold hover:scale-105 transition">
-                Start Playing →
-              </button>
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link href="/auth/signup">
+                <button className="px-12 py-5 rounded-2xl bg-gradient-to-r from-casino-gold to-casino-gold-light text-black text-lg font-bold hover:scale-105 transition">
+                  Join a League →
+                </button>
+              </Link>
+              <Link href="/create-league">
+                <button className="px-12 py-5 rounded-2xl border-2 border-casino-gold text-casino-gold font-bold hover:bg-casino-gold/10 transition">
+                  Create Your Own League →
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
       </main>

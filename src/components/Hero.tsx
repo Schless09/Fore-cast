@@ -22,7 +22,7 @@ export function Hero() {
         <div className="space-y-6">
           <div className="inline-block">
             <p className="text-sm sm:text-base tracking-[0.3em] uppercase text-casino-gold font-bold shimmer">
-              Fantasy Golf • Real Stakes
+              Fantasy Golf • Compete with Friends
             </p>
           </div>
           
@@ -42,22 +42,40 @@ export function Hero() {
           
           <p className="text-base sm:text-lg md:text-xl text-casino-gray max-w-3xl mx-auto leading-relaxed">
             Build your PGA roster under the <span className="text-casino-green font-bold">$30 salary cap</span>, 
-            track live scoring, and compete for <span className="text-casino-gold font-bold">real prize money</span> positions.
+            track live scoring, and climb the <span className="text-casino-gold font-bold">leaderboard</span>.
+            Your strategy decides the outcome—skills matter more than luck.
+          </p>
+          <p className="text-sm sm:text-base text-casino-gray/80 max-w-2xl mx-auto">
+            Create your own league and invite friends—or join an existing one. $1 per member ($10 min).
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-4">
           <Link href="/auth/signup" className="w-full sm:w-auto">
             <button className="btn-casino-gold w-full sm:w-auto px-10 py-4 text-lg rounded-xl font-bold tracking-wide">
-              🏌️ Start Playing
+              🏌️ Join a League
             </button>
           </Link>
-          <Link href="/tournaments" className="w-full sm:w-auto">
+          <Link href="/create-league" className="w-full sm:w-auto">
             <button className="w-full sm:w-auto px-10 py-4 text-lg rounded-xl font-semibold border-2 border-casino-gold text-casino-gold hover:bg-casino-gold/10 transition-all backdrop-blur-sm">
-              View Tournaments
+              Create Your Own League
             </button>
           </Link>
         </div>
+
+        <p className="pt-4 flex flex-wrap items-center justify-center gap-4 text-sm">
+          <Link href="/masters" className="text-casino-green hover:text-casino-gold transition-colors font-medium">
+            🏆 The Masters →
+          </Link>
+          <span className="text-casino-gray/50">·</span>
+          <Link href="/majors" className="text-casino-gold/90 hover:text-casino-gold transition-colors font-medium">
+            Majors Pool →
+          </Link>
+          <span className="text-casino-gray/50">·</span>
+          <Link href="/upcoming-tournaments" className="text-casino-gray hover:text-casino-gold transition-colors">
+            Upcoming tournaments →
+          </Link>
+        </p>
         
         <div className="pt-8 flex items-center justify-center gap-8 text-sm text-casino-gray">
           <div className="flex items-center gap-2">
@@ -69,8 +87,8 @@ export function Hero() {
             <span>Real-Time Updates</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-casino-green">💰</span>
-            <span>Prize Money</span>
+            <span className="text-casino-green">🏆</span>
+            <span>League Standings</span>
           </div>
         </div>
       </div>

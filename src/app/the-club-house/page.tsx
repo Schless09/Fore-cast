@@ -9,7 +9,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 export const metadata: Metadata = {
   title: 'The Club House',
   description:
-    'Fantasy golf league rules, payouts, and payment info. Prize money and Venmo for FORE!SIGHT fantasy golf leagues.',
+    'Fantasy golf league rules and commissioner-managed payouts. Payment info for FORE!SIGHT fantasy golf leagues.',
 };
 
 interface LeagueSettings {

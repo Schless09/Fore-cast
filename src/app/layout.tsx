@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s | FORE!SIGHT Fantasy Golf",
   },
   description:
-    "Fantasy golf with real stakes. Create rosters of PGA Tour players, track live scoring, and compete for prize money. The best fantasy golf app for leagues with friends.",
+    "Fantasy golf with friends. Create PGA Tour rosters, track live scoring, and compete for leaderboard glory. The best fantasy golf app for private leagues.",
   keywords: [
     "Fantasy Golf",
     "fantasy golf",
@@ -45,13 +45,13 @@ export const metadata: Metadata = {
     siteName: "FORE!SIGHT Fantasy Golf",
     title: "Fantasy Golf | FORE!SIGHT - Predict. Play. Win.",
     description:
-      "Fantasy golf with real stakes. Create PGA Tour rosters, track live scoring, compete for prize money. The best fantasy golf app for leagues.",
+      "Fantasy golf with friends. Create PGA Tour rosters, track live scoring, compete for leaderboard glory. The best fantasy golf app for private leagues.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Fantasy Golf | FORE!SIGHT - Predict. Play. Win.",
     description:
-      "Fantasy golf with real stakes. PGA Tour rosters, live scoring, prize money. The best fantasy golf app for leagues.",
+      "Fantasy golf with friends. PGA Tour rosters, live scoring, league standings. The best fantasy golf app for private leagues.",
   },
   robots: {
     index: true,
@@ -65,7 +65,7 @@ const jsonLd = {
   name: "FORE!SIGHT Fantasy Golf",
   alternateName: "FORE!SIGHT",
   description:
-    "Fantasy golf app. Create PGA Tour rosters, track live scoring, compete for prize money in fantasy golf leagues.",
+    "Fantasy golf app. Create PGA Tour rosters, track live scoring, compete in commissioner-managed fantasy golf leagues. $1 per member ($10 min).",
   url: baseUrl,
   applicationCategory: "Game",
   keywords: "Fantasy Golf, fantasy golf app, PGA Tour, golf league, golf picks",
