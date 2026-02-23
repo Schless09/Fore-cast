@@ -34,10 +34,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const username = [firstName, lastName].filter(Boolean).join(' ') || email;
+    const displayName = (formData.get('displayName') as string)?.trim();
+    const username = displayName || [firstName, lastName].filter(Boolean).join(' ') || email;
     const subject = type === 'Bug Report'
       ? `🚨 Bug report from ${username}`
-      : `🚨 Feature request from ${username}`;
+      : type === 'General Inquiry'
+        ? `📩 General inquiry from ${username}`
+        : `🚨 Feature request from ${username}`;
 
     const html = `
       <div style="font-family: sans-serif; max-width: 600px;">

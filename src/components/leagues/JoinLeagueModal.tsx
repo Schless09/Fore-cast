@@ -92,7 +92,7 @@ export function JoinLeagueModal({ onClose, canClose = false }: JoinLeagueModalPr
           {mode === 'create' && (
             <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
               <p className="text-sm text-amber-200">
-                There is a <strong>$4 per league member</strong> administrative fee for running and maintaining the league.
+                There is a <strong>$2 per league member</strong> administrative fee ($20 minimum) for running and maintaining the league.
               </p>
               <p className="text-xs text-amber-200/90 mt-2">
                 The league will be disabled if administrative fees are not paid prior to the Cognizant Classic.

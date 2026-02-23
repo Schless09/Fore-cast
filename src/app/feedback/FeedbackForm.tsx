@@ -5,7 +5,7 @@ import { useUser } from '@clerk/nextjs';
 
 export function FeedbackForm() {
   const { user } = useUser();
-  const [type, setType] = useState<'Feature Request' | 'Bug Report'>('Feature Request');
+  const [type, setType] = useState<'Feature Request' | 'Bug Report' | 'General Inquiry'>('Feature Request');
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -31,6 +31,8 @@ export function FeedbackForm() {
     formData.set('email', email);
     formData.set('firstName', firstName);
     formData.set('lastName', lastName);
+    const displayName = user?.username || [firstName, lastName].filter(Boolean).join(' ') || email;
+    formData.set('displayName', displayName);
     formData.set('message', message);
     if (screenshot) formData.set('screenshot', screenshot);
 
@@ -64,11 +66,12 @@ export function FeedbackForm() {
         <select
           id="type"
           value={type}
-          onChange={(e) => setType(e.target.value as 'Feature Request' | 'Bug Report')}
+          onChange={(e) => setType(e.target.value as 'Feature Request' | 'Bug Report' | 'General Inquiry')}
           className="w-full px-3 py-2 rounded-lg bg-casino-card border border-casino-gold/20 text-casino-text focus:border-casino-gold focus:outline-none"
         >
           <option value="Feature Request">Feature Request</option>
           <option value="Bug Report">Bug Report</option>
+          <option value="General Inquiry">General Inquiry</option>
         </select>
       </div>
 

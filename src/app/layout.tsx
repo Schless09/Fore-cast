@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ClientOnlyComponents } from "@/components/ClientOnlyComponents";
 
@@ -94,6 +95,7 @@ export default function RootLayout({
               <main className="relative">
                 {children}
               </main>
+              <Footer />
             </div>
           </ErrorBoundary>
           <Analytics />
