@@ -28,7 +28,7 @@ export default function TermsPage() {
           <p>
             Welcome to FORE!SIGHT Fantasy Golf (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;). These Terms & Conditions (&quot;Terms&quot;) govern your access and use of{' '}
             <a href="https://foresightgolfleague.com" className="text-casino-gold hover:underline">https://foresightgolfleague.com</a>
-            {' '}and associated pages including the Masters, Create League, Majors, and other league management features (collectively, the &quot;Service&quot;). By visiting or using the Service, you agree to these Terms.
+            {' '}and all associated web pages and features (collectively, the &quot;Service&quot;). By visiting or using the Service, you agree to these Terms.
           </p>
 
           <section>

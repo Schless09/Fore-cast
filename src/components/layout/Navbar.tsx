@@ -124,12 +124,6 @@ export function Navbar() {
             Season
           </Link>
           <Link
-            href="/feedback"
-            className="text-casino-text hover:text-casino-gold font-medium transition-all hover:tracking-wide"
-          >
-            Feedback
-          </Link>
-          <Link
             href="/chat"
             className="text-casino-text hover:text-casino-gold font-medium transition-all hover:tracking-wide relative"
           >
@@ -220,13 +214,6 @@ export function Navbar() {
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Season Standings
-            </Link>
-            <Link
-              href="/feedback"
-              className="text-casino-text hover:text-casino-gold hover:bg-casino-card/50 font-medium transition-all px-4 py-3 rounded-lg"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Feedback
             </Link>
             <Link
               href="/chat"
