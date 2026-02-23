@@ -70,7 +70,7 @@ export default function MastersPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/create-league">
               <button className="group relative px-10 py-4 rounded-xl bg-[#006747] hover:bg-[#007a54] text-white font-bold text-base tracking-wide overflow-hidden transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(0,168,107,0.4)]">
-                <span className="relative z-10">Create Your Masters League →</span>
+                <span className="relative z-10">Create Your Masters Pool →</span>
                 <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-200" />
               </button>
             </Link>
@@ -100,14 +100,14 @@ export default function MastersPage() {
         </div>
       </div>
 
-      {/* ── WHY A MASTERS LEAGUE ─────────────────────────────────── */}
+      {/* ── WHY A MASTERS POOL ─────────────────────────────────── */}
       <div className="relative overflow-hidden py-20">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_50%,rgba(0,103,71,0.05)_0%,transparent_70%)]" />
         <div className="relative max-w-5xl mx-auto px-4">
 
           <div className="text-center mb-12">
             <p className="text-[#00a86b]/60 uppercase tracking-[0.3em] text-xs mb-3">The Case For It</p>
-            <h2 className="text-3xl sm:text-4xl font-bold font-orbitron text-white">Why Run a Masters League?</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold font-orbitron text-white">Why Run a Masters Pool?</h2>
           </div>
 
           <div className="grid sm:grid-cols-3 gap-5">
@@ -282,13 +282,13 @@ export default function MastersPage() {
               </span>
             </h3>
             <p className="text-white/50 mb-10 max-w-lg mx-auto leading-relaxed">
-              Create your Masters league, invite your crew, and let Augusta do the rest.
+              Create your Masters pool, invite your crew, and let Augusta do the rest.
               $2 per member ($20 min). You handle payouts — we handle the scoring.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/create-league">
                 <button className="group relative px-12 py-5 rounded-2xl bg-[#006747] hover:bg-[#007a54] text-white text-base font-bold transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(0,168,107,0.35)]">
-                  Create Your Masters League →
+                  Create Your Masters Pool →
                 </button>
               </Link>
               <Link href="/auth/signup">
