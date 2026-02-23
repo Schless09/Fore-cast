@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 export const metadata: Metadata = {
   title: 'Create a League',
   description:
-    'Become a commissioner and run your own fantasy golf league. $1 per member ($10 min). Lineup management, live scoring, and leaderboards. You handle payouts—we provide the platform.',
+    'Become a commissioner and run your own fantasy golf league. $2 per member ($20 min). Lineup management, live scoring, and leaderboards. You handle payouts—we provide the platform.',
 };
 
 export default function CreateLeaguePage() {
@@ -29,7 +29,7 @@ export default function CreateLeaguePage() {
         <div className="mb-8 p-6 bg-casino-gold/10 border border-casino-gold/30 rounded-xl">
           <p className="text-lg font-semibold text-casino-gold mb-1">Platform pricing</p>
           <p className="text-casino-text">
-            $1 per league member, $10 minimum. A 5-person league is $10; a 15-person league is $15.
+            $2 per league member, $20 minimum. A 10-person league is $20; a 15-person league is $30.
           </p>
         </div>
 
@@ -71,7 +71,7 @@ export default function CreateLeaguePage() {
                 tracking tool—like a scorekeeping app for your league.
               </p>
               <p className="text-casino-gray text-sm">
-                We charge $1 per league member ($10 min) for platform access. We provide software for 
+                We charge $2 per league member ($20 min) for platform access. We provide software for 
                 private fantasy leagues; you run your league.
               </p>
             </CardContent>

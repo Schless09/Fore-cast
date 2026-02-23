@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
+import { useUser } from '@clerk/nextjs';
 
 /**
  * Hero section with animated background.
  */
 export function Hero() {
+  const { isSignedIn } = useUser();
   return (
     <section className="relative w-full min-h-screen flex items-center justify-center overflow-hidden">
       {/* Overlay */}
@@ -46,19 +47,27 @@ export function Hero() {
             Your strategy decides the outcome—skills matter more than luck.
           </p>
           <p className="text-sm sm:text-base text-casino-gray/80 max-w-2xl mx-auto">
-            Create your own league and invite friends—or join an existing one. $1 per member ($10 min).
+            Create your own league and invite friends—or join an existing one. $2 per member ($20 min).
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-4">
-          <Link href="/auth/signup" className="w-full sm:w-auto">
-            <button className="btn-casino-gold w-full sm:w-auto px-10 py-4 text-lg rounded-xl font-bold tracking-wide">
-              🏌️ Join a League
-            </button>
-          </Link>
-          <Link href="/create-league" className="w-full sm:w-auto">
+          {isSignedIn ? (
+            <Link href="/tournaments" className="w-full sm:w-auto">
+              <button className="btn-casino-gold w-full sm:w-auto px-10 py-4 text-lg rounded-xl font-bold tracking-wide">
+                ⭐ This Week&apos;s Tourney
+              </button>
+            </Link>
+          ) : (
+            <Link href="/auth/signup" className="w-full sm:w-auto">
+              <button className="btn-casino-gold w-full sm:w-auto px-10 py-4 text-lg rounded-xl font-bold tracking-wide">
+                🏌️ Join a League
+              </button>
+            </Link>
+          )}
+          <Link href={isSignedIn ? "/leagues" : "/create-league"} className="w-full sm:w-auto">
             <button className="w-full sm:w-auto px-10 py-4 text-lg rounded-xl font-semibold border-2 border-casino-gold text-casino-gold hover:bg-casino-gold/10 transition-all backdrop-blur-sm">
-              Create Your Own League
+              {isSignedIn ? "My Leagues" : "Create Your Own League"}
             </button>
           </Link>
         </div>

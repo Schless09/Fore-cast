@@ -65,7 +65,7 @@ const jsonLd = {
   name: "FORE!SIGHT Fantasy Golf",
   alternateName: "FORE!SIGHT",
   description:
-    "Fantasy golf app. Create PGA Tour rosters, track live scoring, compete in commissioner-managed fantasy golf leagues. $1 per member ($10 min).",
+    "Fantasy golf app. Create PGA Tour rosters, track live scoring, compete in commissioner-managed fantasy golf leagues. $2 per member ($20 min).",
   url: baseUrl,
   applicationCategory: "Game",
   keywords: "Fantasy Golf, fantasy golf app, PGA Tour, golf league, golf picks",
