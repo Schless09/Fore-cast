@@ -64,7 +64,7 @@ export default function CreateLeaguePage() {
             <CardHeader>
               <CardTitle>Your role as commissioner</CardTitle>
             </CardHeader>
-            <CardContent className="text-casino-text space-y-3">
+            <CardContent className="text-casino-text space-y-4">
               <p>
                 <strong>You handle the money.</strong> FORE!SIGHT never takes custody of entry fees or payouts. 
                 You collect from members (e.g., Venmo, cash) and distribute winnings yourself. We&apos;re a 
@@ -74,6 +74,32 @@ export default function CreateLeaguePage() {
                 We charge $2 per league member ($20 min) for platform access. We provide software for 
                 private fantasy leagues; you run your league.
               </p>
+              <p className="text-casino-gold/90 text-sm font-medium">Example payout spreadsheets</p>
+              <div className="rounded-xl overflow-hidden border border-casino-gold/20">
+                <iframe
+                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vTO4bBXP5Fnj4_V8k_fJX25DoBSkjrCnccGsndw6e1xX0EB634otYJSor_HdfYpx22znHdjdbk10FKz/pubhtml?widget=true&headers=false"
+                  className="w-full h-[320px] sm:h-[380px] bg-[#0d1117]"
+                  title="FORE!SIGHT Commissioner Cheat Sheet (Majors)"
+                />
+                <div className="flex flex-wrap gap-3 p-3 bg-casino-gold/5 border-t border-casino-gold/20">
+                  <a
+                    href="https://docs.google.com/spreadsheets/d/1Rq8gAYXP3u4tmtTQkclI9IFakDzxSTRssqglL5Y5q0U/edit?usp=sharing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium text-casino-gold hover:text-casino-gold-light transition-colors"
+                  >
+                    Majors pool template →
+                  </a>
+                  <a
+                    href="https://docs.google.com/spreadsheets/d/1IGuxr0-jJDxrViKYRGby63MFbHIAEdppZSwTwVtZdok/edit?usp=sharing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium text-casino-gold hover:text-casino-gold-light transition-colors"
+                  >
+                    Full season template →
+                  </a>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

@@ -120,7 +120,7 @@ export default function MastersPage() {
               {
                 icon: '👑',
                 title: 'Best Field in Golf',
-                body: 'Scottie, Rory, Rahm, Bryson, and more. Simply the best players in the world.',
+                body: 'Scottie, Rory, Bryson, Rahm, and more. Simply the best players in the world.',
               },  
               {
                 icon: '⚡',
