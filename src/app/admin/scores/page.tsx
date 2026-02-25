@@ -124,6 +124,31 @@ export default function AdminScoresPage() {
     }
   };
 
+  const handleUnmarkWithdrawn = async (pgaPlayerId: string) => {
+    if (!selectedTournament) return;
+    setIsUpdating(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/admin/withdrawals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tournamentId: selectedTournament.id,
+          pgaPlayerIds: [pgaPlayerId],
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to unmark');
+      setMessage(`✅ ${result.message}`);
+      loadTournamentPlayers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to unmark');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const toggleWithdrawalSelect = (pgaPlayerId: string) => {
     setWithdrawalSelection((prev) => {
       const next = new Set(prev);
@@ -384,31 +409,52 @@ export default function AdminScoresPage() {
               <>
                 <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-md bg-white p-2">
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {tournamentPlayers
-                      .filter((tp) => !tp.withdrawn)
-                      .map((tp) => (
-                        <label
-                          key={tp.id}
-                          className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 ${
-                            withdrawalSelection.has(tp.pga_player_id) ? 'bg-amber-100' : ''
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={withdrawalSelection.has(tp.pga_player_id)}
-                            onChange={() => toggleWithdrawalSelect(tp.pga_player_id)}
-                            className="rounded"
-                          />
-                          <span className="text-sm truncate">
-                          {Array.isArray(tp.pga_players)
+                    {[...tournamentPlayers]
+                      .sort((a, b) => (a.withdrawn === b.withdrawn ? 0 : a.withdrawn ? -1 : 1))
+                      .map((tp) => {
+                        const name =
+                          Array.isArray(tp.pga_players)
                             ? tp.pga_players[0]?.name ?? 'Unknown'
-                            : tp.pga_players?.name ?? 'Unknown'}
-                        </span>
-                        </label>
-                      ))}
+                            : tp.pga_players?.name ?? 'Unknown';
+                        if (tp.withdrawn) {
+                          return (
+                            <div
+                              key={tp.id}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded bg-red-50"
+                            >
+                              <span className="text-red-600 text-xs font-medium">WD</span>
+                              <span className="text-sm truncate text-gray-900 line-through flex-1">{name}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleUnmarkWithdrawn(tp.pga_player_id)}
+                                disabled={isUpdating}
+                                className="text-xs text-blue-600 hover:text-blue-800 underline shrink-0"
+                              >
+                                Unmark
+                              </button>
+                            </div>
+                          );
+                        }
+                        return (
+                          <label
+                            key={tp.id}
+                            className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 ${
+                              withdrawalSelection.has(tp.pga_player_id) ? 'bg-amber-100' : ''
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={withdrawalSelection.has(tp.pga_player_id)}
+                              onChange={() => toggleWithdrawalSelect(tp.pga_player_id)}
+                              className="rounded"
+                            />
+                            <span className="text-sm truncate text-gray-900">{name}</span>
+                          </label>
+                        );
+                      })}
                   </div>
-                  {tournamentPlayers.filter((tp) => !tp.withdrawn).length === 0 && (
-                    <p className="text-sm text-gray-500 py-4 text-center">No players (or all withdrawn)</p>
+                  {tournamentPlayers.length === 0 && (
+                    <p className="text-sm text-gray-500 py-4 text-center">No players</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">

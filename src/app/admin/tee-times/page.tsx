@@ -6,6 +6,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import {
   CheckAndClearTeeTimesCard,
   ManualTeeTimesUpload,
+  RemoveDuplicatesCard,
   WeekendTeeTimesUpload,
 } from '@/components/admin/tee-times';
 
@@ -56,6 +57,12 @@ export default function TeeTimesAdminPage() {
       </p>
 
       <CheckAndClearTeeTimesCard />
+
+      <RemoveDuplicatesCard
+        tournaments={tournaments}
+        selectedTournamentId={selectedTournamentId}
+        onTournamentChange={setSelectedTournamentId}
+      />
 
       <ManualTeeTimesUpload
         tournaments={tournaments}

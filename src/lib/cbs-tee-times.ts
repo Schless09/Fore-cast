@@ -23,7 +23,7 @@ const MIN_MATCH_RATE = 0.6;
 /** Min CBS rows to consider the page valid (tournament tee times published) */
 const MIN_CBS_ROWS = 50;
 
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   return (name || '')
     .toLowerCase()
     .trim()
@@ -40,6 +40,20 @@ function normalizeName(name: string): string {
     .replace(/\s+/g, ' ');
 }
 
+/** Whether two player names refer to the same person (for duplicate detection) */
+export function playerNamesMatch(a: string, b: string): boolean {
+  const normA = TEE_TIME_NICKNAME_MAP[normalizeName(a)] ?? normalizeName(a);
+  const normB = TEE_TIME_NICKNAME_MAP[normalizeName(b)] ?? normalizeName(b);
+  if (normA === normB) return true;
+  const partsA = normA.split(' ');
+  const partsB = normB.split(' ');
+  if (partsA.length < 2 || partsB.length < 2) return false;
+  return (
+    partsA[partsA.length - 1] === partsB[partsB.length - 1] &&
+    (partsA[0] === partsB[0] || partsA[0].startsWith(partsB[0]) || partsB[0].startsWith(partsA[0]))
+  );
+}
+
 export const TEE_TIME_NICKNAME_MAP: Record<string, string> = {
   'dan brown': 'daniel brown',
   'johnny keefer': 'john keefer',
@@ -54,6 +68,9 @@ export const TEE_TIME_NICKNAME_MAP: Record<string, string> = {
   'ct pan': 'c.t. pan',
   'hj kim': 'h.j. kim',
   'st lee': 'seung taek lee',
+  // CBS "Nico" / odds "Nicolas"; CBS "Frankie Capan" / odds "Frankie Capan III"
+  'nico echavarria': 'nicolas echavarria',
+  'frankie capan': 'frankie capan iii',
 };
 
 export interface CBSRow {
@@ -81,10 +98,19 @@ export function parseCBSLeaderboardHTML(html: string): CBSRow[] {
 
     cells.each((i, el) => {
       const $el = $(el);
-      const link = $el.find('a[href*="/golf/players/"]').first();
-      if (link.length) {
+      const links = $el.find('a[href*="/golf/players/"]');
+      if (links.length) {
         nameCol = i;
-        name = (link.attr('title') || link.text() || $el.text()).trim();
+        // CBS uses .CellPlayerName--long for full name (Taylor Moore), .CellPlayerName--short for abbrev (T. Moore)
+        const longLink = $el.find('.CellPlayerName--long a[href*="/golf/players/"]').first();
+        const linkToUse = longLink.length ? longLink : links.first();
+        const text = (linkToUse.attr('title') || linkToUse.text()).trim();
+        const href = linkToUse.attr('href') || '';
+        const slugMatch = href.match(/\/golf\/players\/[^/]+\/([^/]+)\/?$/);
+        const slugName = slugMatch
+          ? slugMatch[1].replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+          : '';
+        name = (text || slugName).trim();
       }
     });
 
@@ -137,6 +163,22 @@ function findCbsRowForDbPlayer(dbName: string, cbsRowsByNorm: Map<string, CBSRow
   return null;
 }
 
+/** Check if CBS row matches any existing tournament player by name (avoids duplicate inserts) */
+function cbsRowMatchesExistingPlayer(
+  cbsRow: CBSRow,
+  tournamentPlayers: { pga_player_id: string | null }[],
+  nameByPgaId: Map<string, string>,
+  cbsRowsByNorm: Map<string, CBSRow>
+): boolean {
+  for (const tp of tournamentPlayers) {
+    const name = tp.pga_player_id ? nameByPgaId.get(tp.pga_player_id) : null;
+    if (!name) continue;
+    const found = findCbsRowForDbPlayer(name, cbsRowsByNorm);
+    if (found === cbsRow) return true;
+  }
+  return false;
+}
+
 /**
  * Whether we're in the pre-tournament window: Tuesday through Thursday morning
  * until the tournament starts. CBS publishes tee times Wed; we run Tue–Thu.
@@ -160,7 +202,11 @@ export interface SyncTeeTimesAndWithdrawalsResult {
   replacementsAdded: number;
   withdrawnCount: number;
   emailsSent: number;
+  /** Names of players marked withdrawn (no longer in CBS field) */
+  withdrawnPlayerNames?: string[];
   skipped?: string;
+  /** Diagnostic info when skipped */
+  debug?: { cbsRows: number; matched: number; totalDb: number; matchRatePct: number };
 }
 
 /** Build map: normalized name -> pga_player_id for matching CBS names. */
@@ -218,8 +264,10 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
   try {
     const response = await fetch(CBS_LEADERBOARD_URL, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; GolfStatsBot/1.0)',
-        Accept: 'text/html',
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
       cache: 'no-store',
     });
@@ -247,6 +295,7 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
         withdrawnCount: 0,
         emailsSent: 0,
         skipped: 'CBS row count too low',
+        debug: { cbsRows: cbsRows.length, matched: 0, totalDb: 0, matchRatePct: 0 },
       };
     }
 
@@ -258,20 +307,48 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
       cbsRowsByNorm.set(norm, row);
     }
 
-    const { data: tournamentPlayers, error: tpError } = await supabase
+    // Fetch tournament_players (withdrawn from migration 051)
+    let tournamentPlayers: { id: string; pga_player_id: string | null; withdrawn?: boolean }[] | null;
+    let tpError: { message: string } | null = null;
+    const withWithdrawn = await supabase
       .from('tournament_players')
-      .select('id, pga_player_id, pga_players(name), withdrawn')
+      .select('id, pga_player_id, withdrawn')
       .eq('tournament_id', tournament.id);
+    if (withWithdrawn.error?.message?.includes('withdrawn')) {
+      // Fallback: withdrawn column missing (migration 051 not applied)
+      const fallback = await supabase
+        .from('tournament_players')
+        .select('id, pga_player_id')
+        .eq('tournament_id', tournament.id);
+      tournamentPlayers = fallback.data;
+      tpError = fallback.error;
+    } else {
+      tournamentPlayers = withWithdrawn.data;
+      tpError = withWithdrawn.error;
+    }
 
     if (tpError || !tournamentPlayers?.length) {
       return {
         success: false,
-        message: 'No tournament players',
+        message: `No tournament players in DB for ${tournament.name} (run odds import first)`,
         teeTimesMatched: 0,
         replacementsAdded: 0,
         withdrawnCount: 0,
         emailsSent: 0,
+        skipped: 'No tournament players',
+        debug: { cbsRows: cbsRows.length, matched: 0, totalDb: 0, matchRatePct: 0 },
       };
+    }
+
+    // Batch-fetch player names (avoids pga_players embed which can fail)
+    const pgaIds = [...new Set(tournamentPlayers.map((tp) => tp.pga_player_id).filter(Boolean))];
+    const { data: pgaRows } = await supabase
+      .from('pga_players')
+      .select('id, name')
+      .in('id', pgaIds);
+    const nameByPgaId = new Map<string, string>();
+    for (const p of pgaRows ?? []) {
+      if (p.name) nameByPgaId.set(p.id, p.name);
     }
 
     const nonWithdrawn = tournamentPlayers.filter((tp) => !tp.withdrawn);
@@ -279,8 +356,7 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
     const unmatched: (typeof tournamentPlayers)[0][] = [];
 
     for (const tp of nonWithdrawn) {
-      const pga = tp.pga_players as { name?: string } | { name?: string }[] | null;
-      const name = Array.isArray(pga) ? pga[0]?.name : pga?.name;
+      const name = tp.pga_player_id ? nameByPgaId.get(tp.pga_player_id) : null;
       if (!name) continue;
       const row = findCbsRowForDbPlayer(name, cbsRowsByNorm);
       if (row) matched.push({ tp, row });
@@ -291,12 +367,13 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
     if (matchRate < MIN_MATCH_RATE) {
       return {
         success: true,
-        message: `Match rate ${(matchRate * 100).toFixed(0)}% below ${MIN_MATCH_RATE * 100}%; CBS may not show this tournament`,
+        message: `Match rate ${(matchRate * 100).toFixed(0)}% (${matched.length}/${nonWithdrawn.length}) below ${MIN_MATCH_RATE * 100}%; name mismatch?`,
         teeTimesMatched: 0,
         replacementsAdded: 0,
         withdrawnCount: 0,
         emailsSent: 0,
         skipped: 'Low match rate',
+        debug: { cbsRows: cbsRows.length, matched: matched.length, totalDb: nonWithdrawn.length, matchRatePct: Math.round(matchRate * 100) },
       };
     }
 
@@ -306,6 +383,7 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
     );
 
     // Add replacements: on CBS but not in our DB (alternates who got in)
+    // Skip if CBS name matches an existing tournament player (avoids duplicates from spelling variants)
     const { data: pgaPlayers } = await supabase.from('pga_players').select('id, name');
     const pgaMap = buildPgaNameToIdMap(pgaPlayers ?? []);
     let replacementsAdded = 0;
@@ -314,6 +392,7 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
     for (const row of cbsRows) {
       const pgaId = resolveCbsNameToPgaId(row.name, pgaMap);
       if (!pgaId || existingPgaIds.has(pgaId)) continue;
+      if (cbsRowMatchesExistingPlayer(row, tournamentPlayers, nameByPgaId, cbsRowsByNorm)) continue;
 
       const { error: insertErr } = await supabase.from('tournament_players').insert({
         tournament_id: tournament.id,
@@ -363,8 +442,13 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
     // Mark WD for unmatched players
     let withdrawnCount = 0;
     let emailsSent = 0;
+    const withdrawnPlayerNames: string[] = [];
     if (unmatched.length > 0) {
       const pgaIds = unmatched.map((tp) => tp.pga_player_id).filter(Boolean);
+      for (const tp of unmatched) {
+        const name = tp.pga_player_id ? nameByPgaId.get(tp.pga_player_id) : null;
+        if (name) withdrawnPlayerNames.push(name);
+      }
       const result = await markPlayersWithdrawnAndNotify(supabase, tournament.id, pgaIds);
       withdrawnCount = result.withdrawnCount;
       emailsSent = result.emailsSent;
@@ -377,6 +461,7 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
       replacementsAdded,
       withdrawnCount,
       emailsSent,
+      withdrawnPlayerNames: withdrawnPlayerNames.length > 0 ? withdrawnPlayerNames : undefined,
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';

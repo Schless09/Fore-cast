@@ -10,13 +10,31 @@ interface TeeTimeCheckResult {
   start_date: string;
   withTeeTimes: number;
   total: number;
+  withdrawnPlayerNames?: string[];
 }
 
 export function CheckAndClearTeeTimesCard() {
   const [teeTimeCheck, setTeeTimeCheck] = useState<TeeTimeCheckResult[] | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [syncDetails, setSyncDetails] = useState<{
+    message: string;
+    details?: unknown[];
+    diagnostic?: {
+      cognizantTournaments: { id: string; name: string; start_date: string; count: number }[];
+      inWindowIds: string[];
+      hint?: string;
+    };
+  } | null>(null);
+  const [cbsDebug, setCbsDebug] = useState<{
+    rowsParsed: number;
+    htmlLength: number;
+    hasCellPlayerNameLong: boolean;
+    sampleNames: string[];
+  } | null>(null);
+  const [isDebugging, setIsDebugging] = useState(false);
 
   async function handleCheck() {
     setIsChecking(true);
@@ -37,6 +55,58 @@ export function CheckAndClearTeeTimesCard() {
       setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Failed to check' });
     } finally {
       setIsChecking(false);
+    }
+  }
+
+  async function handleCbsDebug() {
+    setIsDebugging(true);
+    setCbsDebug(null);
+    try {
+      const res = await fetch('/api/admin/tee-times/cbs-debug');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error ?? 'Debug failed' });
+        return;
+      }
+      setCbsDebug({
+        rowsParsed: data.rowsParsed ?? 0,
+        htmlLength: data.htmlLength ?? 0,
+        hasCellPlayerNameLong: data.hasCellPlayerNameLong ?? false,
+        sampleNames: data.sampleNames ?? [],
+      });
+      setMessage({
+        type: data.rowsParsed >= 50 ? 'success' : 'error',
+        text: `CBS: ${data.rowsParsed} rows, ${data.htmlLength} bytes. CellPlayerName--long: ${data.hasCellPlayerNameLong ? 'yes' : 'no'}. Sample: ${(data.sampleNames ?? []).slice(0, 3).join(', ')}`,
+      });
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Debug failed' });
+    } finally {
+      setIsDebugging(false);
+    }
+  }
+
+  async function handleSyncFromCBS() {
+    setIsSyncing(true);
+    setMessage(null);
+    setSyncDetails(null);
+    try {
+      const res = await fetch('/api/admin/tee-times/sync-from-cbs', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error ?? 'Failed to sync from CBS' });
+        return;
+      }
+      setMessage({ type: 'success', text: data.message ?? 'Sync complete' });
+      setSyncDetails({
+        message: data.message,
+        details: data.details,
+        diagnostic: data.diagnostic,
+      });
+      setTeeTimeCheck(null); // Refresh would need another Check
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Failed to sync' });
+    } finally {
+      setIsSyncing(false);
     }
   }
 
@@ -75,9 +145,17 @@ export function CheckAndClearTeeTimesCard() {
         </p>
       </CardHeader>
       <CardContent>
-        <Button onClick={handleCheck} disabled={isChecking} variant="outline" className="mb-4">
-          {isChecking ? 'Checking…' : 'Check Upcoming Tournaments'}
-        </Button>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Button onClick={handleCheck} disabled={isChecking} variant="outline">
+            {isChecking ? 'Checking…' : 'Check Upcoming'}
+          </Button>
+          <Button onClick={handleSyncFromCBS} disabled={isSyncing} variant="primary">
+            {isSyncing ? 'Syncing…' : 'Sync from CBS Now'}
+          </Button>
+          <Button onClick={handleCbsDebug} disabled={isDebugging} variant="ghost" size="sm">
+            {isDebugging ? '…' : 'Debug CBS'}
+          </Button>
+        </div>
         {message && (
           <div
             className={`mb-4 p-3 rounded-lg ${
@@ -106,6 +184,11 @@ export function CheckAndClearTeeTimesCard() {
                   <span className="text-sm text-casino-gray">
                     {t.withTeeTimes} / {t.total} with tee times
                   </span>
+                  {t.withdrawnPlayerNames && t.withdrawnPlayerNames.length > 0 && (
+                    <span className="text-sm text-amber-400" title={t.withdrawnPlayerNames.join(', ')}>
+                      WD: {t.withdrawnPlayerNames.join(', ')}
+                    </span>
+                  )}
                   {t.withTeeTimes > 0 && (
                     <Button
                       variant="outline"
@@ -122,8 +205,66 @@ export function CheckAndClearTeeTimesCard() {
             ))}
           </div>
         )}
-        {teeTimeCheck && teeTimeCheck.length === 0 && (
+        {teeTimeCheck && teeTimeCheck.length === 0 && !syncDetails && (
           <p className="text-sm text-casino-gray">No upcoming tournaments in the next 7 days.</p>
+        )}
+        {syncDetails?.diagnostic?.cognizantTournaments && syncDetails.diagnostic.cognizantTournaments.length > 0 && (
+          <div className="mt-4 p-3 bg-amber-900/20 border border-amber-500/30 rounded-lg text-sm">
+            <p className="font-medium text-amber-400 mb-2">Tournament diagnostic (Cognizant):</p>
+            {syncDetails.diagnostic.cognizantTournaments.map((t) => (
+              <div key={t.id} className="text-casino-gray mb-1">
+                {t.name} ({t.start_date}) — ID: {t.id.slice(0, 8)}… — <strong>{t.count} players</strong>
+                {syncDetails.diagnostic?.inWindowIds.includes(t.id) && (
+                  <span className="text-casino-green ml-1">• in sync window</span>
+                )}
+              </div>
+            ))}
+            {syncDetails.diagnostic.hint && (
+              <p className="text-amber-400/90 mt-2">{syncDetails.diagnostic.hint}</p>
+            )}
+          </div>
+        )}
+        {syncDetails?.details && syncDetails.details.length > 0 && (
+          <div className="mt-4 p-3 bg-casino-dark/50 rounded-lg text-sm space-y-2">
+            {(syncDetails.details as {
+              tournament: string;
+              message?: string;
+              skipped?: string;
+              withdrawnPlayerNames?: string[];
+              debug?: {
+                cbsRows: number;
+                matched: number;
+                totalDb: number;
+                matchRatePct: number;
+                tournamentId?: string;
+                countQueryResult?: number | null;
+                selectError?: string | null;
+              };
+            }[]).map((d, i) => (
+              <div key={i}>
+                <span className="font-medium text-casino-text">{d.tournament}:</span>{' '}
+                <span className="text-casino-gray">{d.message}</span>
+                {d.skipped && <span className="text-amber-400 ml-1">({d.skipped})</span>}
+                {d.withdrawnPlayerNames && d.withdrawnPlayerNames.length > 0 && (
+                  <div className="mt-1 ml-4 text-amber-400">
+                    <span className="font-medium">No longer in field:</span>{' '}
+                    {d.withdrawnPlayerNames.join(', ')}
+                  </div>
+                )}
+                {d.debug && (
+                  <div className="text-xs text-casino-gray mt-1 ml-4">
+                    CBS rows: {d.debug.cbsRows} | Matched: {d.debug.matched}/{d.debug.totalDb} ({d.debug.matchRatePct}%)
+                    {d.debug.tournamentId != null && (
+                      <div className="mt-1">
+                        Sync used tournament ID: {String(d.debug.tournamentId).slice(0, 8)}… | Count query: {d.debug.countQueryResult ?? '?'}
+                        {d.debug.selectError && ` | Select error: ${d.debug.selectError}`}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

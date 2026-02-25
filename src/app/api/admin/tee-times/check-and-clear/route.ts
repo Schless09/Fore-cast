@@ -32,7 +32,14 @@ export async function GET() {
     });
   }
 
-  const results: { id: string; name: string; start_date: string; withTeeTimes: number; total: number }[] = [];
+  const results: {
+    id: string;
+    name: string;
+    start_date: string;
+    withTeeTimes: number;
+    total: number;
+    withdrawnPlayerNames?: string[];
+  }[] = [];
 
   for (const t of tournaments) {
     const { data: players, error: pError } = await supabase
@@ -53,12 +60,29 @@ export async function GET() {
           (p.tee_time_r2 && p.tee_time_r2 !== '-')
       ).length ?? 0;
 
+    // Fetch withdrawn players (column added in migration 051)
+    let withdrawnPlayerNames: string[] | undefined;
+    const { data: withdrawn, error: wError } = await supabase
+      .from('tournament_players')
+      .select('pga_player_id')
+      .eq('tournament_id', t.id)
+      .eq('withdrawn', true);
+    if (!wError && withdrawn?.length) {
+      const pgaIds = withdrawn.map((tp) => tp.pga_player_id).filter(Boolean);
+      const { data: pgaRows } = await supabase
+        .from('pga_players')
+        .select('id, name')
+        .in('id', pgaIds);
+      withdrawnPlayerNames = (pgaRows ?? []).map((p) => p.name).filter((n): n is string => !!n);
+    }
+
     results.push({
       id: t.id,
       name: t.name,
       start_date: t.start_date,
       withTeeTimes,
       total,
+      withdrawnPlayerNames: withdrawnPlayerNames?.length ? withdrawnPlayerNames : undefined,
     });
   }
 

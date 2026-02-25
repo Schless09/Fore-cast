@@ -79,3 +79,81 @@ export async function POST(request: NextRequest) {
     emailsSent: result.emailsSent,
   });
 }
+
+/**
+ * PATCH /api/admin/withdrawals
+ * Unmark player(s) as withdrawn (set withdrawn = false).
+ *
+ * Body: { tournamentId: string, pgaPlayerIds: string[] }
+ */
+export async function PATCH(request: NextRequest) {
+  const { userId: clerkUserId } = await auth();
+  if (!clerkUserId) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let tournamentId: string;
+  let pgaPlayerIds: string[];
+  try {
+    const body = await request.json();
+    tournamentId = body.tournamentId ?? '';
+    pgaPlayerIds = Array.isArray(body.pgaPlayerIds) ? body.pgaPlayerIds : [];
+  } catch {
+    return NextResponse.json(
+      { success: false, error: 'Invalid body. Expected { tournamentId, pgaPlayerIds }' },
+      { status: 400 }
+    );
+  }
+
+  if (!tournamentId || pgaPlayerIds.length === 0) {
+    return NextResponse.json(
+      { success: false, error: 'tournamentId and pgaPlayerIds (non-empty) are required' },
+      { status: 400 }
+    );
+  }
+
+  const supabase = createServiceClient();
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('clerk_id', clerkUserId)
+    .single();
+  if (!profile) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { data: tps, error: tpError } = await supabase
+    .from('tournament_players')
+    .select('id')
+    .eq('tournament_id', tournamentId)
+    .in('pga_player_id', pgaPlayerIds)
+    .eq('withdrawn', true);
+
+  if (tpError || !tps?.length) {
+    return NextResponse.json({
+      success: true,
+      message: 'No withdrawn players to unmark',
+      unmarkedCount: 0,
+    });
+  }
+
+  const tpIds = tps.map((tp) => tp.id);
+  const { error: updateError } = await supabase
+    .from('tournament_players')
+    .update({ withdrawn: false })
+    .in('id', tpIds);
+
+  if (updateError) {
+    return NextResponse.json(
+      { success: false, error: `Failed to unmark: ${updateError.message}` },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: `Unmarked ${tps.length} player(s) from WD`,
+    unmarkedCount: tps.length,
+  });
+}
