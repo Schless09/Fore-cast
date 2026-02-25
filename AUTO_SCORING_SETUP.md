@@ -8,7 +8,7 @@ How live leaderboards and official results are kept in sync.
 |--------|------|----------|------------------|
 | **ESPN** | Live leaderboard and scorecards during the tournament | Every **2 minutes** (tournament days Thu–Sun) | `espn_cache` |
 | **RapidAPI** (Live Golf Data) | Official wrap-up: leaderboard cache, final positions, winnings | **Once per day** (6 AM UTC) | `live_scores_cache`, `tournament_players` (position, prize_money), tournament status |
-| **CBS** (leaderboard scrape) | Tee times (R1/R2) and withdrawal detection | **Tue–Thu** 3x daily (6am, 12pm, 6pm UTC) | `tournament_players` (tee_time_r1/r2, withdrawn) |
+| **CBS** (leaderboard scrape) | Tee times (R1/R2) and withdrawal detection | **Tue–Thu** 3x daily (2pm, 8pm, 4am CST) + Thu 7am CST | `tournament_players` (tee_time_r1/r2, withdrawn) |
 
 - **Tournament page** prefers ESPN when `espn_event_id` is set and cache has data; otherwise uses RapidAPI cache or DB.
 - **Tee times in the DB** come only from CBS (leaderboard scrape Tue–Thu pre-tournament). EST timezone. ESPN tee times are only in `espn_cache` for display.
@@ -72,7 +72,7 @@ Mark the tournament **active** when it starts (auto-sync does this automatically
 
 **Tee times missing in DB**
 
-- CBS sync runs Tue–Thu 3x daily (6am, 12pm, 6pm UTC). CBS must have published tee times (typically Wed).
+- CBS sync runs Tue–Thu 3x daily (2pm, 8pm, 4am CST) plus Thu 7am CST. CBS must have published tee times (typically Wed).
 - Ensure tournament has players in DB; check-withdrawals compares DB vs CBS and syncs when match rate ≥ 60%.
 
 **Scores / winnings not finalizing**

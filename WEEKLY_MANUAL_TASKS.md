@@ -21,7 +21,7 @@ What needs to be done manually each week for FORE!cast Golf.
 
 - **When**: Wednesday before R1 (if CBS cron hasn’t synced them yet)
 - **What**: Paste R1/R2 tee times (CSV or tab-separated)
-- **When to use**: CBS sync runs Tue–Thu 3x daily (6am, 12pm, 6pm UTC). If tee times are still missing on the weekly standings page, upload them here.
+- **When to use**: CBS sync runs Tue–Thu 3x daily (2pm, 8pm, 4am CST) plus Thu 7am CST. If tee times are still missing on the weekly standings page, upload them here.
 
 ### 3. Import prize money (`/admin/prize-money`)
 

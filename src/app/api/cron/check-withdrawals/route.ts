@@ -8,7 +8,7 @@ import {
 /**
  * GET/POST /api/cron/check-withdrawals
  *
- * Runs Tue–Thu 3x daily (6am, 12pm, 6pm UTC).
+ * Runs Tue–Thu 3x daily: 2pm, 8pm, 4am CST (2/10/20 UTC). Plus Thu 7am CST (13 UTC).
  *
  * CBS-only logic: Compare our DB tournament_players to CBS leaderboard tee times.
  * - On CBS with tee time → sync R1/R2 tee times to DB (EST)

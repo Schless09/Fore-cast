@@ -36,7 +36,7 @@ Two data sources; different roles.
 |--------|--------|----------------|------------------|
 | **ESPN** | Live leaderboard and scorecards during the tournament | Every **2 minutes** (Thu–Sun, tournament days) | `espn_cache` (key `espn-{espn_event_id}`) |
 | **RapidAPI** (Live Golf Data) | Official wrap-up: leaderboard cache, mark tournament completed, sync final positions and winnings | **Once per day** (6 AM UTC) via `rapidapi-daily` cron | `live_scores_cache` (key `{year}-{tournId}`), `tournament_players` (positions, prize_money) |
-| **CBS** (leaderboard scrape) | Tee times (R1/R2), replacement players, withdrawal detection | **Tue–Thu** 3x daily (6am, 12pm, 6pm UTC) | `tournament_players` (tee_time_r1/r2, withdrawn) |
+| **CBS** (leaderboard scrape) | Tee times (R1/R2), replacement players, withdrawal detection | **Tue–Thu** 3x daily (2pm, 8pm, 4am CST) + Thu 7am CST | `tournament_players` (tee_time_r1/r2, withdrawn) |
 
 - **Tournament page** prefers **ESPN** when the tournament has `espn_event_id` and `espn_cache` has data (active/completed). Otherwise it uses RapidAPI cache or DB.
 - **Scorecards** use ESPN when leaderboard is ESPN-sourced (`source=espn`); otherwise RapidAPI.
@@ -56,7 +56,7 @@ Relevant routes:
 | `/api/scores/espn-sync` | Every **2 min** | Fetch ESPN scoreboard; fill `espn_cache` for tournaments with `espn_event_id`. Only runs on tournament days (Thu–Sun); interval 2 min. |
 | `/api/scores/auto-sync` | Every **4 min** | **Tournament activation only**: flip `upcoming` → `active` when current time ≥ tournament start. No RapidAPI calls. |
 | `/api/scores/rapidapi-daily` | **Once/day** (6 AM UTC) | Calls `auto-sync?force=true&source=rapidapi-daily` to run RapidAPI logic: leaderboard for active, mark completed, sync final scores and winnings. |
-| `/api/cron/check-withdrawals` | **Tue–Thu** 6am, 12pm, 6pm UTC | CBS leaderboard scrape: sync R1/R2 tee times, add replacements, mark WD for players not on CBS, email roster owners. |
+| `/api/cron/check-withdrawals` | **Tue–Thu** 2pm, 8pm, 4am CST + Thu 7am CST | CBS leaderboard scrape: sync R1/R2 tee times, add replacements, mark WD for players not on CBS, email roster owners. |
 | `/api/cron/sync-rankings` | Mondays 5 PM UTC | Sync world rankings / FedEx Cup from RapidAPI. |
 | `/api/reminders/missing-rosters` | Wed 9:15 PM, Thu 3 AM | Reminder flows for missing rosters (e.g. email). |
 
