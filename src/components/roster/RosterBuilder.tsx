@@ -241,56 +241,30 @@ export function RosterBuilder({
     }
   }
 
-  async function createRoster(profileId: string, budgetSpent: number): Promise<string> {
-    const supabase = createClient();
-
-    // Create roster with budget tracking (use username as roster name)
-    const { data: roster, error: rosterError } = await supabase
-      .from('user_rosters')
-      .insert({
-        user_id: profileId,
+  async function createRoster(_profileId: string, budgetSpent: number): Promise<string> {
+    // Use server API for roster creation (enforces roster lock validation)
+    const response = await fetch('/api/rosters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         tournament_id: tournamentId,
-        roster_name: username,
         budget_spent: budgetSpent,
-        budget_limit: BUDGET_LIMIT,
-        max_players: MAX_PLAYERS,
-      })
-      .select()
-      .single();
+        player_ids: selectedPlayerIds,
+      }),
+    });
 
-    if (rosterError) {
-      // Check if error is due to unique constraint violation
-      if (rosterError.code === '23505') {
-        throw new Error('You already have a roster for this tournament. Please refresh the page.');
-      }
-      throw rosterError;
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to create roster');
     }
-
-    // Get tournament_player ids and costs (freeze cost at save time)
-    const { data: tournamentPlayersData, error: tpError } = await supabase
-      .from('tournament_players')
-      .select('id, pga_player_id, cost')
-      .eq('tournament_id', tournamentId)
-      .in('pga_player_id', selectedPlayerIds);
-
-    if (tpError) throw tpError;
-
-    const rosterPlayers = tournamentPlayersData!.map((tp) => ({
-      roster_id: roster.id,
-      tournament_player_id: tp.id,
-      player_cost: tp.cost ?? 0.2,
-    }));
-
-    const { error: rpError } = await supabase
-      .from('roster_players')
-      .insert(rosterPlayers);
-
-    if (rpError) throw rpError;
-    return roster.id;
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create roster');
+    }
+    return result.rosterId;
   }
 
   async function updateRoster(rosterId: string, budgetSpent: number) {
-    // Use server API for roster updates (supports co-manager authorization)
+    // Use server API for roster updates (enforces roster lock validation)
     const response = await fetch(`/api/rosters/${rosterId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -302,7 +276,7 @@ export function RosterBuilder({
     });
 
     const result = await response.json();
-    if (!result.success) {
+    if (!response.ok || !result.success) {
       throw new Error(result.error || 'Failed to update roster');
     }
   }

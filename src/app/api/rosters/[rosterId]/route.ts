@@ -55,6 +55,24 @@ export async function PUT(
     return NextResponse.json({ success: false, error: 'Not authorized to edit this roster' }, { status: 403 });
   }
 
+  // Roster lock: only allow updates for upcoming tournaments
+  const { data: tournament } = await supabase
+    .from('tournaments')
+    .select('status')
+    .eq('id', roster.tournament_id)
+    .single();
+
+  if (!tournament) {
+    return NextResponse.json({ success: false, error: 'Tournament not found' }, { status: 404 });
+  }
+
+  if (tournament.status !== 'upcoming') {
+    return NextResponse.json(
+      { success: false, error: 'Lineups are locked - the tournament has already started.' },
+      { status: 403 }
+    );
+  }
+
   // Parse request body
   const body = await request.json();
   const { roster_name, budget_spent, player_ids } = body as {

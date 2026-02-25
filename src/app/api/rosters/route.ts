@@ -41,6 +41,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'tournament_id and player_ids are required' }, { status: 400 });
   }
 
+  // Roster lock: only allow creation for upcoming tournaments
+  const { data: tournament } = await supabase
+    .from('tournaments')
+    .select('status')
+    .eq('id', tournament_id)
+    .single();
+
+  if (!tournament) {
+    return NextResponse.json({ success: false, error: 'Tournament not found' }, { status: 404 });
+  }
+
+  if (tournament.status !== 'upcoming') {
+    return NextResponse.json(
+      { success: false, error: 'Lineups are locked - the tournament has already started.' },
+      { status: 403 }
+    );
+  }
+
   // Determine whose roster this is
   const rosterOwnerId = target_user_id || profile.id;
 

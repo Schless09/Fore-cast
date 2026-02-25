@@ -444,7 +444,7 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
     let emailsSent = 0;
     const withdrawnPlayerNames: string[] = [];
     if (unmatched.length > 0) {
-      const pgaIds = unmatched.map((tp) => tp.pga_player_id).filter(Boolean);
+      const pgaIds = unmatched.map((tp) => tp.pga_player_id).filter((id): id is string => !!id);
       for (const tp of unmatched) {
         const name = tp.pga_player_id ? nameByPgaId.get(tp.pga_player_id) : null;
         if (name) withdrawnPlayerNames.push(name);
