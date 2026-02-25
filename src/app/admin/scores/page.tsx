@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -14,10 +14,20 @@ interface Tournament {
   rapidapi_tourn_id: string | null;
 }
 
+interface TournamentPlayerRow {
+  id: string;
+  pga_player_id: string;
+  withdrawn: boolean;
+  pga_players: { name: string } | { name: string }[] | null;
+}
+
 export default function AdminScoresPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
+  const [tournamentPlayers, setTournamentPlayers] = useState<TournamentPlayerRow[]>([]);
+  const [withdrawalSelection, setWithdrawalSelection] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPlayers, setIsLoadingPlayers] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,8 +64,73 @@ export default function AdminScoresPage() {
   const handleTournamentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const tournament = tournaments.find(t => t.id === e.target.value);
     setSelectedTournament(tournament || null);
+    setTournamentPlayers([]);
+    setWithdrawalSelection(new Set());
     setMessage(null);
     setError(null);
+  };
+
+  const loadTournamentPlayers = useCallback(async () => {
+    if (!selectedTournament) return;
+    setIsLoadingPlayers(true);
+    try {
+      const supabase = createClient();
+      const { data, error: fetchError } = await supabase
+        .from('tournament_players')
+        .select('id, pga_player_id, withdrawn, pga_players(name)')
+        .eq('tournament_id', selectedTournament.id)
+        .order('cost', { ascending: false });
+      if (fetchError) throw fetchError;
+      setTournamentPlayers(data || []);
+    } catch (err) {
+      console.error('Error loading tournament players:', err);
+      setTournamentPlayers([]);
+    } finally {
+      setIsLoadingPlayers(false);
+    }
+  }, [selectedTournament]);
+
+  useEffect(() => {
+    if (selectedTournament?.status === 'upcoming') {
+      loadTournamentPlayers();
+    } else {
+      setTournamentPlayers([]);
+    }
+  }, [selectedTournament, loadTournamentPlayers]);
+
+  const handleMarkWithdrawn = async () => {
+    if (!selectedTournament || withdrawalSelection.size === 0) return;
+    setIsUpdating(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/admin/withdrawals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tournamentId: selectedTournament.id,
+          pgaPlayerIds: Array.from(withdrawalSelection),
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to mark withdrawals');
+      setMessage(`✅ ${result.message}`);
+      setWithdrawalSelection(new Set());
+      loadTournamentPlayers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to mark withdrawals');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const toggleWithdrawalSelect = (pgaPlayerId: string) => {
+    setWithdrawalSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(pgaPlayerId)) next.delete(pgaPlayerId);
+      else next.add(pgaPlayerId);
+      return next;
+    });
   };
 
 
@@ -287,6 +362,77 @@ export default function AdminScoresPage() {
         </CardContent>
       </Card>
 
+      {/* Mark Withdrawals - only for upcoming tournaments */}
+      {selectedTournament?.status === 'upcoming' && (
+        <Card className="mb-6 border-amber-200 bg-amber-50/50">
+          <CardHeader>
+            <CardTitle>Mark Withdrawals (WD)</CardTitle>
+            <p className="text-sm text-gray-600 mt-1">
+              Select players who have withdrawn. They&apos;ll show &quot;WD&quot; with strikethrough in the roster builder, and affected roster owners will receive an email.
+            </p>
+            <p className="text-sm text-gray-600 mt-1">
+              <strong>Replacements:</strong> The CBS cron (Tue–Thu) automatically adds alternates who got into the field. They appear in roster selection with default cost ($2.50). To set proper odds/price, add them via <Link href="/admin/odds" className="text-blue-600 underline">Admin → Odds</Link> (CSV upload or single-player update).
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoadingPlayers ? (
+              <div className="flex items-center gap-2 text-gray-600">
+                <LoadingSpinner size="sm" />
+                Loading players...
+              </div>
+            ) : (
+              <>
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-md bg-white p-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {tournamentPlayers
+                      .filter((tp) => !tp.withdrawn)
+                      .map((tp) => (
+                        <label
+                          key={tp.id}
+                          className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 ${
+                            withdrawalSelection.has(tp.pga_player_id) ? 'bg-amber-100' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={withdrawalSelection.has(tp.pga_player_id)}
+                            onChange={() => toggleWithdrawalSelect(tp.pga_player_id)}
+                            className="rounded"
+                          />
+                          <span className="text-sm truncate">
+                          {Array.isArray(tp.pga_players)
+                            ? tp.pga_players[0]?.name ?? 'Unknown'
+                            : tp.pga_players?.name ?? 'Unknown'}
+                        </span>
+                        </label>
+                      ))}
+                  </div>
+                  {tournamentPlayers.filter((tp) => !tp.withdrawn).length === 0 && (
+                    <p className="text-sm text-gray-500 py-4 text-center">No players (or all withdrawn)</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleMarkWithdrawn}
+                    isLoading={isUpdating}
+                    disabled={withdrawalSelection.size === 0}
+                    className="bg-amber-100 border-amber-600 text-amber-800 hover:bg-amber-200"
+                  >
+                    Mark Selected as WD
+                  </Button>
+                  {tournamentPlayers.filter((tp) => tp.withdrawn).length > 0 && (
+                    <span className="text-sm text-gray-600">
+                      {tournamentPlayers.filter((tp) => tp.withdrawn).length} already marked WD
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Info Card */}
       <Card className="bg-gray-50">
         <CardContent className="pt-6">
@@ -297,6 +443,9 @@ export default function AdminScoresPage() {
             </li>
             <li>
               <strong>Calculate Winnings:</strong> Calculates prize money for each player based on their position and updates roster totals
+            </li>
+            <li>
+              <strong>Mark Withdrawals:</strong> For upcoming tournaments only. Select players who withdrew—they show WD with strikethrough in the roster builder and affected roster owners receive an email.
             </li>
             <li>
               <strong>Send Woulda-Coulda Emails:</strong> Run <em>after</em> winnings are calculated. Sends an email only to users who (1) edited their roster during the tournament, (2) their <strong>current</strong> lineup’s total purse is <strong>lower</strong> than a previous version, and (3) that previous lineup would have placed them <strong>strictly higher</strong> (e.g. 6th → would’ve been 2nd, or 4th → would’ve been 1st).
@@ -311,7 +460,7 @@ export default function AdminScoresPage() {
           </ul>
           <p className="text-xs text-gray-600 mt-4">
             <strong>Note:</strong> Scores auto-sync every 15 minutes during tournament days (Thu-Sun) via the cron job.
-            Tee times are synced automatically from RapidAPI.
+            Tee times are synced from CBS (Tue–Thu pre-tournament via check-withdrawals cron).
           </p>
         </CardContent>
       </Card>

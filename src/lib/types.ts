@@ -79,6 +79,7 @@ export interface TournamentPlayer {
   tee_time_r2: string | null;
   starting_tee_r1: number | null;
   starting_tee_r2: number | null;
+  withdrawn: boolean;
   created_at: string;
   updated_at: string;
   // Joined data

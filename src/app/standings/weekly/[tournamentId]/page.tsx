@@ -427,6 +427,7 @@ export default async function WeeklyStandingsByTournamentPage({
                 userLeagueId={userLeagueId || undefined}
                 leagueMemberIds={leagueMemberIds}
                 displayRound={displayRound}
+                tournamentStartDate={tournament.start_date}
                 cutLine={cutLineForStandings}
               />
             ) : tournament.status === 'upcoming' && upcomingStandingsRows.length > 0 ? (
@@ -453,6 +454,7 @@ export default async function WeeklyStandingsByTournamentPage({
                           row={row}
                           index={index}
                           tournamentId={tournamentId}
+                          tournamentStartDate={tournament.start_date}
                           currentUserId={profile.id}
                         />
                       ))}
@@ -494,6 +496,7 @@ export default async function WeeklyStandingsByTournamentPage({
                             isUserRoster={isUserRoster}
                             tournamentId={tournamentId}
                             tournamentStatus={tournament.status}
+                            tournamentStartDate={tournament.start_date}
                             currentUserId={profile.id}
                           />
                         );

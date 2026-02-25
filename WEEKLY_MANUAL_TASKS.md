@@ -19,9 +19,9 @@ What needs to be done manually each week for FORE!cast Golf.
 
 ### 2. (Optional) Manually set tee times (`/admin/tee-times`)
 
-- **When**: Wednesday before R1 (if RapidAPI/CBS don’t have them yet)
+- **When**: Wednesday before R1 (if CBS cron hasn’t synced them yet)
 - **What**: Paste R1/R2 tee times (CSV or tab-separated)
-- **When to use**: RapidAPI runs once/day at 6 AM UTC; CBS fallback only runs when RapidAPI returns 0 matches. If tee times are missing on the weekly standings page, upload them here.
+- **When to use**: CBS sync runs Tue–Thu 3x daily (6am, 12pm, 6pm UTC). If tee times are still missing on the weekly standings page, upload them here.
 
 ### 3. Import prize money (`/admin/prize-money`)
 

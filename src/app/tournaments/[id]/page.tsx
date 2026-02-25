@@ -880,6 +880,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             scorecardSource={leaderboardSource === 'espn' ? 'espn' : 'rapidapi'}
             tournamentStatus={tournament.status}
             currentRound={displayRound}
+            tournamentStartDate={tournament.start_date}
             teeTimeMap={teeTimeMap}
             playerCostMap={playerCostMap}
             initialCutLine={cutLine}
@@ -1074,6 +1075,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 amount: p.amount || 0,
               }))}
               displayRound={displayRound}
+              tournamentStartDate={tournament.start_date}
               cutLine={cutLine}
             />
             </Link>

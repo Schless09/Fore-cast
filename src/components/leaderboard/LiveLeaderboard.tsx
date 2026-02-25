@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from 'react';
 import { formatScore, getScoreColor, formatShortName } from '@/lib/utils';
-import { formatTeeTimeDisplay } from '@/lib/timezone';
+import { formatTeeTimeDisplay, formatTeeTimeInLocalTime } from '@/lib/timezone';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
 import { assignPositionsByScore } from '@/lib/leaderboard-positions';
@@ -23,7 +23,7 @@ interface LeaderboardRow {
   apiPlayerId?: string; // Player ID from RapidAPI for scorecard lookup
   roundComplete?: boolean; // Whether player finished current round
   is_amateur?: boolean; // Amateurs cannot collect prize money
-  teeTime?: string; // Tee time from RapidAPI (e.g., "11:35am")
+  teeTime?: string; // Tee time from CBS or live cache (e.g., "11:35am")
   hasTeedOff?: boolean; // false when THRU shows tee time, haven't started yet
 }
 
@@ -51,7 +51,7 @@ interface APIScorecard {
   currentRoundScore: string;
   roundComplete?: boolean;
   isAmateur?: boolean;
-  teeTime?: string; // Tee time from RapidAPI (e.g., "11:35am")
+  teeTime?: string; // Tee time from CBS or live cache (e.g., "11:35am")
 }
 
 interface LiveLeaderboardProps {
@@ -70,6 +70,7 @@ interface LiveLeaderboardProps {
   scorecardSource?: 'espn' | 'rapidapi';
   tournamentStatus?: 'upcoming' | 'active' | 'completed';
   currentRound?: number;
+  tournamentStartDate?: string;
   teeTimeMap?: Map<string, TeeTimeData>;
   playerCostMap?: Map<string, number>;
   initialCutLine?: CutLineData | null;
@@ -229,6 +230,7 @@ export function LiveLeaderboard({
   scorecardSource = 'rapidapi',
   tournamentStatus: initialTournamentStatus,
   currentRound,
+  tournamentStartDate,
   teeTimeMap,
   playerCostMap,
   initialCutLine,
@@ -726,15 +728,22 @@ export function LiveLeaderboard({
                     /* Player is on course - show holes completed */
                     <span className="text-casino-blue">{row.thru}</span>
                   ) : (() => {
-                    if (row.teeTime) {
-                      return <span className="text-casino-gray">{formatTeeTimeDisplay(row.teeTime)}</span>;
-                    }
-                    // Fallback: look up from DB tee time map
+                    // Prefer CBS (DB) tee time map, fallback: live score tee time
                     const teeTimeData = getTeeTimeDataForPlayer(teeTimeMap, row.name);
                     const teeTimeStr = getTeeTimeForRound(teeTimeData, currentRound);
-                    return teeTimeStr ? (
-                      <span className="text-casino-gray">{formatTeeTimeDisplay(teeTimeStr)}</span>
-                    ) : null;
+                    if (teeTimeStr) {
+                      const display = tournamentStartDate
+                        ? formatTeeTimeInLocalTime(teeTimeStr, tournamentStartDate, effectiveCurrentRound)
+                        : formatTeeTimeDisplay(teeTimeStr);
+                      return <span className="text-casino-gray">{display}</span>;
+                    }
+                    if (row.teeTime) {
+                      const display = tournamentStartDate
+                        ? formatTeeTimeInLocalTime(formatTeeTimeDisplay(row.teeTime), tournamentStartDate, effectiveCurrentRound)
+                        : formatTeeTimeDisplay(row.teeTime);
+                      return <span className="text-casino-gray">{display}</span>;
+                    }
+                    return null;
                   })() ?? (
                     <span className="text-casino-gray-dark">-</span>
                   )}

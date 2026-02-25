@@ -117,9 +117,10 @@ Since you'll be uploading players weekly for each tournament:
 Live leaderboards use two sources:
 
 - **ESPN** — Refreshed every 2 minutes on tournament days; used for in-play leaderboard and scorecards. No rate limit.
-- **RapidAPI** (Live Golf Data) — Runs once per day (6 AM UTC); updates tee times, final positions, and winnings. Used for official wrap-up and DB persistence.
+- **RapidAPI** (Live Golf Data) — Runs once per day (6 AM UTC); updates final positions and winnings. Used for official wrap-up and DB persistence.
+- **CBS** (leaderboard scrape) — Runs Tue–Thu 3x daily; syncs tee times (R1/R2), adds replacements, detects withdrawals.
 
-Crons: `espn-sync` (every 2 min), `auto-sync` (every 4 min, activation only), `rapidapi-daily` (once/day). See **[AUTO_SCORING_SETUP.md](./AUTO_SCORING_SETUP.md)** and **[PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md)** for details.
+Crons: `espn-sync` (every 2 min), `auto-sync` (every 4 min, activation only), `rapidapi-daily` (once/day), `check-withdrawals` (Tue–Thu). See **[AUTO_SCORING_SETUP.md](./AUTO_SCORING_SETUP.md)** and **[PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md)** for details.
 
 ## Project Structure
 

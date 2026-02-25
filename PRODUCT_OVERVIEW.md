@@ -35,11 +35,12 @@ Two data sources; different roles.
 | Source | Purpose | When it runs | Where data lives |
 |--------|--------|----------------|------------------|
 | **ESPN** | Live leaderboard and scorecards during the tournament | Every **2 minutes** (Thu–Sun, tournament days) | `espn_cache` (key `espn-{espn_event_id}`) |
-| **RapidAPI** (Live Golf Data) | Official wrap-up: tee times (R1/R2), leaderboard cache, mark tournament completed, sync final positions and winnings | **Once per day** (6 AM UTC) via `rapidapi-daily` cron | `live_scores_cache` (key `{year}-{tournId}`), `tournament_players` (tee_time_r1/r2, positions, prize_money) |
+| **RapidAPI** (Live Golf Data) | Official wrap-up: leaderboard cache, mark tournament completed, sync final positions and winnings | **Once per day** (6 AM UTC) via `rapidapi-daily` cron | `live_scores_cache` (key `{year}-{tournId}`), `tournament_players` (positions, prize_money) |
+| **CBS** (leaderboard scrape) | Tee times (R1/R2), replacement players, withdrawal detection | **Tue–Thu** 3x daily (6am, 12pm, 6pm UTC) | `tournament_players` (tee_time_r1/r2, withdrawn) |
 
 - **Tournament page** prefers **ESPN** when the tournament has `espn_event_id` and `espn_cache` has data (active/completed). Otherwise it uses RapidAPI cache or DB.
 - **Scorecards** use ESPN when leaderboard is ESPN-sourced (`source=espn`); otherwise RapidAPI.
-- **Tee times in DB** (`tournament_players.tee_time_r1/r2/r3/r4`) come only from **RapidAPI** (or CBS fallback when RapidAPI returns no matches). ESPN tee times exist only inside `espn_cache` and are used for display when showing ESPN-sourced leaderboard.
+- **Tee times in DB** (`tournament_players.tee_time_r1/r2/r3/r4`) come only from **CBS** (leaderboard scrape Tue–Thu pre-tournament). ESPN tee times exist only inside `espn_cache` and are used for display when showing ESPN-sourced leaderboard.
 
 Relevant routes:
 
@@ -54,11 +55,12 @@ Relevant routes:
 |------|----------|---------|
 | `/api/scores/espn-sync` | Every **2 min** | Fetch ESPN scoreboard; fill `espn_cache` for tournaments with `espn_event_id`. Only runs on tournament days (Thu–Sun); interval 2 min. |
 | `/api/scores/auto-sync` | Every **4 min** | **Tournament activation only**: flip `upcoming` → `active` when current time ≥ tournament start. No RapidAPI calls. |
-| `/api/scores/rapidapi-daily` | **Once/day** (6 AM UTC) | Calls `auto-sync?force=true&source=rapidapi-daily` to run all RapidAPI logic: R1/R2 tee times for upcoming (within 2 days), leaderboard for active, mark completed, sync final scores and winnings. |
+| `/api/scores/rapidapi-daily` | **Once/day** (6 AM UTC) | Calls `auto-sync?force=true&source=rapidapi-daily` to run RapidAPI logic: leaderboard for active, mark completed, sync final scores and winnings. |
+| `/api/cron/check-withdrawals` | **Tue–Thu** 6am, 12pm, 6pm UTC | CBS leaderboard scrape: sync R1/R2 tee times, add replacements, mark WD for players not on CBS, email roster owners. |
 | `/api/cron/sync-rankings` | Mondays 5 PM UTC | Sync world rankings / FedEx Cup from RapidAPI. |
 | `/api/reminders/missing-rosters` | Wed 9:15 PM, Thu 3 AM | Reminder flows for missing rosters (e.g. email). |
 
-So: **ESPN** = live experience (frequent). **RapidAPI** = once per day for official state and DB (tee times, positions, winnings).
+So: **ESPN** = live experience (frequent). **RapidAPI** = once per day for official state (positions, winnings). **CBS** = tee times and withdrawals (Tue–Thu).
 
 ---
 

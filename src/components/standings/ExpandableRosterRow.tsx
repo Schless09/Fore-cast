@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/prize-money';
 import { formatShortName } from '@/lib/utils';
+import { formatTeeTimeInLocalTime } from '@/lib/timezone';
 
 interface ExpandableRosterRowProps {
   roster: any;
@@ -11,6 +12,7 @@ interface ExpandableRosterRowProps {
   isUserRoster: boolean;
   tournamentId: string;
   tournamentStatus: string;
+  tournamentStartDate?: string;
   currentUserId: string;
 }
 
@@ -20,6 +22,7 @@ export function ExpandableRosterRow({
   isUserRoster,
   tournamentId,
   tournamentStatus,
+  tournamentStartDate,
   currentUserId,
 }: ExpandableRosterRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -292,7 +295,9 @@ export function ExpandableRosterRow({
                                 <span className="text-casino-blue">{tp.thru}</span>
                               ) : tp?.tee_time_r1 ? (
                                 <span className="text-casino-gray">
-                                  {tp.tee_time_r1}
+                                  {tournamentStartDate
+                                    ? formatTeeTimeInLocalTime(tp.tee_time_r1, tournamentStartDate, 1)
+                                    : tp.tee_time_r1}
                                 </span>
                               ) : (
                                 <span className="text-casino-gray-dark">-</span>

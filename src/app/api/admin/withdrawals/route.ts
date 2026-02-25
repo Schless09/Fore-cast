@@ -1,0 +1,81 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { createServiceClient } from '@/lib/supabase/service';
+import { markPlayersWithdrawnAndNotify } from '@/lib/withdrawals';
+
+/**
+ * POST /api/admin/withdrawals
+ * Mark player(s) as withdrawn for a tournament and email roster owners who have them.
+ *
+ * Body: { tournamentId: string, pgaPlayerIds: string[] }
+ * Auth: Authenticated admin
+ */
+export async function POST(request: NextRequest) {
+  const { userId: clerkUserId } = await auth();
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = request.headers.get('authorization');
+  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const isDev = process.env.NODE_ENV === 'development';
+
+  if (!clerkUserId && !isCron) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let tournamentId: string;
+  let pgaPlayerIds: string[];
+  try {
+    const body = await request.json();
+    tournamentId = body.tournamentId ?? '';
+    pgaPlayerIds = Array.isArray(body.pgaPlayerIds) ? body.pgaPlayerIds : [];
+  } catch {
+    return NextResponse.json(
+      { success: false, error: 'Invalid body. Expected { tournamentId, pgaPlayerIds }' },
+      { status: 400 }
+    );
+  }
+
+  if (!tournamentId || pgaPlayerIds.length === 0) {
+    return NextResponse.json(
+      { success: false, error: 'tournamentId and pgaPlayerIds (non-empty) are required' },
+      { status: 400 }
+    );
+  }
+
+  const supabase = createServiceClient();
+
+  if (!isCron && !isDev) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('clerk_id', clerkUserId)
+      .single();
+    if (!profile) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
+  const result = await markPlayersWithdrawnAndNotify(supabase, tournamentId, pgaPlayerIds);
+
+  if (!result.success) {
+    return NextResponse.json(
+      { success: false, error: result.error ?? 'Failed to mark withdrawals' },
+      { status: result.error === 'Tournament not found' ? 404 : 500 }
+    );
+  }
+
+  if (result.withdrawnCount === 0) {
+    return NextResponse.json({
+      success: true,
+      message: 'No players to update (already withdrawn or not found)',
+      withdrawnCount: 0,
+      emailsSent: 0,
+    });
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: `Marked ${result.withdrawnCount} player(s) as withdrawn. Sent ${result.emailsSent} email(s) to roster owners.`,
+    withdrawnCount: result.withdrawnCount,
+    emailsSent: result.emailsSent,
+  });
+}

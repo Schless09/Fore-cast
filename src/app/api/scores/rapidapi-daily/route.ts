@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 /**
  * RapidAPI Daily Cron — runs once per day (e.g. 6 AM UTC)
  *
- * Calls auto-sync with source=rapidapi-daily to run all RapidAPI logic:
- * - Tee times for upcoming tournaments (within 2 days)
+ * Calls auto-sync with source=rapidapi-daily to run RapidAPI logic:
  * - Leaderboard for active tournaments
  * - Mark completed, sync final scores, calculate winnings
  *
+ * Tee times: CBS only, via check-withdrawals cron (Tue–Thu).
  * ESPN sync (espn-sync) runs every 2 min for live scores; RapidAPI is used
  * only for official wrap-up and event transitions.
  */

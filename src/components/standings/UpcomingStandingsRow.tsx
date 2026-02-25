@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatShortName } from '@/lib/utils';
+import { formatTeeTimeInLocalTime } from '@/lib/timezone';
 
 interface RosterInfo {
   id: string;
@@ -19,6 +20,7 @@ interface UpcomingStandingsRowProps {
   };
   index: number;
   tournamentId: string;
+  tournamentStartDate?: string;
   currentUserId: string;
 }
 
@@ -33,6 +35,7 @@ export function UpcomingStandingsRow({
   row,
   index,
   tournamentId,
+  tournamentStartDate,
   currentUserId,
 }: UpcomingStandingsRowProps) {
   const isUser = row.user_id === currentUserId;
@@ -164,7 +167,9 @@ export function UpcomingStandingsRow({
                         const name = (pga as { name?: string } | null)?.name ?? '—';
                         const teeTimeR1 = tp?.tee_time_r1;
                         const displayTime = teeTimeR1
-                          ? teeTimeR1
+                          ? (tournamentStartDate
+                              ? formatTeeTimeInLocalTime(teeTimeR1, tournamentStartDate, 1)
+                              : teeTimeR1)
                           : '—';
                         return (
                           <tr key={idx} className="hover:bg-casino-card/50 transition-colors">

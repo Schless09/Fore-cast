@@ -130,17 +130,21 @@ export function PlayerSelector({
                         const isSelected = selectedPlayerIds.includes(playerId);
                         const cost = tp.cost || 0.20;
                         const costCents = Math.round(cost * 100);
+                        const isWithdrawn = tp.withdrawn === true;
 
-                        const wouldExceedBudget = !isSelected && (costCents > remainingBudgetCents);
+                        const wouldExceedBudget = !isSelected && !isWithdrawn && (costCents > remainingBudgetCents);
                         const wouldExceedMax = !isSelected && !canAddMore;
-                        const isDisabled = wouldExceedBudget || wouldExceedMax;
+                        // WD: can't add, but can remove if already in roster
+                        const isDisabled = (isWithdrawn && !isSelected) || wouldExceedBudget || wouldExceedMax;
                         const rank = startIdx + (colIdx * 10) + rowIdx + 1;
 
                         return (
                           <div
                             key={tp.id}
                             className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-all text-sm ${
-                              isSelected
+                              isWithdrawn
+                                ? 'border-red-900/40 bg-red-950/30'
+                                : isSelected
                                 ? 'border-casino-green bg-casino-green/10 ring-1 ring-casino-green'
                                 : isDisabled
                                 ? 'border-casino-gold/20 bg-casino-elevated/50 opacity-50'
@@ -163,9 +167,7 @@ export function PlayerSelector({
                             
                             {/* Clickable area for selection */}
                             <div
-                              className={`flex-1 flex items-center gap-2 min-w-0 ${
-                                isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'
-                              }`}
+                              className={`flex-1 flex items-center gap-2 min-w-0 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} ${isWithdrawn ? 'line-through decoration-2 decoration-red-400/80' : ''}`}
                               onClick={() => !isDisabled && onTogglePlayer(playerId)}
                             >
                               <div className="text-xs text-casino-gray w-5 text-right shrink-0">
@@ -197,14 +199,15 @@ export function PlayerSelector({
                                 )}
                               </div>
                               <div className={`text-xs font-bold shrink-0 ${
+                                isWithdrawn ? 'text-red-400' :
                                 cost >= 10 ? 'text-casino-red' : 
                                 cost >= 5 ? 'text-amber-400' : 
                                 cost >= 2 ? 'text-casino-gold' : 
                                 'text-casino-gray'
                               }`}>
-                                ${cost.toFixed(2)}
+                                {isWithdrawn ? 'WD' : `$${cost.toFixed(2)}`}
                               </div>
-                              {isSelected && (
+                              {isSelected && !isWithdrawn && (
                                 <div className="text-casino-green font-bold shrink-0">✓</div>
                               )}
                             </div>

@@ -11,6 +11,7 @@ interface RosterPlayer {
   tournament_player?: {
     cost?: number;
     pga_player_id?: string;
+    withdrawn?: boolean;
     pga_player?: {
       name?: string;
       country?: string;
@@ -104,24 +105,25 @@ export function RosterSection({
               .map((rp, index) => {
               const player = rp.tournament_player?.pga_player;
               const cost = rp.player_cost ?? rp.tournament_player?.cost ?? 0;
+              const isWithdrawn = rp.tournament_player?.withdrawn === true;
               return (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-3 bg-casino-dark/30 border border-casino-gold/10 rounded-lg"
+                  className={`flex items-center justify-between p-3 bg-casino-dark/30 border border-casino-gold/10 rounded-lg ${isWithdrawn ? 'line-through decoration-2 decoration-red-400/80' : ''}`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-casino-green/20 text-casino-green flex items-center justify-center font-bold text-sm">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${isWithdrawn ? 'bg-red-900/30 text-red-400' : 'bg-casino-green/20 text-casino-green'}`}>
                       {index + 1}
                     </div>
                     <div>
                       <div className="font-medium text-casino-text">{player?.name || 'Unknown Player'}</div>
-                      {player?.country && (
+                      {player?.country && !isWithdrawn && (
                         <div className="text-xs text-casino-gray">{player.country}</div>
                       )}
                     </div>
                   </div>
-                  <div className="font-semibold text-casino-green">
-                    ${cost.toFixed(2)}
+                  <div className={`font-semibold ${isWithdrawn ? 'text-red-400' : 'text-casino-green'}`}>
+                    {isWithdrawn ? 'WD' : `$${cost.toFixed(2)}`}
                   </div>
                 </div>
               );

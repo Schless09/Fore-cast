@@ -11,7 +11,7 @@ import {
   normalizeNameForLookup,
   firstNamesMatchForLiveScores,
 } from '@/lib/live-scores-prizes';
-import { formatTeeTimeDisplay } from '@/lib/timezone';
+import { formatTeeTimeDisplay, formatTeeTimeInLocalTime } from '@/lib/timezone';
 
 interface RosterData {
   id: string;
@@ -50,7 +50,7 @@ interface LiveScore {
   currentRoundScore: string;
   roundComplete?: boolean;
   isAmateur?: boolean;
-  teeTime?: string; // Tee time from RapidAPI (e.g., "11:35am")
+  teeTime?: string; // Tee time from CBS or live cache (e.g., "11:35am")
 }
 
 interface LiveTeamStandingsProps {
@@ -70,6 +70,7 @@ interface LiveTeamStandingsProps {
   /** When provided, filter rosters by league membership (not active_league_id) so multi-league users show in each league's standings */
   leagueMemberIds?: string[];
   displayRound?: number;
+  tournamentStartDate?: string;
   /** In R1/R2, zero winnings for players below this cut (projected cut). */
   cutLine?: { cutScore: string; cutCount: number } | null;
 }
@@ -97,6 +98,7 @@ export function LiveTeamStandings({
   userLeagueId,
   leagueMemberIds,
   displayRound = 1,
+  tournamentStartDate,
   cutLine,
 }: LiveTeamStandingsProps) {
   const isCompleted = tournamentStatus === 'completed';
@@ -714,8 +716,19 @@ export function LiveTeamStandings({
                       if (player.liveScore?.thru && player.liveScore.thru !== '-' && player.liveScore.thru !== '0') {
                         return <span className="text-casino-blue">{player.liveScore.thru}</span>;
                       }
-                      if (player.liveScore?.teeTime) return <span className="text-casino-gray">{formatTeeTimeDisplay(player.liveScore.teeTime)}</span>;
-                      if (teeTime) return <span className="text-casino-gray">{formatTeeTimeDisplay(teeTime)}</span>;
+                      if (teeTime) {
+                        const display = tournamentStartDate
+                          ? formatTeeTimeInLocalTime(teeTime, tournamentStartDate, displayRound)
+                          : formatTeeTimeDisplay(teeTime);
+                        return <span className="text-casino-gray">{display}</span>;
+                      }
+                      if (player.liveScore?.teeTime) {
+                        const raw = formatTeeTimeDisplay(player.liveScore.teeTime);
+                        const display = tournamentStartDate
+                          ? formatTeeTimeInLocalTime(raw, tournamentStartDate, displayRound)
+                          : raw;
+                        return <span className="text-casino-gray">{display}</span>;
+                      }
                       return <span className="text-casino-gray-dark">-</span>;
                     })();
                     return (
