@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useUser, useClerk, SignUpButton } from '@clerk/nextjs';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { useSectionNavScroll } from '@/hooks/useSectionNavScroll';
 
 export function Navbar() {
   const router = useRouter();
@@ -13,6 +14,8 @@ export function Navbar() {
   const { signOut } = useClerk();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const unreadCount = useUnreadMessages();
+  const sectionNavVisible = useSectionNavScroll();
+  const navVertical = sectionNavVisible ? 'py-2 md:py-4' : 'py-4';
 
   const handleSignOut = async () => {
     await signOut();
@@ -21,7 +24,7 @@ export function Navbar() {
 
   if (!isLoaded) {
     return (
-      <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50">
+      <nav className={`bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 sticky top-0 z-50 transition-[padding] duration-200 ${navVertical}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-casino-gold font-orbitron tracking-wider -ml-2 px-2 py-1 rounded-lg hover:bg-casino-card/30 transition-colors">
             <Image src="/logo.png" alt="FORE!SIGHT" width={40} height={40} className="rounded" />
@@ -34,7 +37,7 @@ export function Navbar() {
 
   if (!isSignedIn) {
     return (
-      <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50 shadow-[0_4px_20px_rgba(251,191,36,0.1)]">
+      <nav className={`bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 sticky top-0 z-50 shadow-[0_4px_20px_rgba(251,191,36,0.1)] transition-[padding] duration-200 ${navVertical}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-casino-gold font-orbitron tracking-wider -ml-2 px-2 py-1 rounded-lg hover:bg-casino-card/30 transition-colors">
             <Image src="/logo.png" alt="FORE!SIGHT" width={40} height={40} className="rounded" />
@@ -84,7 +87,7 @@ export function Navbar() {
   const isAdmin = user?.username === 'aschuessontheloose';
 
   return (
-      <nav className="bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 py-4 sticky top-0 z-50 shadow-[0_4px_20px_rgba(251,191,36,0.1)]">
+      <nav className={`bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 px-4 sticky top-0 z-50 shadow-[0_4px_20px_rgba(251,191,36,0.1)] transition-[padding] duration-200 ${navVertical}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-casino-gold font-orbitron tracking-wider -ml-2 px-2 py-1 rounded-lg hover:bg-casino-card/30 transition-colors">
             <Image src="/logo.png" alt="FORE!SIGHT" width={40} height={40} className="rounded" />

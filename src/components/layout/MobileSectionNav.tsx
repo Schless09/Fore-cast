@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
-
-const SCROLL_THRESHOLD = 60;
+import { useSectionNavScroll } from '@/hooks/useSectionNavScroll';
 // Slightly below navbar so the bar isn’t clipped at the top (py-4 + content + safe area)
-const TOP_OFFSET = 'calc(64px + env(safe-area-inset-top, 0px))';
+// Full-height nav ≈ 64px. When scrolled, nav uses py-2 ≈ 48px.
+const TOP_OFFSET_COMPACT = 'calc(48px + env(safe-area-inset-top, 0px))';
 
 const SECTIONS = [
   { href: '/tournaments', label: 'Tournaments', match: (path: string) => path.startsWith('/tournaments') },
@@ -17,30 +15,14 @@ const SECTIONS = [
 
 export function MobileSectionNav() {
   const pathname = usePathname();
-  const isMobile = useMediaQuery('(max-width: 767px)');
-  const [showBar, setShowBar] = useState(false);
+  const showBar = useSectionNavScroll();
 
-  const isOnSection = SECTIONS.some((s) => s.match(pathname ?? ''));
-
-  useEffect(() => {
-    if (!isOnSection || !isMobile) return;
-
-    const onScroll = () => {
-      setShowBar(window.scrollY > SCROLL_THRESHOLD);
-    };
-
-    onScroll(); // in case already scrolled
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [isOnSection, isMobile]);
-
-  if (!isMobile || !isOnSection) return null;
   if (!showBar) return null;
 
   return (
     <div
-      className="fixed left-0 right-0 z-40 pt-2 pb-0 px-4 bg-casino-bg/95 backdrop-blur-md md:hidden"
-      style={{ top: TOP_OFFSET }}
+      className="fixed left-0 right-0 z-40 pb-0 px-4 bg-casino-bg/95 backdrop-blur-md md:hidden"
+      style={{ top: TOP_OFFSET_COMPACT }}
     >
       <div className="max-w-7xl mx-auto flex overflow-hidden border border-casino-gold/20 bg-casino-card/30 min-w-0 w-full">
         {SECTIONS.map((section) => {
