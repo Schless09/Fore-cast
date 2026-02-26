@@ -201,11 +201,6 @@ export function InsideTheFieldTable({
           >
             All season
           </button>
-          {viewMode === 'season' && (
-            <span className="text-xs text-casino-gray">
-              ({totalSeasonSlots.toLocaleString()} roster slots this season)
-            </span>
-          )}
         </div>
       )}
       <div className="overflow-x-auto">
