@@ -96,6 +96,7 @@ export function ExpandableRosterRow({
             total_score,
             thru,
             made_cut,
+            withdrawn,
             tee_time,
             tee_time_r1,
             tee_time_r2,
@@ -231,6 +232,7 @@ export function ExpandableRosterRow({
                       {players.map((rp: any, idx: number) => {
                         const tp = rp.tournament_player;
                         const player = tp?.pga_players;
+                        const isWithdrawn = tp?.withdrawn === true;
                         
                         return (
                           <tr key={idx} className="hover:bg-casino-card/50 transition-colors">
@@ -249,8 +251,8 @@ export function ExpandableRosterRow({
                                     </span>
                                   </div>
                                 )}
-                                <span className="truncate sm:hidden">{formatShortName(player?.name || 'Unknown')}</span>
-                                <span className="truncate hidden sm:inline">{player?.name || 'Unknown'}</span>
+                                <span className={`truncate sm:hidden ${isWithdrawn ? 'line-through text-casino-red/90' : ''}`}>{formatShortName(player?.name || 'Unknown')}</span>
+                                <span className={`truncate hidden sm:inline ${isWithdrawn ? 'line-through text-casino-red/90' : ''}`}>{player?.name || 'Unknown'}</span>
                                 {player?.country && (
                                   <span className="text-xs hidden sm:inline" title={player.country}>
                                     {getFlagEmoji(player.country)}
@@ -259,7 +261,9 @@ export function ExpandableRosterRow({
                               </div>
                             </td>
                             <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center">
-                              {tp?.made_cut === false ? (
+                              {isWithdrawn ? (
+                                <span className="font-medium text-casino-red">WD</span>
+                              ) : tp?.made_cut === false ? (
                                 <span className="font-medium text-casino-red">MC</span>
                               ) : tp?.position ? (
                                 <span className={`font-medium ${
@@ -274,7 +278,9 @@ export function ExpandableRosterRow({
                               )}
                             </td>
                             <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center hidden sm:table-cell">
-                              {tp?.made_cut === false ? (
+                              {isWithdrawn ? (
+                                <span className="text-casino-red font-medium">WD</span>
+                              ) : tp?.made_cut === false ? (
                                 <span className="text-casino-red font-medium">MC</span>
                               ) : tp?.total_score ? (
                                 <span className={
@@ -289,7 +295,9 @@ export function ExpandableRosterRow({
                               )}
                             </td>
                             <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-center hidden md:table-cell">
-                              {tp?.thru === 'F' ? (
+                              {isWithdrawn ? (
+                                <span className="text-casino-gray-dark">-</span>
+                              ) : tp?.thru === 'F' ? (
                                 <span className="text-casino-green font-medium">F</span>
                               ) : (tp?.thru && tp.thru !== '-' && parseInt(tp.thru) > 0) ? (
                                 <span className="text-casino-blue">{tp.thru}</span>
@@ -306,12 +314,14 @@ export function ExpandableRosterRow({
                             <td className="px-1 sm:px-2 py-1.5 text-xs sm:text-sm text-right">
                               <span
                                 className={
-                                  (rp.player_winnings || 0) > 0
-                                    ? 'text-casino-green font-semibold'
-                                    : 'text-casino-gray-dark'
+                                  isWithdrawn
+                                    ? 'text-casino-red font-semibold'
+                                    : (rp.player_winnings || 0) > 0
+                                      ? 'text-casino-green font-semibold'
+                                      : 'text-casino-gray-dark'
                                 }
                               >
-                                {formatCurrency(rp.player_winnings || 0)}
+                                {isWithdrawn ? 'WD' : formatCurrency(rp.player_winnings || 0)}
                               </span>
                             </td>
                           </tr>

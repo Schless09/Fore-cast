@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { clerkClient } from '@clerk/nextjs/server';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -7,6 +8,8 @@ export interface MarkWithdrawnResult {
   success: boolean;
   withdrawnCount: number;
   emailsSent: number;
+  /** Set when no emails could be sent (e.g. no email on profile or Clerk) */
+  emailsUnavailable?: boolean;
   error?: string;
 }
 
@@ -89,14 +92,30 @@ export async function markPlayersWithdrawnAndNotify(
 
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, email')
+    .select('id, email, clerk_id')
     .in('id', rosters.map((r) => r.user_id));
 
-  const userEmails = new Map(
-    (profiles ?? [])
-      .map((p) => [p.id, p.email] as [string, string])
-      .filter(([, e]) => Boolean(e))
-  );
+  const userEmails = new Map<string, string>();
+
+  for (const p of profiles ?? []) {
+    const profileEmail = (p as { email?: string | null }).email;
+    if (profileEmail?.trim()) {
+      userEmails.set(p.id, profileEmail.trim());
+      continue;
+    }
+    const clerkId = (p as { clerk_id?: string | null }).clerk_id;
+    if (clerkId) {
+      try {
+        const client = await clerkClient();
+        const user = await client.users.getUser(clerkId);
+        const primaryEmail = user.emailAddresses?.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress
+          ?? user.emailAddresses?.[0]?.emailAddress;
+        if (primaryEmail) userEmails.set(p.id, primaryEmail);
+      } catch (err) {
+        console.error('[Withdrawals] Clerk lookup failed for clerk_id', clerkId, err);
+      }
+    }
+  }
 
   const playerNames = tps
     .map((tp) => {
@@ -124,6 +143,9 @@ export async function markPlayersWithdrawnAndNotify(
 
   let emailsSent = 0;
   const seenEmails = new Set<string>();
+  const uniqueUserIds = [...new Set(rosters.map((r) => r.user_id))];
+  const recipientsWithoutEmail = uniqueUserIds.filter((uid) => !userEmails.has(uid));
+
   for (const roster of rosters) {
     const email = userEmails.get(roster.user_id);
     if (!email || seenEmails.has(email)) continue;
@@ -141,5 +163,10 @@ export async function markPlayersWithdrawnAndNotify(
     }
   }
 
-  return { success: true, withdrawnCount: tps.length, emailsSent };
+  return {
+    success: true,
+    withdrawnCount: tps.length,
+    emailsSent,
+    emailsUnavailable: rosterIds.length > 0 && recipientsWithoutEmail.length > 0 && emailsSent === 0,
+  };
 }

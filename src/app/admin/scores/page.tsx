@@ -91,7 +91,8 @@ export default function AdminScoresPage() {
   }, [selectedTournament]);
 
   useEffect(() => {
-    if (selectedTournament?.status === 'upcoming') {
+    // Load players for upcoming (pre-tournament WD) and active/completed (day-of or late WD)
+    if (selectedTournament && ['upcoming', 'active', 'completed'].includes(selectedTournament.status)) {
       loadTournamentPlayers();
     } else {
       setTournamentPlayers([]);
@@ -387,8 +388,8 @@ export default function AdminScoresPage() {
         </CardContent>
       </Card>
 
-      {/* Mark Withdrawals - only for upcoming tournaments */}
-      {selectedTournament?.status === 'upcoming' && (
+      {/* Mark Withdrawals - upcoming, active, and completed (for day-of or late scratches) */}
+      {selectedTournament && ['upcoming', 'active', 'completed'].includes(selectedTournament.status) && (
         <Card className="mb-6 border-amber-200 bg-amber-50/50">
           <CardHeader>
             <CardTitle>Mark Withdrawals (WD)</CardTitle>
@@ -491,7 +492,7 @@ export default function AdminScoresPage() {
               <strong>Calculate Winnings:</strong> Calculates prize money for each player based on their position and updates roster totals
             </li>
             <li>
-              <strong>Mark Withdrawals:</strong> For upcoming tournaments only. Select players who withdrew—they show WD with strikethrough in the roster builder and affected roster owners receive an email.
+              <strong>Mark Withdrawals:</strong> For upcoming, active, or completed tournaments. Select players who withdrew (e.g. last-minute scratch). They show WD with strikethrough in the roster builder and affected roster owners receive an email.
             </li>
             <li>
               <strong>Send Woulda-Coulda Emails:</strong> Run <em>after</em> winnings are calculated. Sends an email only to users who (1) edited their roster during the tournament, (2) their <strong>current</strong> lineup’s total purse is <strong>lower</strong> than a previous version, and (3) that previous lineup would have placed them <strong>strictly higher</strong> (e.g. 6th → would’ve been 2nd, or 4th → would’ve been 1st).

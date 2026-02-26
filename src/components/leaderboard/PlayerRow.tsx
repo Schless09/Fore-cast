@@ -36,6 +36,7 @@ function getTeeTimeForRound(player: TournamentPlayer, currentRound?: number): st
 export function PlayerRow({ player, playerWinnings, rank, currentRound }: PlayerRowProps) {
   const pgaPlayer = player.pga_player;
   const displayName = pgaPlayer?.name || 'Unknown Player';
+  const isWithdrawn = player.withdrawn === true;
 
   return (
     <tr className="border-b border-casino-gold/10 hover:bg-casino-card/50 transition-colors">
@@ -58,7 +59,7 @@ export function PlayerRow({ player, playerWinnings, rank, currentRound }: Player
             </div>
           )}
           <div className="min-w-0">
-            <p className="font-medium text-casino-text text-xs sm:text-sm truncate">{displayName}</p>
+            <p className={`font-medium text-casino-text text-xs sm:text-sm truncate ${isWithdrawn ? 'line-through text-casino-red/90' : ''}`}>{displayName}</p>
             {pgaPlayer?.country && (
               <p className="text-xs text-casino-gray hidden sm:block">{pgaPlayer.country}</p>
             )}
@@ -66,7 +67,9 @@ export function PlayerRow({ player, playerWinnings, rank, currentRound }: Player
         </div>
       </td>
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-casino-text">
-        {player.made_cut === false ? (
+        {isWithdrawn ? (
+          <span className="text-casino-red font-medium">WD</span>
+        ) : player.made_cut === false ? (
           <span className="text-casino-red font-medium">MC</span>
         ) : player.position ? (
           `${player.is_tied && player.tied_with_count > 1 ? 'T' : ''}${player.position}`
@@ -74,23 +77,26 @@ export function PlayerRow({ player, playerWinnings, rank, currentRound }: Player
           '-'
         )}
       </td>
-      <td className={`px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium ${getScoreColor(player.total_score)}`}>
-        {formatScore(player.total_score)}
+      <td className={`px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium ${isWithdrawn ? 'text-casino-red' : getScoreColor(player.total_score)}`}>
+        {isWithdrawn ? 'WD' : formatScore(player.total_score)}
       </td>
       <td className={`px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm ${getScoreColor(player.today_score)} hidden sm:table-cell`}>
-        {formatScore(player.today_score)}
+        {isWithdrawn ? '-' : formatScore(player.today_score)}
       </td>
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-casino-text hidden md:table-cell">
-        {player.thru && player.thru !== 0 ? player.thru :
-         getTeeTimeForRound(player, currentRound) || '-'}
+        {isWithdrawn ? '-' : (player.thru && player.thru !== 0 ? player.thru : getTeeTimeForRound(player, currentRound) || '-')}
       </td>
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-right">
-        <span className={`font-semibold ${playerWinnings > 0 ? 'text-casino-green' : 'text-casino-gray'}`}>
-          {formatCurrency(playerWinnings)}
+        <span className={`font-semibold ${isWithdrawn ? 'text-casino-red' : playerWinnings > 0 ? 'text-casino-green' : 'text-casino-gray'}`}>
+          {isWithdrawn ? 'WD' : formatCurrency(playerWinnings)}
         </span>
       </td>
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-center hidden sm:table-cell">
-        {player.made_cut === false ? (
+        {isWithdrawn ? (
+          <span className="px-2 py-1 bg-casino-red/20 text-casino-red border border-casino-red/30 rounded-full text-xs font-medium">
+            WD
+          </span>
+        ) : player.made_cut === false ? (
           <span className="px-2 py-1 bg-casino-red/20 text-casino-red border border-casino-red/30 rounded-full text-xs font-medium">
             Cut
           </span>

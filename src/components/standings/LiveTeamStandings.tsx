@@ -40,6 +40,7 @@ interface RosterData {
     madeCut?: boolean | null;
     /** From processLiveScoresForPrizes (includes "MC" for cut players) */
     positionDisplay?: string;
+    withdrawn?: boolean;
   }>;
 }
 
@@ -222,6 +223,19 @@ export function LiveTeamStandings({
     return rosters.map((roster) => {
       let totalWinnings = 0;
       const playersWithScores = roster.players.map((player) => {
+        // Withdrawn: show WD, $0 winnings
+        if (player.withdrawn) {
+          totalWinnings += 0;
+          return {
+            ...player,
+            liveScore: undefined,
+            winnings: 0,
+            isAmateur: false,
+            hasTeedOff: false,
+            positionDisplay: 'WD',
+          };
+        }
+
         // For completed tournaments, use stored final data (per-player for display)
         if (isCompleted) {
           const winnings = player.finalPrizeMoney || 0;
@@ -380,6 +394,7 @@ export function LiveTeamStandings({
             total_score,
             prize_money,
             made_cut,
+            withdrawn,
             pga_players(name, is_amateur)
           )
         )
@@ -420,6 +435,7 @@ export function LiveTeamStandings({
           total_score?: number | null;
           prize_money?: number | null;
           made_cut?: boolean | null;
+          withdrawn?: boolean;
         } | null;
       }> | null;
     };
@@ -446,6 +462,7 @@ export function LiveTeamStandings({
           finalPrizeMoney: rp.player_winnings ?? rp.tournament_player?.prize_money,
           isAmateur: rp.tournament_player?.pga_players?.is_amateur,
           madeCut: rp.tournament_player?.made_cut,
+          withdrawn: rp.tournament_player?.withdrawn === true,
         })),
       };
     });
@@ -761,7 +778,7 @@ export function LiveTeamStandings({
                       <tr key={`${roster.id}-player-${idx}`} className={`border-b border-casino-gold/10 ${detailBg} hover:bg-casino-card/50 transition-colors`}>
                         {/* Rank + Team columns merged for golfer rows */}
                         <td colSpan={2} className="px-px sm:px-2 py-1 sm:py-1.5 text-xs sm:text-sm text-casino-text">
-                          <span className="block border-l-2 border-casino-gold/20 truncate pl-1 sm:pl-2">
+                          <span className={`block border-l-2 border-casino-gold/20 truncate pl-1 sm:pl-2 ${player.withdrawn ? 'line-through text-casino-red/90' : ''}`}>
                             <button
                               type="button"
                               onClick={(e) => handlePlayerNameClick(e, player.playerName)}
@@ -777,7 +794,9 @@ export function LiveTeamStandings({
                         </td>
                         {/* Pos */}
                         <td className="px-px sm:px-4 py-1 sm:py-1.5 text-xs text-center">
-                          {(player.positionDisplay ?? player.liveScore?.position) ? (
+                          {player.withdrawn ? (
+                            <span className="font-medium text-casino-red">WD</span>
+                          ) : (player.positionDisplay ?? player.liveScore?.position) ? (
                             <span className={`font-medium ${
                               (player.positionDisplay ?? player.liveScore?.position) === 'MC' ? 'text-casino-red' :
                               player.liveScore?.positionValue === 1 ? 'text-casino-gold' :
@@ -791,7 +810,9 @@ export function LiveTeamStandings({
                         </td>
                         {/* Score — click to open scorecard (same as live leaderboard) */}
                         <td className="px-px sm:px-4 py-1 sm:py-1.5 text-xs text-center">
-                          {player.liveScore ? (
+                          {player.withdrawn ? (
+                            <span className="text-casino-red font-medium">WD</span>
+                          ) : player.liveScore ? (
                             canShowScorecard && player.liveScore.playerId ? (
                               <button
                                 type="button"
@@ -818,20 +839,20 @@ export function LiveTeamStandings({
                         </td>
                         {/* Thru */}
                         <td className="px-px sm:px-4 py-1 sm:py-1.5 text-xs text-center whitespace-nowrap">
-                          {thruCell}
+                          {player.withdrawn ? <span className="text-casino-gray-dark">-</span> : thruCell}
                         </td>
                         {/* Winnings */}
                         {isMobile ? (
                           <td colSpan={2} className="px-px py-1 sm:py-1.5 text-xs text-right">
-                            <span className={player.winnings > 0 ? 'text-casino-text' : 'text-casino-gray-dark'}>
-                              {formatCurrency(player.winnings)}
+                            <span className={player.withdrawn ? 'text-casino-red font-medium' : player.winnings > 0 ? 'text-casino-text' : 'text-casino-gray-dark'}>
+                              {player.withdrawn ? 'WD' : formatCurrency(player.winnings)}
                             </span>
                           </td>
                         ) : (
                           <>
                             <td className="px-1 sm:px-4 py-1 sm:py-1.5 text-xs text-right">
-                              <span className={player.winnings > 0 ? 'text-casino-text' : 'text-casino-gray-dark'}>
-                                {formatCurrency(player.winnings)}
+                              <span className={player.withdrawn ? 'text-casino-red font-medium' : player.winnings > 0 ? 'text-casino-text' : 'text-casino-gray-dark'}>
+                                {player.withdrawn ? 'WD' : formatCurrency(player.winnings)}
                               </span>
                             </td>
                             <td className="px-1 sm:px-4 py-1 sm:py-1.5" />

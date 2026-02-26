@@ -103,6 +103,182 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
   const totalRosters = leagueRosters?.length || 0;
   const rosterIds = leagueRosters?.map(r => r.id) || [];
 
+  // Season-level pick counts and aggregates (same league, tournaments the commissioner selected for the season)
+  type SeasonStatRow = { selectionCount: number; percentage: number; pickedByUsers: string[]; totalEarnings: number; totalCost: number };
+  let seasonStatsForTable: Record<string, SeasonStatRow> = {};
+  let totalSeasonSlots = 0;
+
+  if (profile.active_league_id) {
+    // Tournaments that are completed or active
+    const { data: allSeasonEligible } = await supabase
+      .from('tournaments')
+      .select('id, espn_event_id')
+      .in('status', ['completed', 'active']);
+    // League commissioner selection: exclude any tournament marked is_excluded
+    const { data: leagueTournamentRows } = await supabase
+      .from('league_tournaments')
+      .select('tournament_id, is_excluded')
+      .eq('league_id', profile.active_league_id)
+      .in('tournament_id', (allSeasonEligible || []).map((t) => t.id));
+    const excludedTids = new Set(
+      (leagueTournamentRows || []).filter((r) => r.is_excluded === true).map((r) => r.tournament_id)
+    );
+    const seasonTournamentList = (allSeasonEligible || []).filter((t) => !excludedTids.has(t.id));
+    const seasonTournamentIds = seasonTournamentList.map((t) => t.id);
+
+    if (seasonTournamentIds.length === 0) {
+      // no tournaments in league season (commissioner has none selected or all excluded)
+    } else {
+      const { data: leagueProfileIds } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('active_league_id', profile.active_league_id);
+      const leagueUserIds = (leagueProfileIds || []).map((p) => p.id);
+
+      const { data: seasonRosters } = await supabase
+        .from('user_rosters')
+        .select('id, user_id, tournament_id')
+        .in('user_id', leagueUserIds)
+        .in('tournament_id', seasonTournamentIds);
+
+      const seasonRosterIds = (seasonRosters || []).map((r) => r.id);
+      const seasonRosterToUser = new Map<string, string>(
+        (seasonRosters || []).map((r) => [r.id, r.user_id])
+      );
+      const seasonRosterToTournament = new Map<string, string>(
+        (seasonRosters || []).map((r) => [r.id, r.tournament_id])
+      );
+
+      if (seasonRosterIds.length > 0) {
+        const seasonUserIds = [...new Set((seasonRosters || []).map((r) => r.user_id))];
+        const { data: seasonProfiles } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', seasonUserIds);
+        const seasonUserIdToUsername = new Map(
+          (seasonProfiles || []).map((p) => [p.id, p.username ?? ''])
+        );
+
+        // Per-tournament processed prize data and cost maps
+        const seasonProcessedByTid = new Map<string, Map<string, ProcessedPrizeData>>();
+        const seasonCostByTid = new Map<string, Map<string, number>>();
+
+        for (const t of seasonTournamentList) {
+          const tid = t.id;
+          const { data: distro } = await supabase
+            .from('prize_money_distributions')
+            .select('position, amount')
+            .eq('tournament_id', tid)
+            .order('position', { ascending: true });
+          const prizeMap = new Map<number, number>((distro || []).map((p) => [p.position, p.amount ?? 0]));
+
+          let processed = new Map<string, ProcessedPrizeData>();
+          if (t.espn_event_id) {
+            const { data: espnCached } = await supabase
+              .from('espn_cache')
+              .select('data')
+              .eq('cache_key', `espn-${t.espn_event_id}`)
+              .maybeSingle();
+            if (espnCached?.data?.data && Array.isArray(espnCached.data.data)) {
+              const scores = (espnCached.data.data as CachedPlayer[]).map((p) => ({
+                player: p.player || (p.firstName && p.lastName ? `${p.firstName} ${p.lastName}` : ''),
+                positionValue: p.positionValue,
+                position: p.position,
+                total: p.total,
+                thru: p.thru,
+                teeTime: p.teeTime,
+                isAmateur: p.isAmateur,
+                currentRoundScore: p.currentRoundScore,
+              }));
+              processed = processLiveScoresForPrizes(scores, 'espn', prizeMap);
+            }
+          }
+          if (processed.size === 0) {
+            const { data: cachedData } = await supabase
+              .from('live_scores_cache')
+              .select('data')
+              .eq('tournament_id', tid)
+              .maybeSingle();
+            if (cachedData?.data?.data && Array.isArray(cachedData.data.data)) {
+              const scores = (cachedData.data.data as CachedPlayer[]).map((p) => ({
+                player: p.player || (p.firstName && p.lastName ? `${p.firstName} ${p.lastName}` : ''),
+                positionValue: p.positionValue,
+                position: p.position,
+                total: p.total,
+                thru: p.thru,
+                teeTime: p.teeTime,
+                isAmateur: p.isAmateur,
+                currentRoundScore: p.currentRoundScore,
+              }));
+              processed = processLiveScoresForPrizes(scores, 'rapidapi', prizeMap);
+            }
+          }
+          seasonProcessedByTid.set(tid, processed);
+
+          const { data: tpList } = await supabase
+            .from('tournament_players')
+            .select('cost, pga_players!inner(name)')
+            .eq('tournament_id', tid);
+          const costMap = new Map<string, number>();
+          (tpList || []).forEach((tp: { cost?: number; pga_players: { name: string } }) => {
+            const name = tp.pga_players?.name;
+            if (name) costMap.set(name, tp.cost ?? 0);
+          });
+          seasonCostByTid.set(tid, costMap);
+        }
+
+        const { data: seasonSelections } = await supabase
+          .from('roster_players')
+          .select(`
+            roster_id,
+            tournament_player:tournament_players!inner(pga_players!inner(name))
+          `)
+          .in('roster_id', seasonRosterIds);
+
+        totalSeasonSlots = seasonSelections?.length ?? 0;
+        const seasonCounts = new Map<string, number>();
+        const seasonPickedBy = new Map<string, Set<string>>();
+        const seasonTotalEarnings = new Map<string, number>();
+        const seasonTotalCost = new Map<string, number>();
+
+        seasonSelections?.forEach((row) => {
+          const tp = row.tournament_player as unknown as { pga_players: { name: string } };
+          const playerName = tp?.pga_players?.name;
+          if (playerName) {
+            seasonCounts.set(playerName, (seasonCounts.get(playerName) ?? 0) + 1);
+            const uid = seasonRosterToUser.get(row.roster_id);
+            if (uid) {
+              const uname = seasonUserIdToUsername.get(uid);
+              if (uname) {
+                if (!seasonPickedBy.has(playerName)) seasonPickedBy.set(playerName, new Set());
+                seasonPickedBy.get(playerName)!.add(uname);
+              }
+            }
+            const tid = seasonRosterToTournament.get(row.roster_id);
+            if (tid) {
+              const processedMap = seasonProcessedByTid.get(tid);
+              const costMap = seasonCostByTid.get(tid);
+              const earnings = processedMap ? (getPrizeDataForPlayer(processedMap, playerName)?.winnings ?? 0) : 0;
+              const cost = costMap?.get(playerName) ?? 0;
+              seasonTotalEarnings.set(playerName, (seasonTotalEarnings.get(playerName) ?? 0) + earnings);
+              seasonTotalCost.set(playerName, (seasonTotalCost.get(playerName) ?? 0) + cost);
+            }
+          }
+        });
+
+        for (const [playerName, selectionCount] of seasonCounts.entries()) {
+          seasonStatsForTable[playerName] = {
+            selectionCount,
+            percentage: totalSeasonSlots > 0 ? Math.round((selectionCount / totalSeasonSlots) * 100) : 0,
+            pickedByUsers: Array.from(seasonPickedBy.get(playerName) ?? []),
+            totalEarnings: seasonTotalEarnings.get(playerName) ?? 0,
+            totalCost: seasonTotalCost.get(playerName) ?? 0,
+          };
+        }
+      }
+    }
+  }
+
   // Get the current user's roster for this tournament
   const userRoster = leagueRosters?.find(r => r.user_id === profile.id);
   const userRosterPlayerNames = new Set<string>();
@@ -310,7 +486,12 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
           </CardHeader>
           <CardContent>
             {playerStats.length > 0 ? (
-              <InsideTheFieldTable playerStats={playerStats} totalRosters={totalRosters} />
+              <InsideTheFieldTable
+                playerStats={playerStats}
+                totalRosters={totalRosters}
+                seasonStats={seasonStatsForTable}
+                totalSeasonSlots={totalSeasonSlots}
+              />
             ) : (
               <div className="text-center py-8 text-casino-gray">
                 No player selections found for this tournament in your league.

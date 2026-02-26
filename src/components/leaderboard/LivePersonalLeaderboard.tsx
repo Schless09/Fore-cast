@@ -33,6 +33,7 @@ interface RosterPlayer {
   teeTimeR2?: string | null;
   teeTimeR3?: string | null;
   teeTimeR4?: string | null;
+  withdrawn?: boolean;
 }
 
 interface LivePersonalLeaderboardProps {
@@ -60,6 +61,7 @@ interface RosterPlayerRow {
     tee_time_r2?: string | null;
     tee_time_r3?: string | null;
     tee_time_r4?: string | null;
+    withdrawn?: boolean;
     pga_players?: { name?: string } | null;
   } | null;
 }
@@ -175,6 +177,16 @@ export function LivePersonalLeaderboard({
   // Calculate winnings for each player based on live scores (uses shared prize logic)
   const playersWithLiveData = useMemo(() => {
     return rosterPlayers.map((player) => {
+      if (player.withdrawn) {
+        return {
+          ...player,
+          liveScore: undefined,
+          winnings: 0,
+          isAmateur: false,
+          hasTeedOff: false,
+          positionDisplay: 'WD',
+        };
+      }
       const liveScore = findLiveScore(player.playerName);
       const lookupKey = liveScore ? normalizeNameForLookup(liveScore.player) : null;
       const prizeData = lookupKey ? prizeDataByPlayer.get(lookupKey) : null;
@@ -216,6 +228,7 @@ export function LivePersonalLeaderboard({
           tee_time_r2,
           tee_time_r3,
           tee_time_r4,
+          withdrawn,
           pga_players(name)
         )
       `)
@@ -233,6 +246,7 @@ export function LivePersonalLeaderboard({
       teeTimeR2: rp.tournament_player?.tee_time_r2,
       teeTimeR3: rp.tournament_player?.tee_time_r3,
       teeTimeR4: rp.tournament_player?.tee_time_r4,
+      withdrawn: rp.tournament_player?.withdrawn === true,
     }));
 
     setRosterPlayers(players);
@@ -358,6 +372,7 @@ export function LivePersonalLeaderboard({
                     <td className="px-0.5 sm:px-3 py-2 font-medium text-casino-text text-xs sm:text-sm whitespace-nowrap">
                       {player.positionDisplay ? (
                         <span className={`font-medium ${
+                          player.positionDisplay === 'WD' ? 'text-casino-red' :
                           player.positionDisplay === 'MC' ? 'text-casino-red' :
                           player.positionDisplay === '1' || player.positionDisplay === 'T1' ? 'text-casino-gold' :
                           parseInt(player.positionDisplay.replace('T', '')) <= 10 ? 'text-casino-green' :
@@ -370,18 +385,21 @@ export function LivePersonalLeaderboard({
                       )}
                     </td>
                     <td className="px-0.5 sm:px-3 py-2 text-xs sm:text-sm text-casino-text">
-                      <span className="truncate block">
+                      <span className={`truncate block ${player.withdrawn ? 'line-through text-casino-red/90' : ''}`}>
                         {isMobile ? formatShortName(player.playerName) : player.playerName}
                         {player.isAmateur && <span className="text-casino-gray font-normal ml-1">(a)</span>}
                       </span>
                     </td>
                     <td className={`px-0.5 sm:px-4 py-2 font-semibold text-xs sm:text-sm whitespace-nowrap text-center ${
+                      player.withdrawn ? 'text-casino-red' :
                       player.liveScore
                         ? parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
                           parseScore(player.liveScore.total) > 0 ? 'text-casino-red' : 'text-casino-gray'
                         : ''
                     }`}>
-                      {player.liveScore ? (
+                      {player.withdrawn ? (
+                        <span>WD</span>
+                      ) : player.liveScore ? (
                         player.liveScore.total
                       ) : (
                         <span className="text-casino-gray-dark">-</span>
@@ -442,8 +460,8 @@ export function LivePersonalLeaderboard({
                       })()}
                     </td>
                     <td className="px-0.5 sm:px-4 py-2 text-right text-xs sm:text-sm whitespace-nowrap tabular-nums">
-                      <span className={player.winnings > 0 ? 'text-casino-gold' : 'text-casino-gray-dark'}>
-                        {formatCurrency(player.winnings)}
+                      <span className={player.withdrawn ? 'text-casino-red' : player.winnings > 0 ? 'text-casino-gold' : 'text-casino-gray-dark'}>
+                        {player.withdrawn ? 'WD' : formatCurrency(player.winnings)}
                       </span>
                     </td>
                   </tr>

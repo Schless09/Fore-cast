@@ -72,11 +72,17 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  const message =
+    result.emailsUnavailable && result.emailsSent === 0
+      ? `Marked ${result.withdrawnCount} player(s) as withdrawn. No emails sent — no email address found for affected roster owners (check profiles or Clerk).`
+      : `Marked ${result.withdrawnCount} player(s) as withdrawn. Sent ${result.emailsSent} email(s) to roster owners.`;
+
   return NextResponse.json({
     success: true,
-    message: `Marked ${result.withdrawnCount} player(s) as withdrawn. Sent ${result.emailsSent} email(s) to roster owners.`,
+    message,
     withdrawnCount: result.withdrawnCount,
     emailsSent: result.emailsSent,
+    emailsUnavailable: result.emailsUnavailable,
   });
 }
 

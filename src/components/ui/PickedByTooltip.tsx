@@ -8,13 +8,16 @@ interface PickedByTooltipProps {
   percentage: number;
   totalRosters: number;
   pickedByUsers: string[];
+  /** When true, tooltip says "Picked by (this season)" */
+  isSeason?: boolean;
 }
 
-export function PickedByTooltip({ 
-  selectionCount, 
-  percentage, 
+export function PickedByTooltip({
+  selectionCount,
+  percentage,
   totalRosters,
-  pickedByUsers 
+  pickedByUsers,
+  isSeason = false,
 }: PickedByTooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [coords, setCoords] = useState({ x: 0, y: 0 });
@@ -24,9 +27,9 @@ export function PickedByTooltip({
     setMounted(true);
   }, []);
 
-  const colorClass = 
-    selectionCount >= totalRosters * 0.75 ? 'text-casino-gold' :
-    selectionCount >= totalRosters * 0.5 ? 'text-casino-green' :
+  const colorClass =
+    totalRosters > 0 && selectionCount >= totalRosters * 0.75 ? 'text-casino-gold' :
+    totalRosters > 0 && selectionCount >= totalRosters * 0.5 ? 'text-casino-green' :
     'text-casino-text';
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLSpanElement>) => {
@@ -59,7 +62,9 @@ export function PickedByTooltip({
             transform: 'translateX(-50%)',
           }}
         >
-          <div className="text-xs text-gray-400 mb-1 font-medium">Picked by:</div>
+          <div className="text-xs text-gray-400 mb-1 font-medium">
+            {isSeason ? 'Picked by (this season):' : 'Picked by:'}
+          </div>
           <div className="flex flex-col gap-0.5">
             {pickedByUsers.map((username) => (
               <span key={username} className="text-sm text-white whitespace-nowrap">

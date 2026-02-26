@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { formatCurrency } from '@/lib/prize-money';
+import { formatShortName } from '@/lib/utils';
 import { PickedByTooltip } from '@/components/ui/PickedByTooltip';
 
 export interface PlayerSelectionStats {
@@ -39,23 +40,83 @@ function valueForDisplay(prizeMoney: number, cost: number): number | null {
   return prizeMoney / cost;
 }
 
+export interface SeasonPickStats {
+  selectionCount: number;
+  percentage: number;
+  pickedByUsers: string[];
+  /** Combined earnings across all season tournaments (for All Season view) */
+  totalEarnings?: number;
+  /** Sum of cost in each event where player was picked (for All Season value calc) */
+  totalCost?: number;
+}
+
 interface InsideTheFieldTableProps {
   playerStats: PlayerSelectionStats[];
   totalRosters: number;
+  seasonStats?: Record<string, SeasonPickStats>;
+  totalSeasonSlots?: number;
 }
 
 const VALUE_TOOLTIP = 'Return per dollar spent (earnings ÷ cost)';
 
-export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFieldTableProps) {
+type ViewMode = 'tournament' | 'season';
+
+export function InsideTheFieldTable({
+  playerStats,
+  totalRosters,
+  seasonStats = {},
+  totalSeasonSlots = 0,
+}: InsideTheFieldTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('picked');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [viewMode, setViewMode] = useState<ViewMode>('tournament');
   const [showValueTooltip, setShowValueTooltip] = useState(false);
   const [valueTooltipCoords, setValueTooltipCoords] = useState({ x: 0, y: 0 });
   const [mounted, setMounted] = useState(false);
+  const hasSeasonData = totalSeasonSlots > 0 && Object.keys(seasonStats).length > 0;
+
+  // In season view, show all players with season totals (earnings, cost) for display and value calc
+  const statsToDisplay = useMemo(() => {
+    if (viewMode !== 'season' || !hasSeasonData) return playerStats;
+    const byName = new Map<string, PlayerSelectionStats>(playerStats.map((p) => [p.playerName, p]));
+    const merged: PlayerSelectionStats[] = [];
+    for (const [playerName, season] of Object.entries(seasonStats)) {
+      const existing = byName.get(playerName);
+      const seasonEarnings = season.totalEarnings ?? 0;
+      const seasonCost = season.totalCost ?? 0;
+      if (existing) {
+        merged.push({
+          ...existing,
+          prizeMoney: seasonEarnings,
+          cost: seasonCost,
+          position: null, // no single POS in season view
+        });
+      } else {
+        merged.push({
+          playerName,
+          selectionCount: season.selectionCount,
+          percentage: season.percentage,
+          position: null,
+          prizeMoney: seasonEarnings,
+          isOnUserRoster: false,
+          cost: seasonCost,
+          pickedByUsers: season.pickedByUsers,
+        });
+      }
+    }
+    return merged;
+  }, [viewMode, hasSeasonData, playerStats, seasonStats]);
 
   useEffect(() => setMounted(true), []);
 
+  useEffect(() => {
+    if (viewMode === 'season' && sortKey === 'pos') setSortKey('earnings');
+  }, [viewMode, sortKey]);
+
+  const isSeasonView = viewMode === 'season';
+
   const handleSort = (key: SortKey) => {
+    if (key === 'pos' && isSeasonView) return; // no POS in season view
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -65,14 +126,16 @@ export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFiel
   };
 
   const sortedStats = useMemo(() => {
-    const arr = [...playerStats];
+    const arr = [...statsToDisplay];
+    const getPickedCount = (p: PlayerSelectionStats) =>
+      viewMode === 'season' ? (seasonStats[p.playerName]?.selectionCount ?? 0) : p.selectionCount;
     arr.sort((a, b) => {
       let aVal: number | string | null;
       let bVal: number | string | null;
       switch (sortKey) {
         case 'picked':
-          aVal = a.selectionCount;
-          bVal = b.selectionCount;
+          aVal = getPickedCount(a);
+          bVal = getPickedCount(b);
           break;
         case 'pos':
           aVal = parsePosForSort(a.position);
@@ -96,11 +159,11 @@ export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFiel
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return arr;
-  }, [playerStats, sortKey, sortDir]);
+  }, [statsToDisplay, sortKey, sortDir, viewMode, seasonStats]);
 
   const SortHeader = ({ label, sortKey: k, align = 'center', title }: { label: string; sortKey: SortKey; align?: 'left' | 'center' | 'right'; title?: string }) => (
     <th
-      className={`px-1 sm:px-3 py-3 cursor-pointer select-none hover:text-casino-gold transition-colors ${align === 'right' ? 'text-right' : align === 'left' ? 'text-left' : 'text-center'}`}
+      className={`px-1 sm:px-3 py-2 cursor-pointer select-none hover:text-casino-gold transition-colors ${align === 'right' ? 'text-right' : align === 'left' ? 'text-left' : 'text-center'}`}
       onClick={() => handleSort(k)}
       title={title}
     >
@@ -112,17 +175,50 @@ export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFiel
   );
 
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-3">
+      {hasSeasonData && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-casino-gray">Picked:</span>
+          <button
+            type="button"
+            onClick={() => setViewMode('tournament')}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+              viewMode === 'tournament'
+                ? 'bg-casino-gold/30 text-casino-gold border border-casino-gold/50'
+                : 'bg-casino-card text-casino-gray border border-casino-gold/20 hover:border-casino-gold/40'
+            }`}
+          >
+            This tournament
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('season')}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+              viewMode === 'season'
+                ? 'bg-casino-gold/30 text-casino-gold border border-casino-gold/50'
+                : 'bg-casino-card text-casino-gray border border-casino-gold/20 hover:border-casino-gold/40'
+            }`}
+          >
+            All season
+          </button>
+          {viewMode === 'season' && (
+            <span className="text-xs text-casino-gray">
+              ({totalSeasonSlots.toLocaleString()} roster slots this season)
+            </span>
+          )}
+        </div>
+      )}
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-casino-gold/30 text-left text-casino-gray uppercase text-xs">
-            <th className="px-1 sm:px-3 py-3 w-8">#</th>
-            <th className="px-1 sm:px-3 py-3">Player</th>
+            <th className="px-1 sm:px-3 py-2 w-8">#</th>
+            <th className="px-1 sm:px-3 py-2">Player</th>
             <SortHeader label="Picked" sortKey="picked" />
-            <SortHeader label="POS" sortKey="pos" />
+            {!isSeasonView && <SortHeader label="POS" sortKey="pos" />}
             <SortHeader label="Earnings" sortKey="earnings" align="right" />
             <th
-              className="px-1 sm:px-3 py-3 cursor-pointer select-none hover:text-casino-gold transition-colors text-right"
+              className="px-1 sm:px-3 py-2 cursor-pointer select-none hover:text-casino-gold transition-colors text-right"
               onClick={() => handleSort('roi')}
             >
               <span className="inline-flex items-center gap-1">
@@ -148,6 +244,11 @@ export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFiel
         <tbody>
           {sortedStats.map((player, index) => {
             const value = valueForDisplay(player.prizeMoney, player.cost);
+            const isSeason = viewMode === 'season';
+            const picked = isSeason
+              ? (seasonStats[player.playerName] ?? { selectionCount: 0, percentage: 0, pickedByUsers: [] })
+              : { selectionCount: player.selectionCount, percentage: player.percentage, pickedByUsers: player.pickedByUsers };
+            const pickedTotal = isSeason ? totalSeasonSlots : totalRosters;
             return (
               <tr
                 key={player.playerName}
@@ -157,47 +258,45 @@ export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFiel
                     : 'border-casino-gold/10 hover:bg-casino-elevated'
                 }`}
               >
-                <td className="px-1 sm:px-3 py-3 text-casino-gray">
+                <td className="px-1 sm:px-3 py-1.5 text-casino-gray">
                   {index + 1}
                 </td>
-                <td className={`px-1 sm:px-3 py-3 font-medium ${player.isOnUserRoster ? 'text-casino-gold' : 'text-casino-text'}`}>
-                  <div className="flex flex-col">
-                    <span>
-                      {player.playerName}
-                      <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
-                    </span>
-                    <span className="text-xs text-casino-gray sm:hidden">
-                      {player.selectionCount}/{totalRosters} teams ({player.percentage}%)
-                    </span>
-                  </div>
+                <td className={`px-1 sm:px-3 py-1.5 font-medium ${player.isOnUserRoster ? 'text-casino-gold' : 'text-casino-text'}`}>
+                  <span title={player.playerName}>
+                    {formatShortName(player.playerName)}
+                    <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
+                  </span>
                 </td>
-                <td className="px-1 sm:px-3 py-3 text-center">
+                <td className="px-1 sm:px-3 py-1.5 text-center">
                   <PickedByTooltip
-                    selectionCount={player.selectionCount}
-                    percentage={player.percentage}
-                    totalRosters={totalRosters}
-                    pickedByUsers={player.pickedByUsers}
+                    selectionCount={picked.selectionCount}
+                    percentage={picked.percentage}
+                    totalRosters={pickedTotal}
+                    pickedByUsers={picked.pickedByUsers}
+                    isSeason={isSeason}
                   />
                 </td>
-                <td className="px-1 sm:px-3 py-3 text-center">
-                  {player.position ? (
-                    <span className={`font-medium ${
-                      parseInt(player.position.replace('T', '')) === 1 ? 'text-casino-gold' :
-                      parseInt(player.position.replace('T', '')) <= 10 ? 'text-casino-green' :
-                      'text-casino-text'
-                    }`}>
-                      {player.position}
-                    </span>
-                  ) : (
-                    <span className="text-casino-gray-dark">-</span>
-                  )}
-                </td>
-                <td className="px-1 sm:px-3 py-3 text-right">
+                {!isSeasonView && (
+                  <td className="px-1 sm:px-3 py-1.5 text-center">
+                    {player.position ? (
+                      <span className={`font-medium ${
+                        parseInt(player.position.replace('T', '')) === 1 ? 'text-casino-gold' :
+                        parseInt(player.position.replace('T', '')) <= 10 ? 'text-casino-green' :
+                        'text-casino-text'
+                      }`}>
+                        {player.position}
+                      </span>
+                    ) : (
+                      <span className="text-casino-gray-dark">-</span>
+                    )}
+                  </td>
+                )}
+                <td className="px-1 sm:px-3 py-1.5 text-right">
                   <span className={player.prizeMoney > 0 ? 'text-casino-green' : 'text-casino-gray-dark'}>
                     {formatCurrency(player.prizeMoney)}
                   </span>
                 </td>
-                <td className="px-1 sm:px-3 py-3 text-right" title="Return per $1 of salary cap spent on this player (earnings ÷ cost)">
+                <td className="px-1 sm:px-3 py-1.5 text-right" title="Return per $1 of salary cap spent on this player (earnings ÷ cost)">
                   {value !== null ? (
                     <span className={value > 0 ? 'text-casino-green' : 'text-casino-gray'}>
                       {formatCurrency(value)}
@@ -211,6 +310,7 @@ export function InsideTheFieldTable({ playerStats, totalRosters }: InsideTheFiel
           })}
         </tbody>
       </table>
+      </div>
       {mounted && showValueTooltip && createPortal(
         <div
           className="fixed z-[100] px-2 py-1.5 text-xs text-white bg-gray-900 border border-casino-gold/40 rounded shadow-lg max-w-[200px] text-center pointer-events-none"
