@@ -4,6 +4,7 @@ import { shouldPollNow } from '@/lib/polling-config';
 import { assignPositionsByScore } from '@/lib/leaderboard-positions';
 import { syncTournamentScoresFromESPN } from '@/lib/sync-scores';
 import { calculateTournamentWinnings } from '@/lib/calculate-winnings';
+import { normalizeNameForLookup } from '@/lib/live-scores-prizes';
 
 const ESPN_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard';
 const ESPN_ATHLETE_BASE = 'https://sports.core.api.espn.com/v2/sports/golf/leagues/pga/seasons';
@@ -147,16 +148,6 @@ async function fetchAmateurFromAthleteApi(athleteId: string, year: number): Prom
   } catch {
     return undefined;
   }
-}
-
-/** Normalize name for DB lookup: lowercase, collapse spaces, strip diacritics. */
-function normalizeNameForLookup(s: string): string {
-  return (s || '')
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ');
 }
 
 /** Load amateur status: pga_players first, then ESPN athlete API for missing. Max 5 concurrent API requests. */

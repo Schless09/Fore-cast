@@ -39,7 +39,11 @@ function parseScore(score: string | number | null): number {
   return parseInt(s, 10) || 0;
 }
 
-/** Normalize for matching API names to DB names; handles accents and Scandinavian/German (ø→o, å→a, etc.). */
+/**
+ * Single source of truth for normalizing player names when matching API ↔ DB
+ * (live leaderboard, picks, standings, tee times, cost map, ESPN sync, etc.).
+ * Handles accents (NFD) and explicit ø→o, ö→o, å→a, ä→a, æ→ae, ß→ss.
+ */
 export function normalizeNameForLookup(name: string): string {
   let s = name
     .toLowerCase()

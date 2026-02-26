@@ -607,12 +607,6 @@ export function LiveSeasonStandings({
                 {combinedStandings.map((standing, index) => {
                   const rank = index + 1;
                   const isUser = standing.user_id === currentUserId;
-                  const quartileStats = quartileStatsByUser.get(standing.user_id);
-                  const quartileParts = quartileStats && quartileStats.totalEvents > 0
-                    ? quartileStats.counts
-                        .map((count, i) => ({ label: ['Q1', 'Q2', 'Q3', 'Q4'][i], pct: Math.round((count / quartileStats.totalEvents) * 100), count }))
-                        .filter((p) => p.count > 0)
-                    : [];
 
                   return (
                     <div
@@ -646,17 +640,6 @@ export function LiveSeasonStandings({
                             <span className="text-xs text-casino-gray ml-1">+{formatCurrency(standing.live_winnings)} live</span>
                           )}
                         </div>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {quartileParts.length > 0 ? (
-                          quartileParts.map((p) => (
-                            <span key={p.label} className="text-xs text-casino-gray bg-casino-elevated px-2 py-0.5 rounded">
-                              {p.label} {p.pct}%
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-casino-gray-dark">—</span>
-                        )}
                       </div>
                     </div>
                   );

@@ -5,7 +5,7 @@ import { formatScore, getScoreColor, formatShortName } from '@/lib/utils';
 import { formatTeeTimeDisplay, formatTeeTimeInLocalTime } from '@/lib/timezone';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
-import { firstNamesMatchForLiveScores } from '@/lib/live-scores-prizes';
+import { firstNamesMatchForLiveScores, normalizeNameForLookup } from '@/lib/live-scores-prizes';
 import { ScorecardModal } from './ScorecardModal';
 import { SuspendedStatusBanner } from './SuspendedStatusBanner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -123,18 +123,23 @@ function getTeeTimeForRound(teeTime: TeeTimeData | undefined, currentRound?: num
   return estTime ?? null;
 }
 
-/** Look up pick count for a player, with fuzzy name matching (e.g. Matti vs Mattias Schmidt) */
+/** Look up pick count for a player; uses shared normalize so API "Højgaard" matches DB "Hojgaard". */
 function getPickCountForPlayer(apiName: string, picksByPlayer: Record<string, number>): number {
   const exact = picksByPlayer[apiName];
   if (exact !== undefined) return exact;
 
-  const normalized = apiName.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const parts = normalized.split(/\s+/);
+  const normalizedApi = normalizeNameForLookup(apiName);
+  for (const [dbName, count] of Object.entries(picksByPlayer)) {
+    if (normalizeNameForLookup(dbName) === normalizedApi) return count;
+  }
+
+  const parts = normalizedApi.split(/\s+/);
   if (parts.length >= 2) {
     const apiLast = parts[parts.length - 1];
     const apiFirst = parts[0];
     for (const [dbName, count] of Object.entries(picksByPlayer)) {
-      const dbParts = dbName.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/);
+      const dbNorm = normalizeNameForLookup(dbName);
+      const dbParts = dbNorm.split(/\s+/);
       if (dbParts.length >= 2) {
         const dbLast = dbParts[dbParts.length - 1];
         const dbFirst = dbParts[0];
@@ -143,19 +148,6 @@ function getPickCountForPlayer(apiName: string, picksByPlayer: Record<string, nu
     }
   }
   return 0;
-}
-
-// Normalize name for matching: trim, lowercase, strip accents, replace ø/ö/å etc. with ASCII
-function normalizeNameForTeeTime(name: string): string {
-  let s = name
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '') // remove combining marks (accents)
-    .replace(/\s+/g, ' ');
-  // Replace non-ASCII Latin chars that NFD doesn't decompose (e.g. ø, ö, å)
-  s = s.replace(/ø/g, 'o').replace(/ö/g, 'o').replace(/å/g, 'a').replace(/ä/g, 'a').replace(/æ/g, 'ae').replace(/ß/g, 'ss');
-  return s;
 }
 
 // First-name nickname/alternate forms for tee time lookup (API vs DB)
@@ -198,16 +190,16 @@ function getTeeTimeDataForPlayer(
   if (!teeTimeMap || !playerName?.trim()) return undefined;
   const exact = teeTimeMap.get(playerName);
   if (exact) return exact;
-  const normalized = normalizeNameForTeeTime(playerName);
+  const normalized = normalizeNameForLookup(playerName);
   for (const [key, data] of teeTimeMap.entries()) {
-    if (normalizeNameForTeeTime(key) === normalized) return data;
+    if (normalizeNameForLookup(key) === normalized) return data;
   }
   const parts = normalized.split(/\s+/);
   if (parts.length >= 2) {
     const apiFirst = parts[0];
     const apiLast = parts[parts.length - 1];
     for (const [key, data] of teeTimeMap.entries()) {
-      const keyNorm = normalizeNameForTeeTime(key);
+      const keyNorm = normalizeNameForLookup(key);
       const keyParts = keyNorm.split(/\s+/);
       if (keyParts.length >= 2 && keyParts[keyParts.length - 1] === apiLast && firstNamesMatch(apiFirst, keyParts[0])) {
         return data;
@@ -554,10 +546,8 @@ export function LiveLeaderboard({
         <tbody>
           {leaderboardData.map((row, idx) => {
             const name = row.name || 'Unknown';
-            const normalizedName = name.toLowerCase().trim()
-              .replace(/\s*\([A-Z]{2}\)\s*$/i, '')
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '');
+            const nameWithoutCountry = name.replace(/\s*\([A-Z]{2}\)\s*$/i, '').trim();
+            const normalizedName = normalizeNameForLookup(nameWithoutCountry);
 
             // Nickname mappings for fuzzy matching
             const nicknameMap: Record<string, string[]> = {
@@ -590,8 +580,8 @@ export function LiveLeaderboard({
               's.t.': ['seung taek'],
             };
 
-            // Try exact match first
-            let playerId = playerNameToIdMap.get(normalizedName) || playerNameToIdMap.get(name.toLowerCase().trim());
+            // Try exact match first (map keys use normalizeNameForLookup on tournament page)
+            let playerId = playerNameToIdMap.get(normalizedName) || playerNameToIdMap.get(nameWithoutCountry.toLowerCase().trim());
             let matchedMapName = normalizedName; // Track which name matched for cost lookup
             
             // If no match, try fuzzy matching (e.g., "Cam Davis" vs "Cameron Davis")
