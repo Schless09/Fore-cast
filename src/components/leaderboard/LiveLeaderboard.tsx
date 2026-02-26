@@ -5,7 +5,6 @@ import { formatScore, getScoreColor, formatShortName } from '@/lib/utils';
 import { formatTeeTimeDisplay, formatTeeTimeInLocalTime } from '@/lib/timezone';
 import { formatCurrency } from '@/lib/prize-money';
 import { REFRESH_INTERVAL_MS } from '@/lib/config';
-import { assignPositionsByScore } from '@/lib/leaderboard-positions';
 import { firstNamesMatchForLiveScores } from '@/lib/live-scores-prizes';
 import { ScorecardModal } from './ScorecardModal';
 import { SuspendedStatusBanner } from './SuspendedStatusBanner';
