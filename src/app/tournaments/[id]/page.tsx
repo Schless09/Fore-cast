@@ -889,7 +889,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 pt-4 pb-8 sm:pt-8">
       {/* Tournament Selector */}
       {tournamentsForSelector && tournamentsForSelector.length > 1 && (
         <Card className="mb-6">

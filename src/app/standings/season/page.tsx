@@ -307,7 +307,7 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
   } : undefined;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 pt-4 pb-8 sm:pt-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold bg-linear-to-r from-casino-gold to-casino-gold-light bg-clip-text text-transparent mb-2">Season Standings</h1>
         <p className="text-casino-gray">

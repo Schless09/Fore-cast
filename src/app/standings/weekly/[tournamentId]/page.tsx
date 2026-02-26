@@ -289,7 +289,7 @@ export default async function WeeklyStandingsByTournamentPage({
   const currentWeekTournamentId = currentWeekTournament?.id ?? null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 pt-4 pb-8 sm:pt-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">Weekly Standings</h1>
         <p className="text-gray-300">

@@ -39,7 +39,7 @@ export function MobileSectionNav() {
 
   return (
     <div
-      className="fixed left-0 right-0 z-40 pt-2 pb-0 bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 md:hidden"
+      className="fixed left-0 right-0 z-40 pt-1 pb-0 bg-casino-bg/95 backdrop-blur-md border-b border-casino-gold/20 md:hidden"
       style={{ top: TOP_OFFSET }}
     >
       <div className="max-w-7xl mx-auto flex overflow-hidden border border-casino-gold/20 bg-casino-card/30 min-w-0">
@@ -49,7 +49,7 @@ export function MobileSectionNav() {
             <Link
               key={section.href}
               href={section.href}
-              className={`flex-1 py-2.5 text-center text-sm font-medium transition-colors border-r border-casino-gold/20 last:border-r-0 ${
+              className={`flex-1 py-1.5 text-center text-sm font-medium transition-colors border-r border-casino-gold/20 last:border-r-0 ${
                 isActive
                   ? 'bg-casino-gold/25 text-casino-gold'
                   : 'text-casino-gray hover:text-casino-text hover:bg-casino-elevated/50'
