@@ -249,7 +249,15 @@ export function LiveTeamStandings({
         const liveScore = findLiveScore(player.playerName);
         const lookupKey = liveScore ? normalizeNameForLookup(liveScore.player) : null;
         const prizeData = lookupKey ? prizeDataByPlayer.get(lookupKey) : null;
-        const winnings = prizeData?.winnings ?? 0;
+        const baseWinnings = prizeData?.winnings ?? 0;
+        const hasTeedOff = prizeData?.hasTeedOff ?? false;
+        const basePosition = prizeData?.positionDisplay;
+
+        // Round 1: players who haven't teed off yet show "-" for position and no prize
+        const showDash = !hasTeedOff && displayRound === 1;
+        const winnings = showDash ? 0 : baseWinnings;
+        const positionDisplay = showDash ? '-' : basePosition;
+
         totalWinnings += winnings;
 
         return {
@@ -257,8 +265,8 @@ export function LiveTeamStandings({
           liveScore,
           winnings,
           isAmateur: liveScore?.isAmateur === true,
-          hasTeedOff: prizeData?.hasTeedOff ?? false,
-          positionDisplay: prizeData?.positionDisplay,
+          hasTeedOff,
+          positionDisplay,
         };
       });
 

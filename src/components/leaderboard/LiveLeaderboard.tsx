@@ -650,10 +650,15 @@ export function LiveLeaderboard({
             // MC = Missed Cut; cache already has correct status (position null = MC). Do NOT use position > cutCount —
             // made-cut players can be T51, T52, etc. (tied at cut line); they have position from cache = made cut.
             const missedCutByPosition = isRound3OrLater && cutLine && positionNum === null;
-            const pos = missedCutByPosition
+            let pos = missedCutByPosition
               ? 'MC'
               : (row.position ? `${row.is_tied ? 'T' : ''}${row.position}` : '-');
-            const showPrizeDash = false;
+            // Round 1 only: players who haven't teed off yet shouldn't show a POS or dollar amount in Prize;
+            // they effectively have "no prize yet" even though they'll eventually earn money.
+            const showPrizeDash = !teedOff && effectiveCurrentRound === 1;
+            if (showPrizeDash) {
+              pos = '-';
+            }
             const prizeAmount = showPrizeDash || row.is_amateur || isCut || isBelowProjectedCut || missedCutByPosition
               ? 0
               : (row.prize_money || (positionNum ? prizeDistributionMap.get(positionNum) : 0) || 0);
