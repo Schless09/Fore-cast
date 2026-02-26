@@ -106,6 +106,7 @@ export function LiveSeasonStandings({
   // Use round/cut from live API when present so season matches weekly (same source of truth)
   const [liveRound, setLiveRound] = useState<number | null>(null);
   const [liveCutLine, setLiveCutLine] = useState<{ cutScore: string; cutCount: number } | null>(null);
+  const [selectedMember, setSelectedMember] = useState<{ user_id: string; username: string } | null>(null);
 
   // Prize distribution map
   const prizeMap = useMemo(
@@ -447,6 +448,44 @@ export function LiveSeasonStandings({
     return finishes;
   }, [combinedStandings, currentUserId]);
 
+  // Per-tournament finish for every user (for member modal)
+  const tournamentFinishesByUser = useMemo(() => {
+    const byUser = new Map<string, Map<string, { rank: number; total: number; quartileLabel: string }>>();
+    const byTournament = new Map<string, { user_id: string; winnings: number }[]>();
+    combinedStandings.forEach((standing) => {
+      standing.rosters.forEach((roster) => {
+        const tid = roster.tournament_id;
+        if (!tid) return;
+        if (!byTournament.has(tid)) byTournament.set(tid, []);
+        byTournament.get(tid)!.push({
+          user_id: standing.user_id,
+          winnings: roster.winnings,
+        });
+      });
+    });
+
+    for (const [tournamentId, entries] of byTournament.entries()) {
+      const sorted = entries.slice().sort((a, b) => b.winnings - a.winnings);
+      const total = sorted.length;
+      if (total === 0) continue;
+
+      sorted.forEach((entry, index) => {
+        const fraction = index / total;
+        let quartileLabel = 'Q4 (Bottom 25%)';
+        if (fraction < 0.25) quartileLabel = 'Q1 (Top 25%)';
+        else if (fraction < 0.5) quartileLabel = 'Q2 (25–50%)';
+        else if (fraction < 0.75) quartileLabel = 'Q3 (50–75%)';
+        if (!byUser.has(entry.user_id)) byUser.set(entry.user_id, new Map());
+        byUser.get(entry.user_id)!.set(tournamentId, {
+          rank: index + 1,
+          total,
+          quartileLabel,
+        });
+      });
+    }
+    return byUser;
+  }, [combinedStandings]);
+
   // Generate period options based on segment definitions
   const periodOptions = useMemo(() => {
     const options: Array<{ value: SeasonPeriod; label: string }> = [
@@ -466,6 +505,20 @@ export function LiveSeasonStandings({
     const segDef = segmentDefinitions.find(s => s.number === period);
     return segDef?.name || `Segment ${period}`;
   };
+
+  // Close member modal on Escape
+  useEffect(() => {
+    if (!selectedMember) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedMember(null);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [selectedMember]);
 
   return (
     <div className="pb-24">
@@ -572,7 +625,13 @@ export function LiveSeasonStandings({
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="text-sm font-medium text-casino-text shrink-0">{rank}</span>
                           {rank === 1 && <span className="shrink-0">🏆</span>}
-                          <span className="font-medium text-casino-text truncate">{standing.username}</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedMember({ user_id: standing.user_id, username: standing.username })}
+                            className="font-medium text-casino-text truncate text-left hover:text-casino-gold hover:underline focus:outline-none focus:ring-1 focus:ring-casino-gold rounded"
+                          >
+                            {standing.username}
+                          </button>
                           {isUser && (
                             <span className="px-1.5 py-0.5 bg-casino-green/30 text-casino-green border border-casino-green/50 rounded text-xs font-medium shrink-0">
                               You
@@ -658,7 +717,13 @@ export function LiveSeasonStandings({
                             </div>
                           </td>
                           <td className="px-1 sm:px-4 py-3">
-                            <span className="font-medium text-casino-text text-xs sm:text-sm">{standing.username}</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMember({ user_id: standing.user_id, username: standing.username })}
+                              className="font-medium text-casino-text text-xs sm:text-sm hover:text-casino-gold hover:underline focus:outline-none focus:ring-1 focus:ring-casino-gold rounded text-left"
+                            >
+                              {standing.username}
+                            </button>
                           </td>
                           <td className="px-1 sm:px-4 py-3 text-right">
                             <span className="font-semibold text-casino-green text-xs sm:text-sm">
@@ -746,6 +811,85 @@ export function LiveSeasonStandings({
           </CardContent>
         </Card>
       )}
+
+      {/* Member tournament breakdown modal */}
+      {selectedMember && (() => {
+        const memberStanding = combinedStandings.find((s) => s.user_id === selectedMember.user_id);
+        const memberFinishes = tournamentFinishesByUser.get(selectedMember.user_id);
+        return (
+          <div
+            className="fixed inset-0 z-9999 flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="member-modal-title"
+          >
+            <div
+              className="absolute inset-0 bg-black/80"
+              onClick={() => setSelectedMember(null)}
+            />
+            <div
+              className="relative w-full max-w-md max-h-[85vh] overflow-hidden rounded-xl border border-casino-gold/30 bg-casino-card shadow-xl flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 border-b border-casino-gold/20 shrink-0">
+                <h2 id="member-modal-title" className="text-lg font-bold text-casino-gold">
+                  {selectedMember.username}&apos;s Tournament Breakdown
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMember(null)}
+                  className="p-2 rounded-lg text-casino-gray hover:bg-casino-elevated hover:text-casino-text transition-colors focus:outline-none focus:ring-1 focus:ring-casino-gold"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto space-y-3">
+                {memberStanding && memberStanding.rosters.length > 0 ? (
+                  [...memberStanding.rosters]
+                    .sort((a, b) => b.winnings - a.winnings)
+                    .map((roster, index) => {
+                      const finish = roster.tournament_id ? memberFinishes?.get(roster.tournament_id) : null;
+                      return (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-3 rounded-lg border ${
+                            roster.is_active
+                              ? 'bg-casino-green/10 border-casino-green/30'
+                              : 'bg-casino-elevated/50 border-casino-gold/10'
+                          }`}
+                        >
+                          <div>
+                            <p className="font-medium text-casino-text">
+                              {roster.tournament_name}
+                              {roster.is_active && (
+                                <span className="ml-2 text-xs text-casino-green">● Live</span>
+                              )}
+                            </p>
+                            {finish && (
+                              <p className="text-xs text-casino-gray-dark mt-0.5">
+                                Finish: {finish.rank}/{finish.total} · {finish.quartileLabel}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-casino-green font-orbitron">
+                              {formatCurrency(roster.winnings)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                ) : (
+                  <p className="text-casino-gray text-sm">No tournaments in this period.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
