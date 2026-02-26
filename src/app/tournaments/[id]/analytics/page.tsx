@@ -107,12 +107,13 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
   type SeasonStatRow = { selectionCount: number; percentage: number; pickedByUsers: string[]; totalEarnings: number; totalCost: number };
   let seasonStatsForTable: Record<string, SeasonStatRow> = {};
   let totalSeasonSlots = 0;
+  let seasonPlayerBreakdown: Record<string, { tournamentName: string; earnings: number }[]> = {};
 
   if (profile.active_league_id) {
     // Tournaments that are completed or active
     const { data: allSeasonEligible } = await supabase
       .from('tournaments')
-      .select('id, espn_event_id')
+      .select('id, espn_event_id, name')
       .in('status', ['completed', 'active']);
     // League commissioner selection: exclude any tournament marked is_excluded
     const { data: leagueTournamentRows } = await supabase
@@ -125,6 +126,7 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
     );
     const seasonTournamentList = (allSeasonEligible || []).filter((t) => !excludedTids.has(t.id));
     const seasonTournamentIds = seasonTournamentList.map((t) => t.id);
+    const tidToName = new Map<string, string>(seasonTournamentList.map((t) => [t.id, t.name ?? 'Unknown']));
 
     if (seasonTournamentIds.length === 0) {
       // no tournaments in league season (commissioner has none selected or all excluded)
@@ -267,6 +269,11 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
               if (!earningsAddedPerPlayerTournament.has(earningsKey)) {
                 earningsAddedPerPlayerTournament.add(earningsKey);
                 seasonTotalEarnings.set(playerName, (seasonTotalEarnings.get(playerName) ?? 0) + earnings);
+                if (!seasonPlayerBreakdown[playerName]) seasonPlayerBreakdown[playerName] = [];
+                seasonPlayerBreakdown[playerName].push({
+                  tournamentName: tidToName.get(tid) ?? 'Unknown',
+                  earnings,
+                });
               }
               seasonTotalCost.set(playerName, (seasonTotalCost.get(playerName) ?? 0) + cost);
             }
@@ -498,6 +505,7 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
                 totalRosters={totalRosters}
                 seasonStats={seasonStatsForTable}
                 totalSeasonSlots={totalSeasonSlots}
+                seasonPlayerBreakdown={seasonPlayerBreakdown}
               />
             ) : (
               <div className="text-center py-8 text-casino-gray">

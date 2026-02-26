@@ -50,11 +50,18 @@ export interface SeasonPickStats {
   totalCost?: number;
 }
 
+export interface SeasonTournamentEarnings {
+  tournamentName: string;
+  earnings: number;
+}
+
 interface InsideTheFieldTableProps {
   playerStats: PlayerSelectionStats[];
   totalRosters: number;
   seasonStats?: Record<string, SeasonPickStats>;
   totalSeasonSlots?: number;
+  /** Per-player list of tournament earnings for All Season breakdown modal */
+  seasonPlayerBreakdown?: Record<string, SeasonTournamentEarnings[]>;
 }
 
 const VALUE_TOOLTIP = 'Return per dollar spent (earnings ÷ cost)';
@@ -66,6 +73,7 @@ export function InsideTheFieldTable({
   totalRosters,
   seasonStats = {},
   totalSeasonSlots = 0,
+  seasonPlayerBreakdown = {},
 }: InsideTheFieldTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('picked');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -73,6 +81,7 @@ export function InsideTheFieldTable({
   const [showValueTooltip, setShowValueTooltip] = useState(false);
   const [valueTooltipCoords, setValueTooltipCoords] = useState({ x: 0, y: 0 });
   const [mounted, setMounted] = useState(false);
+  const [breakdownModal, setBreakdownModal] = useState<{ playerName: string; tournaments: SeasonTournamentEarnings[] } | null>(null);
   const hasSeasonData = totalSeasonSlots > 0 && Object.keys(seasonStats).length > 0;
 
   // In season view, show all players with season totals (earnings, cost) for display and value calc
@@ -257,17 +266,39 @@ export function InsideTheFieldTable({
                   {index + 1}
                 </td>
                 <td className={`px-1 sm:px-3 py-1.5 font-medium ${player.isOnUserRoster ? 'text-casino-gold' : 'text-casino-text'}`}>
-                  <span title={player.playerName}>
-                    {formatShortName(player.playerName)}
-                    <span
-                      className="text-casino-gray font-normal ml-1"
-                      title={isSeasonView ? 'Avg cost per pick this season' : undefined}
+                  {isSeasonView && seasonPlayerBreakdown[player.playerName]?.length ? (
+                    <button
+                      type="button"
+                      onClick={() => setBreakdownModal({
+                        playerName: player.playerName,
+                        tournaments: [...seasonPlayerBreakdown[player.playerName]].sort((a, b) => b.earnings - a.earnings),
+                      })}
+                      className="text-left hover:underline focus:underline focus:outline-none"
+                      title={`${player.playerName} — view earnings by tournament`}
                     >
-                      ({isSeasonView && picked.selectionCount
-                        ? (Number(player.cost ?? 0) / picked.selectionCount).toFixed(2)
-                        : (Number(player.cost ?? 0)).toFixed(2)})
+                      {formatShortName(player.playerName)}
+                      <span
+                        className="text-casino-gray font-normal ml-1"
+                        title="Avg cost per pick this season"
+                      >
+                        ({picked.selectionCount
+                          ? (Number(player.cost ?? 0) / picked.selectionCount).toFixed(2)
+                          : (Number(player.cost ?? 0)).toFixed(2)})
+                      </span>
+                    </button>
+                  ) : (
+                    <span title={player.playerName}>
+                      {formatShortName(player.playerName)}
+                      <span
+                        className="text-casino-gray font-normal ml-1"
+                        title={isSeasonView ? 'Avg cost per pick this season' : undefined}
+                      >
+                        ({isSeasonView && picked.selectionCount
+                          ? (Number(player.cost ?? 0) / picked.selectionCount).toFixed(2)
+                          : (Number(player.cost ?? 0)).toFixed(2)})
+                      </span>
                     </span>
-                  </span>
+                  )}
                 </td>
                 <td className="px-1 sm:px-3 py-1.5 text-center">
                   <PickedByTooltip
@@ -323,6 +354,49 @@ export function InsideTheFieldTable({
           }}
         >
           {VALUE_TOOLTIP}
+        </div>,
+        document.body
+      )}
+      {mounted && breakdownModal && createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60"
+          onClick={() => setBreakdownModal(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="breakdown-modal-title"
+        >
+          <div
+            className="bg-casino-card border border-casino-gold/30 rounded-lg shadow-xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-casino-gold/20 flex items-center justify-between">
+              <h2 id="breakdown-modal-title" className="text-casino-gold font-semibold">
+                {breakdownModal.playerName} — season earnings
+              </h2>
+              <button
+                type="button"
+                onClick={() => setBreakdownModal(null)}
+                className="text-casino-gray hover:text-casino-gold p-1 focus:outline-none"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-4">
+              <ul className="space-y-2">
+                {breakdownModal.tournaments.map((t) => (
+                  <li key={t.tournamentName} className="flex justify-between items-center text-sm">
+                    <span className="text-casino-text truncate pr-2">{t.tournamentName}</span>
+                    <span className={t.earnings > 0 ? 'text-casino-green' : 'text-casino-gray-dark'}>{formatCurrency(t.earnings)}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 pt-3 border-t border-casino-gold/20 flex justify-between text-casino-gold font-medium">
+                <span>Total</span>
+                <span>{formatCurrency(breakdownModal.tournaments.reduce((sum, t) => sum + t.earnings, 0))}</span>
+              </div>
+            </div>
+          </div>
         </div>,
         document.body
       )}
