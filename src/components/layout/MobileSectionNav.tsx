@@ -43,7 +43,7 @@ export function MobileSectionNav() {
       style={{ top: TOP_OFFSET }}
     >
       <div className="max-w-7xl mx-auto flex overflow-hidden border border-casino-gold/20 bg-casino-card/30 min-w-0 w-full">
-        {SECTIONS.map((section, i) => {
+        {SECTIONS.map((section) => {
           const isActive = section.match(pathname ?? '');
           return (
             <Link
