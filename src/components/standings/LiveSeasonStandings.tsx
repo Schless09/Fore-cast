@@ -576,8 +576,8 @@ export function LiveSeasonStandings({
         <CardContent>
           {combinedStandings.length > 0 ? (
             <>
-              {/* Mobile: stacked cards so nothing scrunches */}
-              <div className="sm:hidden space-y-2">
+              {/* Mobile: stacked cards so nothing scrunches (tight spacing like weekly) */}
+              <div className="sm:hidden space-y-1">
                 {combinedStandings.map((standing, index) => {
                   const rank = index + 1;
                   const isUser = standing.user_id === currentUserId;
@@ -585,7 +585,7 @@ export function LiveSeasonStandings({
                   return (
                     <div
                       key={standing.user_id}
-                      className={`rounded-lg border p-3 ${
+                      className={`rounded-lg border px-2 py-1.5 ${
                         isUser ? 'bg-casino-green/10 border-casino-green/30' : 'bg-casino-card/50 border-casino-gold/10'
                       }`}
                     >
@@ -620,16 +620,16 @@ export function LiveSeasonStandings({
                 })}
               </div>
 
-              {/* Desktop: table */}
+              {/* Desktop: table (tight row spacing like weekly leaderboard) */}
               <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b border-casino-gold/30">
-                      <th className="px-1 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Rank</th>
-                      <th className="px-1 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
-                      <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Winnings</th>
-                      <th className="px-1 sm:px-4 py-2 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Tournaments</th>
-                      <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase" title="Wins / Top 5 / Top 10 / Top 25 finishes">W · T5 · T10 · T25</th>
+                      <th className="px-px sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase">Rank</th>
+                      <th className="px-px sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
+                      <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase">Winnings</th>
+                      <th className="px-1 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Tournaments</th>
+                      <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase" title="Wins / Top 5 / Top 10 / Top 25 finishes">W · T5 · T10 · T25</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -644,11 +644,11 @@ export function LiveSeasonStandings({
                       return (
                         <tr
                           key={standing.user_id}
-                          className={`border-b border-casino-gold/10 transition-colors ${
+                          className={`border-b border-casino-gold/20 transition-colors ${
                             isUser ? 'bg-casino-green/10 hover:bg-casino-green/20' : 'hover:bg-casino-elevated'
                           }`}
                         >
-                          <td className="px-1 sm:px-4 py-3">
+                          <td className="px-px sm:px-2 py-1.5">
                             <div className="flex items-center gap-1 sm:gap-2">
                               <span className="text-xs sm:text-sm font-medium text-casino-text">{rank}</span>
                               {rank === 1 && <span className="text-base sm:text-lg">🏆</span>}
@@ -659,7 +659,7 @@ export function LiveSeasonStandings({
                               )}
                             </div>
                           </td>
-                          <td className="px-1 sm:px-4 py-3">
+                          <td className="px-px sm:px-2 py-1.5">
                             <button
                               type="button"
                               onClick={() => setSelectedMember({ user_id: standing.user_id, username: standing.username })}
@@ -668,7 +668,7 @@ export function LiveSeasonStandings({
                               {standing.username}
                             </button>
                           </td>
-                          <td className="px-1 sm:px-4 py-3 text-right">
+                          <td className="px-1 sm:px-4 py-1.5 text-right">
                             <span className="font-semibold text-casino-green text-xs sm:text-sm">
                               {formatCurrency(standing.total_winnings)}
                             </span>
@@ -678,10 +678,10 @@ export function LiveSeasonStandings({
                               </span>
                             )}
                           </td>
-                          <td className="px-1 sm:px-4 py-3 text-center text-xs sm:text-sm text-casino-gray hidden sm:table-cell">
+                          <td className="px-1 sm:px-4 py-1.5 text-center text-xs sm:text-sm text-casino-gray hidden sm:table-cell">
                             {standing.tournaments_played}
                           </td>
-                          <td className="px-1 sm:px-4 py-3 text-right text-xs sm:text-sm text-casino-gray tabular-nums">
+                          <td className="px-1 sm:px-4 py-1.5 text-right text-xs sm:text-sm text-casino-gray tabular-nums">
                             {topDisplay}
                           </td>
                         </tr>
