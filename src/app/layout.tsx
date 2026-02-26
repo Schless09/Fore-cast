@@ -81,7 +81,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning className="dark">
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased relative`}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased relative min-h-screen flex flex-col`}
           suppressHydrationWarning
         >
           <script
@@ -90,9 +90,9 @@ export default function RootLayout({
           />
           <ClientOnlyComponents />
           <ErrorBoundary>
-            <div className="relative z-10">
+            <div className="relative z-10 flex flex-col flex-1 min-h-0">
               <Navbar />
-              <main className="relative">
+              <main className="relative flex-1 min-h-0">
                 {children}
               </main>
               <Footer />
