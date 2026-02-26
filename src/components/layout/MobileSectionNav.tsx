@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSectionNavScroll } from '@/hooks/useSectionNavScroll';
 // Slightly below navbar so the bar isn’t clipped at the top (py-4 + content + safe area)
-// Full-height nav ≈ 64px. When scrolled, nav uses py-2 ≈ 48px.
-const TOP_OFFSET_COMPACT = 'calc(48px + env(safe-area-inset-top, 0px))';
+// Full-height nav ≈ 64px. When scrolled, nav uses py-1 ≈ 40px.
+const TOP_OFFSET_COMPACT = 'calc(40px + env(safe-area-inset-top, 0px))';
 
 const SECTIONS = [
   { href: '/tournaments', label: 'Tournaments', match: (path: string) => path.startsWith('/tournaments') },

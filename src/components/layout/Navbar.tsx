@@ -15,7 +15,7 @@ export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const unreadCount = useUnreadMessages();
   const sectionNavVisible = useSectionNavScroll();
-  const navVertical = sectionNavVisible ? 'py-2 md:py-4' : 'py-4';
+  const navVertical = sectionNavVisible ? 'py-1 md:py-4' : 'py-4';
 
   const handleSignOut = async () => {
     await signOut();
