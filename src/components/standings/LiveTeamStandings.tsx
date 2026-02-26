@@ -18,6 +18,8 @@ interface RosterData {
   roster_name: string;
   user_id: string;
   username: string;
+  /** Stored total from user_rosters.total_winnings; used for completed tournaments so weekly matches season. */
+  totalWinningsFromDb?: number | null;
   /** True when league member did not submit a lineup this week */
   noLineup?: boolean;
   players: Array<{
@@ -113,6 +115,9 @@ export function LiveTeamStandings({
   const [selectedPlayerNames, setSelectedPlayerNames] = useState<Set<string>>(new Set());
   const hasInitialLoaded = useRef(false);
   const hasSetDefaultUserExpand = useRef(false);
+  // Use round/cut from live API when present so weekly matches season (same source of truth)
+  const [liveRound, setLiveRound] = useState<number | null>(null);
+  const [liveCutLine, setLiveCutLine] = useState<{ cutScore: string; cutCount: number } | null>(null);
 
   // Toggle a single roster expansion
   const toggleRoster = (rosterId: string) => {
@@ -142,6 +147,8 @@ export function LiveTeamStandings({
     () => new Map(prizeDistributions.map((d) => [d.position, d.amount])),
     [prizeDistributions]
   );
+
+  const effectiveRound = liveRound ?? displayRound ?? 1;
 
   // Create a map of player name -> live score data with multiple lookup keys (use shared normalize so API "Højgaard" matches DB "Hojgaard")
   const playerScoreMap = useMemo(() => {
@@ -193,23 +200,25 @@ export function LiveTeamStandings({
   // Shared prize logic: position-from-score (ESPN), tie split; in R1/R2 zero winnings below cut
   const prizeDataByPlayer = useMemo(() => {
     if (!liveScores.length) return new Map<string, { winnings: number; hasTeedOff: boolean; positionDisplay?: string }>();
+    const effectiveCutLine = liveCutLine ?? cutLine ?? undefined;
+    const effectiveRound = liveRound ?? displayRound ?? 1;
     const processed = processLiveScoresForPrizes(liveScores, liveSource, prizeMap, {
-      cutLine: cutLine ?? undefined,
-      currentRound: displayRound,
+      cutLine: effectiveCutLine,
+      currentRound: effectiveRound,
     });
     const byPlayer = new Map<string, { winnings: number; hasTeedOff: boolean; positionDisplay?: string }>();
     processed.forEach((data, key) => {
       byPlayer.set(key, { winnings: data.winnings, hasTeedOff: data.hasTeedOff, positionDisplay: data.positionDisplay });
     });
     return byPlayer;
-  }, [liveScores, liveSource, prizeMap, cutLine, displayRound]);
+  }, [liveScores, liveSource, prizeMap, cutLine, displayRound, liveCutLine, liveRound]);
 
   // Calculate winnings for each roster based on live scores OR stored final data
   const rostersWithLiveWinnings = useMemo(() => {
     return rosters.map((roster) => {
       let totalWinnings = 0;
       const playersWithScores = roster.players.map((player) => {
-        // For completed tournaments, use stored final data
+        // For completed tournaments, use stored final data (per-player for display)
         if (isCompleted) {
           const winnings = player.finalPrizeMoney || 0;
           totalWinnings += winnings;
@@ -244,7 +253,7 @@ export function LiveTeamStandings({
         const basePosition = prizeData?.positionDisplay;
 
         // Round 1: players who haven't teed off yet show "-" for position and no prize
-        const showDash = !hasTeedOff && displayRound === 1;
+        const showDash = !hasTeedOff && effectiveRound === 1;
         const winnings = showDash ? 0 : baseWinnings;
         const positionDisplay = showDash ? '-' : basePosition;
 
@@ -262,10 +271,16 @@ export function LiveTeamStandings({
 
       playersWithScores.sort((a, b) => b.winnings - a.winnings);
 
+      // For completed tournaments, use user_rosters.total_winnings so weekly matches season standings
+      const resolvedTotal =
+        isCompleted && roster.totalWinningsFromDb != null && roster.totalWinningsFromDb !== undefined
+          ? roster.totalWinningsFromDb
+          : totalWinnings;
+
       return {
         ...roster,
         playersWithScores,
-        totalWinnings,
+        totalWinnings: resolvedTotal,
       };
     }).sort((a, b) => {
       if (b.totalWinnings !== a.totalWinnings) return b.totalWinnings - a.totalWinnings;
@@ -274,7 +289,7 @@ export function LiveTeamStandings({
       if (a.noLineup && b.noLineup) return a.username.localeCompare(b.username);
       return 0;
     });
-  }, [rosters, findLiveScore, prizeDataByPlayer, isCompleted]);
+  }, [rosters, findLiveScore, prizeDataByPlayer, isCompleted, effectiveRound]);
 
   // Map: normalized player name -> roster IDs that have that player
   const playerNameToRosterIds = useMemo(() => {
@@ -338,13 +353,14 @@ export function LiveTeamStandings({
     const supabase = createClient();
     
     // Get rosters with their players, filtered by league membership (so multi-league users show in each league's standings)
-    // Include final scores for completed tournaments
+    // Include total_winnings so completed tournament totals match season standings (same source of truth)
     let query = supabase
       .from('user_rosters')
       .select(`
         id,
         roster_name,
         user_id,
+        total_winnings,
         profiles(username),
         roster_players(
           player_winnings,
@@ -383,6 +399,7 @@ export function LiveTeamStandings({
       id: string;
       roster_name: string;
       user_id: string;
+      total_winnings?: number | null;
       profiles?: { username?: string } | { username?: string }[] | null;
       roster_players?: Array<{
         player_winnings?: number | null;
@@ -409,6 +426,7 @@ export function LiveTeamStandings({
         id: r.id,
         roster_name: r.roster_name,
         user_id: r.user_id,
+        totalWinningsFromDb: r.total_winnings ?? null,
         username: profiles?.username || 'Unknown',
         players: (r.roster_players || []).map((rp) => ({
           playerId: rp.tournament_player?.pga_player_id ?? '',
@@ -476,6 +494,12 @@ export function LiveTeamStandings({
 
       setLiveScores(result.data);
       setLiveSource(result.source === 'espn' ? 'espn' : 'rapidapi');
+      const round = result.currentRound ?? result.current_round;
+      if (round != null) {
+        const n = typeof round === 'number' ? round : (typeof round === 'object' && round?.$numberInt != null ? parseInt(round.$numberInt, 10) : null);
+        if (typeof n === 'number' && n >= 1) setLiveRound(n);
+      }
+      if (result.cutLine && typeof result.cutLine === 'object') setLiveCutLine(result.cutLine);
       console.log('[LiveTeamStandings] Refreshed scores at', new Date().toLocaleTimeString());
     } catch (error) {
       setSyncError('Network error - unable to refresh scores');

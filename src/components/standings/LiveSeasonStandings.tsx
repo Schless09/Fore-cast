@@ -103,6 +103,9 @@ export function LiveSeasonStandings({
   const [nextRefreshIn, setNextRefreshIn] = useState(REFRESH_INTERVAL_MS / 1000);
   const [selectedPeriod, setSelectedPeriod] = useState<SeasonPeriod>(initialPeriod || 'full');
   const hasInitialLoaded = useRef(false);
+  // Use round/cut from live API when present so season matches weekly (same source of truth)
+  const [liveRound, setLiveRound] = useState<number | null>(null);
+  const [liveCutLine, setLiveCutLine] = useState<{ cutScore: string; cutCount: number } | null>(null);
 
   // Prize distribution map
   const prizeMap = useMemo(
@@ -158,16 +161,18 @@ export function LiveSeasonStandings({
   // Shared prize logic: position-from-score (ESPN), tie split; R1/R2 projected cut by score, R3/R4 cut by position
   const prizeDataByPlayer = useMemo(() => {
     if (!liveScores.length) return new Map<string, number>();
+    const effectiveCutLine = liveCutLine ?? activeTournament?.cutLine ?? undefined;
+    const effectiveRound = liveRound ?? activeTournament?.displayRound ?? 1;
     const processed = processLiveScoresForPrizes(liveScores, liveSource, prizeMap, {
-      cutLine: activeTournament?.cutLine ?? undefined,
-      currentRound: activeTournament?.displayRound ?? 1,
+      cutLine: effectiveCutLine,
+      currentRound: effectiveRound,
     });
     const byPlayer = new Map<string, number>();
     processed.forEach((data, key) => {
       byPlayer.set(key, data.winnings);
     });
     return byPlayer;
-  }, [liveScores, liveSource, prizeMap, activeTournament?.cutLine, activeTournament?.displayRound]);
+  }, [liveScores, liveSource, prizeMap, activeTournament?.cutLine, activeTournament?.displayRound, liveCutLine, liveRound]);
 
   // Calculate live winnings for a roster (uses shared prize logic)
   const calculateLiveWinnings = useCallback((playerNames: string[]): number => {
@@ -301,6 +306,12 @@ export function LiveSeasonStandings({
       if (result.data) {
         setLiveScores(result.data);
         setLiveSource(result.source === 'espn' ? 'espn' : 'rapidapi');
+        const round = result.currentRound ?? result.current_round;
+        if (round != null) {
+          const n = typeof round === 'number' ? round : (typeof round === 'object' && round?.$numberInt != null ? parseInt(round.$numberInt, 10) : null);
+          if (typeof n === 'number' && n >= 1) setLiveRound(n);
+        }
+        if (result.cutLine && typeof result.cutLine === 'object') setLiveCutLine(result.cutLine);
       }
     } catch (error) {
       console.error('[LiveSeasonStandings] Error:', error);
