@@ -575,122 +575,75 @@ export function LiveSeasonStandings({
         </CardHeader>
         <CardContent>
           {combinedStandings.length > 0 ? (
-            <>
-              {/* Mobile: stacked cards so nothing scrunches (tight spacing like weekly) */}
-              <div className="sm:hidden space-y-1">
-                {combinedStandings.map((standing, index) => {
-                  const rank = index + 1;
-                  const isUser = standing.user_id === currentUserId;
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-casino-gold/30">
+                    <th className="px-px sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase">Rank</th>
+                    <th className="px-px sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
+                    <th className="px-1 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Tournaments</th>
+                    <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase" title="Wins / Top 5 / Top 10 / Top 25 finishes">W · T5 · T10 · T25</th>
+                    <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase">Winnings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {combinedStandings.map((standing, index) => {
+                    const rank = index + 1;
+                    const isUser = standing.user_id === currentUserId;
+                    const topFinishes = topFinishesByUser.get(standing.user_id);
+                    const topDisplay = topFinishes
+                      ? `${topFinishes.wins} / ${topFinishes.top5} / ${topFinishes.top10} / ${topFinishes.top25}`
+                      : '—';
 
-                  return (
-                    <div
-                      key={standing.user_id}
-                      className={`rounded-lg border px-2 py-1.5 ${
-                        isUser ? 'bg-casino-green/10 border-casino-green/30' : 'bg-casino-card/50 border-casino-gold/10'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-sm font-medium text-casino-text shrink-0">{rank}</span>
-                          {rank === 1 && <span className="shrink-0">🏆</span>}
+                    return (
+                      <tr
+                        key={standing.user_id}
+                        className={`border-b border-casino-gold/20 transition-colors ${
+                          isUser ? 'bg-casino-green/10 hover:bg-casino-green/20' : 'hover:bg-casino-elevated'
+                        }`}
+                      >
+                        <td className="px-px sm:px-2 py-1.5">
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <span className="text-xs sm:text-sm font-medium text-casino-text">{rank}</span>
+                            {rank === 1 && <span className="text-base sm:text-lg">🏆</span>}
+                            {isUser && (
+                              <span className="px-1.5 py-0.5 bg-casino-green/30 text-casino-green border border-casino-green/50 rounded text-xs font-medium">
+                                You
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-px sm:px-2 py-1.5">
                           <button
                             type="button"
                             onClick={() => setSelectedMember({ user_id: standing.user_id, username: standing.username })}
-                            className="font-medium text-casino-text truncate text-left hover:text-casino-gold hover:underline focus:outline-none focus:ring-1 focus:ring-casino-gold rounded"
+                            className="font-medium text-casino-text text-xs sm:text-sm hover:text-casino-gold hover:underline focus:outline-none focus:ring-1 focus:ring-casino-gold rounded text-left"
                           >
                             {standing.username}
                           </button>
-                          {isUser && (
-                            <span className="px-1.5 py-0.5 bg-casino-green/30 text-casino-green border border-casino-green/50 rounded text-xs font-medium shrink-0">
-                              You
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className="font-semibold text-casino-green text-sm">
+                        </td>
+                        <td className="px-1 sm:px-4 py-1.5 text-center text-xs sm:text-sm text-casino-gray hidden sm:table-cell">
+                          {standing.tournaments_played}
+                        </td>
+                        <td className="px-1 sm:px-4 py-1.5 text-right text-xs sm:text-sm text-casino-gray tabular-nums">
+                          {topDisplay}
+                        </td>
+                        <td className="px-1 sm:px-4 py-1.5 text-right">
+                          <span className="font-semibold text-casino-green text-xs sm:text-sm">
                             {formatCurrency(standing.total_winnings)}
                           </span>
                           {standing.live_winnings > 0 && (
-                            <span className="text-xs text-casino-gray ml-1">+{formatCurrency(standing.live_winnings)} live</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Desktop: table (tight row spacing like weekly leaderboard) */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b border-casino-gold/30">
-                      <th className="px-px sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase">Rank</th>
-                      <th className="px-px sm:px-2 py-1.5 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
-                      <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase">Winnings</th>
-                      <th className="px-1 sm:px-4 py-1.5 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Tournaments</th>
-                      <th className="px-1 sm:px-4 py-1.5 text-right text-xs font-medium text-casino-gray uppercase" title="Wins / Top 5 / Top 10 / Top 25 finishes">W · T5 · T10 · T25</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {combinedStandings.map((standing, index) => {
-                      const rank = index + 1;
-                      const isUser = standing.user_id === currentUserId;
-                      const topFinishes = topFinishesByUser.get(standing.user_id);
-                      const topDisplay = topFinishes
-                        ? `${topFinishes.wins} / ${topFinishes.top5} / ${topFinishes.top10} / ${topFinishes.top25}`
-                        : '—';
-
-                      return (
-                        <tr
-                          key={standing.user_id}
-                          className={`border-b border-casino-gold/20 transition-colors ${
-                            isUser ? 'bg-casino-green/10 hover:bg-casino-green/20' : 'hover:bg-casino-elevated'
-                          }`}
-                        >
-                          <td className="px-px sm:px-2 py-1.5">
-                            <div className="flex items-center gap-1 sm:gap-2">
-                              <span className="text-xs sm:text-sm font-medium text-casino-text">{rank}</span>
-                              {rank === 1 && <span className="text-base sm:text-lg">🏆</span>}
-                              {isUser && (
-                                <span className="px-1.5 py-0.5 bg-casino-green/30 text-casino-green border border-casino-green/50 rounded text-xs font-medium">
-                                  You
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-px sm:px-2 py-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedMember({ user_id: standing.user_id, username: standing.username })}
-                              className="font-medium text-casino-text text-xs sm:text-sm hover:text-casino-gold hover:underline focus:outline-none focus:ring-1 focus:ring-casino-gold rounded text-left"
-                            >
-                              {standing.username}
-                            </button>
-                          </td>
-                          <td className="px-1 sm:px-4 py-1.5 text-right">
-                            <span className="font-semibold text-casino-green text-xs sm:text-sm">
-                              {formatCurrency(standing.total_winnings)}
+                            <span className="hidden sm:block text-xs text-casino-gray">
+                              +{formatCurrency(standing.live_winnings)} live
                             </span>
-                            {standing.live_winnings > 0 && (
-                              <span className="block text-xs text-casino-gray">
-                                +{formatCurrency(standing.live_winnings)} live
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-1 sm:px-4 py-1.5 text-center text-xs sm:text-sm text-casino-gray hidden sm:table-cell">
-                            {standing.tournaments_played}
-                          </td>
-                          <td className="px-1 sm:px-4 py-1.5 text-right text-xs sm:text-sm text-casino-gray tabular-nums">
-                            {topDisplay}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <div className="text-center py-12">
               <p className="text-casino-gray mb-4">
