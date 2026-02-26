@@ -220,8 +220,9 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
             .select('cost, pga_players!inner(name)')
             .eq('tournament_id', tid);
           const costMap = new Map<string, number>();
-          (tpList || []).forEach((tp: { cost?: number; pga_players: { name: string } }) => {
-            const name = tp.pga_players?.name;
+          (tpList || []).forEach((tp: { cost?: number; pga_players: { name: string } | { name: string }[] }) => {
+            const pga = Array.isArray(tp.pga_players) ? tp.pga_players[0] : tp.pga_players;
+            const name = pga?.name;
             if (name) costMap.set(name, tp.cost ?? 0);
           });
           seasonCostByTid.set(tid, costMap);
