@@ -722,15 +722,8 @@ export function LiveSeasonStandings({
                   const eventTop10 = positions.filter((p) => p <= 10).length;
                   const eventTop25 = positions.filter((p) => p <= 25).length;
                   const hasTierData = positions.length > 0;
-                  return (
-                    <div
-                      key={index}
-                      className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                        roster.is_active
-                          ? 'bg-casino-green/10 border-casino-green/30'
-                          : 'bg-casino-card/50 border-casino-gold/10 hover:border-casino-gold/30'
-                      }`}
-                    >
+                  const cardContent = (
+                    <>
                       <div className="min-w-0">
                         <p className="font-medium text-casino-text">
                           {roster.tournament_name}
@@ -759,6 +752,24 @@ export function LiveSeasonStandings({
                           {formatCurrency(roster.winnings)}
                         </p>
                       </div>
+                    </>
+                  );
+                  const cardClass = `flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                    roster.is_active
+                      ? 'bg-casino-green/10 border-casino-green/30'
+                      : 'bg-casino-card/50 border-casino-gold/10 hover:border-casino-gold/30'
+                  }`;
+                  return roster.tournament_id ? (
+                    <Link
+                      key={index}
+                      href={`/standings/weekly/${roster.tournament_id}`}
+                      className={`${cardClass} hover:border-casino-gold/40 block`}
+                    >
+                      {cardContent}
+                    </Link>
+                  ) : (
+                    <div key={index} className={cardClass}>
+                      {cardContent}
                     </div>
                   );
                 })}
@@ -827,15 +838,13 @@ export function LiveSeasonStandings({
                       const eventTop10 = positions.filter((p) => p <= 10).length;
                       const eventTop25 = positions.filter((p) => p <= 25).length;
                       const hasTierData = positions.length > 0;
-                      return (
-                        <div
-                          key={index}
-                          className={`flex items-center justify-between p-3 rounded-lg border ${
-                            roster.is_active
-                              ? 'bg-casino-green/10 border-casino-green/30'
-                              : 'bg-casino-elevated/50 border-casino-gold/10'
-                          }`}
-                        >
+                      const rowClass = `flex items-center justify-between p-3 rounded-lg border ${
+                        roster.is_active
+                          ? 'bg-casino-green/10 border-casino-green/30'
+                          : 'bg-casino-elevated/50 border-casino-gold/10'
+                      }`;
+                      const rowContent = (
+                        <>
                           <div className="min-w-0">
                             <p className="font-medium text-casino-text">
                               {roster.tournament_name}
@@ -864,6 +873,19 @@ export function LiveSeasonStandings({
                               {formatCurrency(roster.winnings)}
                             </p>
                           </div>
+                        </>
+                      );
+                      return roster.tournament_id ? (
+                        <Link
+                          key={index}
+                          href={`/standings/weekly/${roster.tournament_id}`}
+                          className={`${rowClass} hover:border-casino-gold/30 block`}
+                        >
+                          {rowContent}
+                        </Link>
+                      ) : (
+                        <div key={index} className={rowClass}>
+                          {rowContent}
                         </div>
                       );
                     })

@@ -12,6 +12,7 @@ import {
   firstNamesMatchForLiveScores,
 } from '@/lib/live-scores-prizes';
 import { formatTeeTimeDisplay, formatTeeTimeInLocalTime } from '@/lib/timezone';
+import { ScorecardModal } from '@/components/leaderboard/ScorecardModal';
 
 interface RosterData {
   id: string;
@@ -118,6 +119,7 @@ export function LiveTeamStandings({
   // Use round/cut from live API when present so weekly matches season (same source of truth)
   const [liveRound, setLiveRound] = useState<number | null>(null);
   const [liveCutLine, setLiveCutLine] = useState<{ cutScore: string; cutCount: number } | null>(null);
+  const [selectedScorecardPlayer, setSelectedScorecardPlayer] = useState<{ id: string; name: string } | null>(null);
 
   // Toggle a single roster expansion
   const toggleRoster = (rosterId: string) => {
@@ -149,6 +151,8 @@ export function LiveTeamStandings({
   );
 
   const effectiveRound = liveRound ?? displayRound ?? 1;
+  const scorecardEventId = scorecardSource === 'espn' && espnEventId ? espnEventId : liveGolfAPITournamentId;
+  const canShowScorecard = Boolean(scorecardEventId && !isCompleted);
 
   // Create a map of player name -> live score data with multiple lookup keys (use shared normalize so API "Højgaard" matches DB "Hojgaard")
   const playerScoreMap = useMemo(() => {
@@ -785,15 +789,29 @@ export function LiveTeamStandings({
                             <span className="text-casino-gray-dark">-</span>
                           )}
                         </td>
-                        {/* Score */}
+                        {/* Score — click to open scorecard (same as live leaderboard) */}
                         <td className="px-px sm:px-4 py-1 sm:py-1.5 text-xs text-center">
                           {player.liveScore ? (
-                            <span className={
-                              parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
-                              parseScore(player.liveScore.total) > 0 ? 'text-casino-red' : 'text-casino-gray'
-                            }>
-                              {player.liveScore.total}
-                            </span>
+                            canShowScorecard && player.liveScore.playerId ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedScorecardPlayer({ id: player.liveScore!.playerId, name: player.playerName })}
+                                className={`hover:underline hover:text-casino-gold transition-colors cursor-pointer ${
+                                  parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
+                                  parseScore(player.liveScore.total) > 0 ? 'text-casino-red' : 'text-casino-gray'
+                                }`}
+                                title="Click to view scorecard"
+                              >
+                                {player.liveScore.total}
+                              </button>
+                            ) : (
+                              <span className={
+                                parseScore(player.liveScore.total) < 0 ? 'text-casino-green' :
+                                parseScore(player.liveScore.total) > 0 ? 'text-casino-red' : 'text-casino-gray'
+                              }>
+                                {player.liveScore.total}
+                              </span>
+                            )
                           ) : (
                             <span className="text-casino-gray-dark">-</span>
                           )}
@@ -847,6 +865,18 @@ export function LiveTeamStandings({
             </div>
           </div>
         </div>
+      )}
+
+      {scorecardEventId && (
+        <ScorecardModal
+          isOpen={selectedScorecardPlayer !== null}
+          onClose={() => setSelectedScorecardPlayer(null)}
+          playerId={selectedScorecardPlayer?.id ?? ''}
+          playerName={selectedScorecardPlayer?.name ?? ''}
+          eventId={scorecardEventId}
+          source={scorecardSource}
+          year={scorecardSource === 'rapidapi' ? new Date().getFullYear().toString() : undefined}
+        />
       )}
     </div>
   );
