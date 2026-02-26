@@ -575,7 +575,7 @@ export function LiveSeasonStandings({
         </CardHeader>
         <CardContent>
           {combinedStandings.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto pr-4 sm:pr-0">
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-casino-gold/30">

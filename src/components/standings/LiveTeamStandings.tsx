@@ -636,7 +636,7 @@ export function LiveTeamStandings({
       </div>
 
       {/* Standings Table: Rank | Team (name + players below) | Pos | Score | Thru | Win | Winnings (rightmost) */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto pr-4 sm:pr-0">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b border-casino-gold/30">

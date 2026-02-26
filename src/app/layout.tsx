@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
+import { MobileSectionNav } from "@/components/layout/MobileSectionNav";
 import { Footer } from "@/components/layout/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ClientOnlyComponents } from "@/components/ClientOnlyComponents";
@@ -92,6 +93,7 @@ export default function RootLayout({
           <ErrorBoundary>
             <div className="relative z-10 flex flex-col flex-1 min-h-0">
               <Navbar />
+              <MobileSectionNav />
               <main className="relative flex-1 min-h-0">
                 {children}
               </main>
