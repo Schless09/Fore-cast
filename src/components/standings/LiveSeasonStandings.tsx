@@ -467,7 +467,7 @@ export function LiveSeasonStandings({
   };
 
   return (
-    <div>
+    <div className="pb-24">
       {/* Period Toggle */}
       <div className="mb-6 flex flex-wrap gap-2">
         {periodOptions.map(({ value, label }) => (
@@ -547,83 +547,141 @@ export function LiveSeasonStandings({
         </CardHeader>
         <CardContent>
           {combinedStandings.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-casino-gold/30">
-                    <th className="px-1 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Rank</th>
-                    <th className="px-1 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
-                    <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Winnings</th>
-                    <th className="px-1 sm:px-4 py-2 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Tournaments</th>
-                    <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Quartiles</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {combinedStandings.map((standing, index) => {
-                    const rank = index + 1;
-                    const isUser = standing.user_id === currentUserId;
-                    const quartileStats = quartileStatsByUser.get(standing.user_id);
-                    let quartileDisplay = '—';
-                    if (quartileStats && quartileStats.totalEvents > 0) {
-                      const labels = ['Q1', 'Q2', 'Q3', 'Q4'];
-                      const parts = quartileStats.counts
-                        .map((count, i) => ({
-                          label: labels[i],
-                          count,
-                          pct: Math.round((count / quartileStats.totalEvents) * 100),
-                        }))
+            <>
+              {/* Mobile: stacked cards so nothing scrunches */}
+              <div className="sm:hidden space-y-2">
+                {combinedStandings.map((standing, index) => {
+                  const rank = index + 1;
+                  const isUser = standing.user_id === currentUserId;
+                  const quartileStats = quartileStatsByUser.get(standing.user_id);
+                  const quartileParts = quartileStats && quartileStats.totalEvents > 0
+                    ? quartileStats.counts
+                        .map((count, i) => ({ label: ['Q1', 'Q2', 'Q3', 'Q4'][i], pct: Math.round((count / quartileStats.totalEvents) * 100), count }))
                         .filter((p) => p.count > 0)
-                        .slice(0, 3);
-                      if (parts.length > 0) {
-                        quartileDisplay = parts
-                          .map((p) => `${p.label} ${p.pct}%`)
-                          .join(' · ');
-                      }
-                    }
+                    : [];
 
-                    return (
-                      <tr
-                        key={standing.user_id}
-                        className={`border-b border-casino-gold/10 transition-colors ${
-                          isUser ? 'bg-casino-green/10 hover:bg-casino-green/20' : 'hover:bg-casino-elevated'
-                        }`}
-                      >
-                        <td className="px-1 sm:px-4 py-3">
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <span className="text-xs sm:text-sm font-medium text-casino-text">{rank}</span>
-                            {rank === 1 && <span className="text-base sm:text-lg">🏆</span>}
-                            {isUser && (
-                              <span className="px-1.5 py-0.5 bg-casino-green/30 text-casino-green border border-casino-green/50 rounded text-xs font-medium">
-                                You
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-1 sm:px-4 py-3">
-                          <span className="font-medium text-casino-text text-xs sm:text-sm">{standing.username}</span>
-                        </td>
-                        <td className="px-1 sm:px-4 py-3 text-right">
-                          <span className="font-semibold text-casino-green text-xs sm:text-sm">
+                  return (
+                    <div
+                      key={standing.user_id}
+                      className={`rounded-lg border p-3 ${
+                        isUser ? 'bg-casino-green/10 border-casino-green/30' : 'bg-casino-card/50 border-casino-gold/10'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-medium text-casino-text shrink-0">{rank}</span>
+                          {rank === 1 && <span className="shrink-0">🏆</span>}
+                          <span className="font-medium text-casino-text truncate">{standing.username}</span>
+                          {isUser && (
+                            <span className="px-1.5 py-0.5 bg-casino-green/30 text-casino-green border border-casino-green/50 rounded text-xs font-medium shrink-0">
+                              You
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-semibold text-casino-green text-sm">
                             {formatCurrency(standing.total_winnings)}
                           </span>
                           {standing.live_winnings > 0 && (
-                            <span className="block text-xs text-casino-gray">
-                              +{formatCurrency(standing.live_winnings)} live
-                            </span>
+                            <span className="text-xs text-casino-gray ml-1">+{formatCurrency(standing.live_winnings)} live</span>
                           )}
-                        </td>
-                        <td className="px-1 sm:px-4 py-3 text-center text-xs sm:text-sm text-casino-gray hidden sm:table-cell">
-                          {standing.tournaments_played}
-                        </td>
-                        <td className="px-1 sm:px-4 py-3 text-right text-xs sm:text-sm text-casino-gray">
-                          {quartileDisplay}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {quartileParts.length > 0 ? (
+                          quartileParts.map((p) => (
+                            <span key={p.label} className="text-xs text-casino-gray bg-casino-elevated px-2 py-0.5 rounded">
+                              {p.label} {p.pct}%
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-casino-gray-dark">—</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop: table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-casino-gold/30">
+                      <th className="px-1 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Rank</th>
+                      <th className="px-1 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
+                      <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Winnings</th>
+                      <th className="px-1 sm:px-4 py-2 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Tournaments</th>
+                      <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Quartiles</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {combinedStandings.map((standing, index) => {
+                      const rank = index + 1;
+                      const isUser = standing.user_id === currentUserId;
+                      const quartileStats = quartileStatsByUser.get(standing.user_id);
+                      let quartileDisplay = '—';
+                      if (quartileStats && quartileStats.totalEvents > 0) {
+                        const labels = ['Q1', 'Q2', 'Q3', 'Q4'];
+                        const parts = quartileStats.counts
+                          .map((count, i) => ({
+                            label: labels[i],
+                            count,
+                            pct: Math.round((count / quartileStats.totalEvents) * 100),
+                          }))
+                          .filter((p) => p.count > 0)
+                          .slice(0, 3);
+                        if (parts.length > 0) {
+                          quartileDisplay = parts
+                            .map((p) => `${p.label} ${p.pct}%`)
+                            .join(' · ');
+                        }
+                      }
+
+                      return (
+                        <tr
+                          key={standing.user_id}
+                          className={`border-b border-casino-gold/10 transition-colors ${
+                            isUser ? 'bg-casino-green/10 hover:bg-casino-green/20' : 'hover:bg-casino-elevated'
+                          }`}
+                        >
+                          <td className="px-1 sm:px-4 py-3">
+                            <div className="flex items-center gap-1 sm:gap-2">
+                              <span className="text-xs sm:text-sm font-medium text-casino-text">{rank}</span>
+                              {rank === 1 && <span className="text-base sm:text-lg">🏆</span>}
+                              {isUser && (
+                                <span className="px-1.5 py-0.5 bg-casino-green/30 text-casino-green border border-casino-green/50 rounded text-xs font-medium">
+                                  You
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-1 sm:px-4 py-3">
+                            <span className="font-medium text-casino-text text-xs sm:text-sm">{standing.username}</span>
+                          </td>
+                          <td className="px-1 sm:px-4 py-3 text-right">
+                            <span className="font-semibold text-casino-green text-xs sm:text-sm">
+                              {formatCurrency(standing.total_winnings)}
+                            </span>
+                            {standing.live_winnings > 0 && (
+                              <span className="block text-xs text-casino-gray">
+                                +{formatCurrency(standing.live_winnings)} live
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-1 sm:px-4 py-3 text-center text-xs sm:text-sm text-casino-gray hidden sm:table-cell">
+                            {standing.tournaments_played}
+                          </td>
+                          <td className="px-1 sm:px-4 py-3 text-right text-xs sm:text-sm text-casino-gray">
+                            {quartileDisplay}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <div className="text-center py-12">
               <p className="text-casino-gray mb-4">
