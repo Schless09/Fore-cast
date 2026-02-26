@@ -143,21 +143,11 @@ export function LiveTeamStandings({
     [prizeDistributions]
   );
 
-  // Normalize name for matching (handle accents, case, extra spaces)
-  const normalizeName = (name: string): string => {
-    return name
-      .toLowerCase()
-      .trim()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove accents
-      .replace(/\s+/g, ' '); // Normalize spaces
-  };
-
-  // Create a map of player name -> live score data with multiple lookup keys
+  // Create a map of player name -> live score data with multiple lookup keys (use shared normalize so API "Højgaard" matches DB "Hojgaard")
   const playerScoreMap = useMemo(() => {
     const map = new Map<string, LiveScore>();
     liveScores.forEach((score) => {
-      const normalizedName = normalizeName(score.player);
+      const normalizedName = normalizeNameForLookup(score.player);
       map.set(normalizedName, score);
       
       // Also add lookup by last name for fuzzy matching
@@ -174,7 +164,7 @@ export function LiveTeamStandings({
 
   // Find live score with fuzzy matching for nicknames like "Cam" vs "Cameron"
   const findLiveScore = useCallback((playerName: string): LiveScore | undefined => {
-    const normalizedName = normalizeName(playerName);
+    const normalizedName = normalizeNameForLookup(playerName);
     
     // Try exact match first
     const match = playerScoreMap.get(normalizedName);
@@ -292,7 +282,7 @@ export function LiveTeamStandings({
     for (const roster of rostersWithLiveWinnings) {
       if (roster.noLineup) continue;
       for (const p of roster.playersWithScores) {
-        const key = normalizeName(p.playerName);
+        const key = normalizeNameForLookup(p.playerName);
         if (!map.has(key)) map.set(key, new Set());
         map.get(key)!.add(roster.id);
       }
@@ -304,7 +294,7 @@ export function LiveTeamStandings({
   const handlePlayerNameClick = useCallback(
     (e: React.MouseEvent, playerName: string) => {
       e.stopPropagation();
-      const key = normalizeName(playerName);
+      const key = normalizeNameForLookup(playerName);
       setSelectedPlayerNames((prev) => {
         const next = new Set(prev);
         if (next.has(key)) {
@@ -601,9 +591,9 @@ export function LiveTeamStandings({
               ({Array.from(selectedPlayerNames)
                 .map((n) => {
                   const roster = rostersWithLiveWinnings.find((r) =>
-                    r.playersWithScores.some((p) => normalizeName(p.playerName) === n)
+                    r.playersWithScores.some((p) => normalizeNameForLookup(p.playerName) === n)
                   );
-                  return roster?.playersWithScores.find((p) => normalizeName(p.playerName) === n)?.playerName ?? n;
+                  return roster?.playersWithScores.find((p) => normalizeNameForLookup(p.playerName) === n)?.playerName ?? n;
                 })
                 .join(', ')})
             </span>
@@ -747,7 +737,7 @@ export function LiveTeamStandings({
                             <button
                               type="button"
                               onClick={(e) => handlePlayerNameClick(e, player.playerName)}
-                              className={`text-left hover:underline focus:outline-none focus:ring-1 focus:ring-casino-gold rounded px-0.5 -mx-0.5 ${selectedPlayerNames.has(normalizeName(player.playerName)) ? 'text-casino-gold font-semibold ring-1 ring-casino-gold/50 rounded' : ''}`}
+                              className={`text-left hover:underline focus:outline-none focus:ring-1 focus:ring-casino-gold rounded px-0.5 -mx-0.5 ${selectedPlayerNames.has(normalizeNameForLookup(player.playerName)) ? 'text-casino-gold font-semibold ring-1 ring-casino-gold/50 rounded' : ''}`}
                             >
                               {isMobile ? formatShortName(player.playerName) : player.playerName}
                             </button>

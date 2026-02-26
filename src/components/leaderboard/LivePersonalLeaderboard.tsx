@@ -75,16 +75,6 @@ const parseScore = (score: string | number | null): number => {
   return parseInt(s, 10) || 0;
 };
 
-// Normalize name for matching
-const normalizeName = (name: string): string => {
-  return name
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ');
-};
-
 export function LivePersonalLeaderboard({
   rosterId,
   rosterName,
@@ -117,11 +107,11 @@ export function LivePersonalLeaderboard({
     [prizeDistributions]
   );
 
-  // Create a map of player name -> live score data with multiple lookup keys
+  // Create a map of player name -> live score data with multiple lookup keys (use shared normalize so API "Højgaard" matches DB "Hojgaard")
   const playerScoreMap = useMemo(() => {
     const map = new Map<string, LiveScore>();
     liveScores.forEach((score) => {
-      const normalizedName = normalizeName(score.player);
+      const normalizedName = normalizeNameForLookup(score.player);
       map.set(normalizedName, score);
       
       // Also add lookup by last name for fuzzy matching
@@ -137,7 +127,7 @@ export function LivePersonalLeaderboard({
 
   // Find live score with fuzzy matching for nicknames like "Cam" vs "Cameron"
   const findLiveScore = useCallback((playerName: string): LiveScore | undefined => {
-    const normalizedName = normalizeName(playerName);
+    const normalizedName = normalizeNameForLookup(playerName);
     
     // Try exact match first
     const match = playerScoreMap.get(normalizedName);

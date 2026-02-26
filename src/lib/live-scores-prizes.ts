@@ -39,13 +39,17 @@ function parseScore(score: string | number | null): number {
   return parseInt(s, 10) || 0;
 }
 
+/** Normalize for matching API names to DB names; handles accents and Scandinavian/German (ø→o, å→a, etc.). */
 export function normalizeNameForLookup(name: string): string {
-  return name
+  let s = name
     .toLowerCase()
     .trim()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ');
+  // Explicit replacements for Latin chars that may not decompose consistently (e.g. Nicolai Højgaard vs Hojgaard)
+  s = s.replace(/ø/g, 'o').replace(/ö/g, 'o').replace(/å/g, 'a').replace(/ä/g, 'a').replace(/æ/g, 'ae').replace(/ß/g, 'ss');
+  return s;
 }
 
 /** First-name nickname aliases so "Matti Schmid" (DB) matches "Matthias Schmid" (ESPN) and vice versa */
