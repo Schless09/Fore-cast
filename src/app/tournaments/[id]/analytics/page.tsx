@@ -241,6 +241,8 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
         const seasonPickedBy = new Map<string, Set<string>>();
         const seasonTotalEarnings = new Map<string, number>();
         const seasonTotalCost = new Map<string, number>();
+        // Earnings: count each tournament once per player (actual purse). Cost: sum every pick (total spent).
+        const earningsAddedPerPlayerTournament = new Set<string>();
 
         seasonSelections?.forEach((row) => {
           const tp = row.tournament_player as unknown as { pga_players: { name: string } };
@@ -261,7 +263,11 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
               const costMap = seasonCostByTid.get(tid);
               const earnings = processedMap ? (getPrizeDataForPlayer(processedMap, playerName)?.winnings ?? 0) : 0;
               const cost = costMap?.get(playerName) ?? 0;
-              seasonTotalEarnings.set(playerName, (seasonTotalEarnings.get(playerName) ?? 0) + earnings);
+              const earningsKey = `${playerName}|${tid}`;
+              if (!earningsAddedPerPlayerTournament.has(earningsKey)) {
+                earningsAddedPerPlayerTournament.add(earningsKey);
+                seasonTotalEarnings.set(playerName, (seasonTotalEarnings.get(playerName) ?? 0) + earnings);
+              }
               seasonTotalCost.set(playerName, (seasonTotalCost.get(playerName) ?? 0) + cost);
             }
           }

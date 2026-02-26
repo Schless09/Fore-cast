@@ -264,7 +264,14 @@ export function InsideTheFieldTable({
                 <td className={`px-1 sm:px-3 py-1.5 font-medium ${player.isOnUserRoster ? 'text-casino-gold' : 'text-casino-text'}`}>
                   <span title={player.playerName}>
                     {formatShortName(player.playerName)}
-                    <span className="text-casino-gray font-normal ml-1">(${player.cost})</span>
+                    <span
+                      className="text-casino-gray font-normal ml-1"
+                      title={isSeasonView ? 'Avg cost per pick this season' : undefined}
+                    >
+                      ({isSeasonView && picked.selectionCount
+                        ? (Number(player.cost ?? 0) / picked.selectionCount).toFixed(2)
+                        : (Number(player.cost ?? 0)).toFixed(2)})
+                    </span>
                   </span>
                 </td>
                 <td className="px-1 sm:px-3 py-1.5 text-center">
