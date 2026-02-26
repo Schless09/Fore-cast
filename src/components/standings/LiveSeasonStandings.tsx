@@ -25,6 +25,8 @@ interface CompletedStanding {
     winnings: number;
     is_active: boolean;
     segments: number[]; // empty array means included in all segments
+    /** Golfer finish positions in this tournament (1st, 2nd, 23rd, etc.) for W/T5/T10/T25 counts */
+    player_positions?: number[];
   }>;
 }
 
@@ -355,62 +357,32 @@ export function LiveSeasonStandings({
   const userRank = userStandingIndex !== -1 ? userStandingIndex + 1 : null;
   const userStanding = userStandingIndex !== -1 ? combinedStandings[userStandingIndex] : null;
 
-  // Quartile distribution (Q1–Q4) for each user across tournaments in the selected period
-  const quartileStatsByUser = useMemo(() => {
-    // Build per-tournament standings from combinedStandings (which already respects selectedPeriod and live winnings)
-    const byTournament = new Map<string, { user_id: string; winnings: number }[]>();
+  // Winner + Top 5 / Top 10 / Top 25: count of roster golfers who finished in each tier (not league rank)
+  const topFinishesByUser = useMemo(() => {
+    const userStats = new Map<string, { wins: number; top5: number; top10: number; top25: number }>();
+    combinedStandings.forEach((s) => {
+      userStats.set(s.user_id, { wins: 0, top5: 0, top10: 0, top25: 0 });
+    });
 
     combinedStandings.forEach((standing) => {
+      const stats = userStats.get(standing.user_id);
+      if (!stats) return;
       standing.rosters.forEach((roster) => {
-        const tid = roster.tournament_id;
-        if (!tid) return;
-        if (!byTournament.has(tid)) byTournament.set(tid, []);
-        byTournament.get(tid)!.push({
-          user_id: standing.user_id,
-          winnings: roster.winnings,
+        const positions = roster.player_positions ?? [];
+        positions.forEach((pos) => {
+          if (pos === 1) stats.wins += 1;
+          if (pos <= 5) stats.top5 += 1;
+          if (pos <= 10) stats.top10 += 1;
+          if (pos <= 25) stats.top25 += 1;
         });
       });
     });
-
-    // Initialize user stats
-    const userStats = new Map<
-      string,
-      { totalEvents: number; counts: [number, number, number, number] }
-    >();
-    combinedStandings.forEach((s) => {
-      userStats.set(s.user_id, { totalEvents: 0, counts: [0, 0, 0, 0] });
-    });
-
-    // For each tournament, rank users by winnings and assign quartiles
-    for (const [, entries] of byTournament.entries()) {
-      const validEntries = entries.slice().sort((a, b) => b.winnings - a.winnings);
-      const n = validEntries.length;
-      if (n === 0) continue;
-
-      validEntries.forEach((entry, index) => {
-        const stats = userStats.get(entry.user_id);
-        if (!stats) return;
-
-        const fraction = index / n;
-        let qIndex: 0 | 1 | 2 | 3;
-        if (fraction < 0.25) qIndex = 0; // Q1 (top 25%)
-        else if (fraction < 0.5) qIndex = 1; // Q2
-        else if (fraction < 0.75) qIndex = 2; // Q3
-        else qIndex = 3; // Q4
-
-        stats.totalEvents += 1;
-        stats.counts[qIndex] += 1;
-      });
-    }
-
     return userStats;
   }, [combinedStandings]);
 
-  // Per-tournament finish + quartile for the current user (used in breakdown section)
+  // Per-tournament: league rank (by winnings) + best tier from roster's golfer positions (W/T5/T10/T25)
   const userTournamentFinishes = useMemo(() => {
-    const finishes = new Map<string, { rank: number; total: number; quartileLabel: string }>();
-
-    // Rebuild per-tournament standings from combinedStandings
+    const finishes = new Map<string, { rank: number; total: number; topTier: 'W' | 'T5' | 'T10' | 'T25' | null }>();
     const byTournament = new Map<string, { user_id: string; winnings: number }[]>();
     combinedStandings.forEach((standing) => {
       standing.rosters.forEach((roster) => {
@@ -432,25 +404,26 @@ export function LiveSeasonStandings({
       const index = sorted.findIndex((e) => e.user_id === currentUserId);
       if (index === -1) continue;
 
-      const fraction = index / total;
-      let quartileLabel = 'Q4 (Bottom 25%)';
-      if (fraction < 0.25) quartileLabel = 'Q1 (Top 25%)';
-      else if (fraction < 0.5) quartileLabel = 'Q2 (25–50%)';
-      else if (fraction < 0.75) quartileLabel = 'Q3 (50–75%)';
+      const rank = index + 1;
+      // Best tier from current user's roster golfer positions in this tournament
+      const userRoster = combinedStandings
+        .find((s) => s.user_id === currentUserId)
+        ?.rosters.find((r) => r.tournament_id === tournamentId);
+      const positions = userRoster?.player_positions ?? [];
+      let topTier: 'W' | 'T5' | 'T10' | 'T25' | null = null;
+      if (positions.some((p) => p === 1)) topTier = 'W';
+      else if (positions.some((p) => p <= 5)) topTier = 'T5';
+      else if (positions.some((p) => p <= 10)) topTier = 'T10';
+      else if (positions.some((p) => p <= 25)) topTier = 'T25';
 
-      finishes.set(tournamentId, {
-        rank: index + 1,
-        total,
-        quartileLabel,
-      });
+      finishes.set(tournamentId, { rank, total, topTier });
     }
-
     return finishes;
   }, [combinedStandings, currentUserId]);
 
-  // Per-tournament finish for every user (for member modal)
+  // Per-tournament for every user (member modal): league rank/total + best tier from roster's golfer positions
   const tournamentFinishesByUser = useMemo(() => {
-    const byUser = new Map<string, Map<string, { rank: number; total: number; quartileLabel: string }>>();
+    const byUser = new Map<string, Map<string, { rank: number; total: number; topTier: 'W' | 'T5' | 'T10' | 'T25' | null }>>();
     const byTournament = new Map<string, { user_id: string; winnings: number }[]>();
     combinedStandings.forEach((standing) => {
       standing.rosters.forEach((roster) => {
@@ -470,17 +443,18 @@ export function LiveSeasonStandings({
       if (total === 0) continue;
 
       sorted.forEach((entry, index) => {
-        const fraction = index / total;
-        let quartileLabel = 'Q4 (Bottom 25%)';
-        if (fraction < 0.25) quartileLabel = 'Q1 (Top 25%)';
-        else if (fraction < 0.5) quartileLabel = 'Q2 (25–50%)';
-        else if (fraction < 0.75) quartileLabel = 'Q3 (50–75%)';
+        const rank = index + 1;
+        const userRoster = combinedStandings
+          .find((s) => s.user_id === entry.user_id)
+          ?.rosters.find((r) => r.tournament_id === tournamentId);
+        const positions = userRoster?.player_positions ?? [];
+        let topTier: 'W' | 'T5' | 'T10' | 'T25' | null = null;
+        if (positions.some((p) => p === 1)) topTier = 'W';
+        else if (positions.some((p) => p <= 5)) topTier = 'T5';
+        else if (positions.some((p) => p <= 10)) topTier = 'T10';
+        else if (positions.some((p) => p <= 25)) topTier = 'T25';
         if (!byUser.has(entry.user_id)) byUser.set(entry.user_id, new Map());
-        byUser.get(entry.user_id)!.set(tournamentId, {
-          rank: index + 1,
-          total,
-          quartileLabel,
-        });
+        byUser.get(entry.user_id)!.set(tournamentId, { rank, total, topTier });
       });
     }
     return byUser;
@@ -655,31 +629,17 @@ export function LiveSeasonStandings({
                       <th className="px-1 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
                       <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Winnings</th>
                       <th className="px-1 sm:px-4 py-2 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Tournaments</th>
-                      <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Quartiles</th>
+                      <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase" title="Wins / Top 5 / Top 10 / Top 25 finishes">W · T5 · T10 · T25</th>
                     </tr>
                   </thead>
                   <tbody>
                     {combinedStandings.map((standing, index) => {
                       const rank = index + 1;
                       const isUser = standing.user_id === currentUserId;
-                      const quartileStats = quartileStatsByUser.get(standing.user_id);
-                      let quartileDisplay = '—';
-                      if (quartileStats && quartileStats.totalEvents > 0) {
-                        const labels = ['Q1', 'Q2', 'Q3', 'Q4'];
-                        const parts = quartileStats.counts
-                          .map((count, i) => ({
-                            label: labels[i],
-                            count,
-                            pct: Math.round((count / quartileStats.totalEvents) * 100),
-                          }))
-                          .filter((p) => p.count > 0)
-                          .slice(0, 3);
-                        if (parts.length > 0) {
-                          quartileDisplay = parts
-                            .map((p) => `${p.label} ${p.pct}%`)
-                            .join(' · ');
-                        }
-                      }
+                      const topFinishes = topFinishesByUser.get(standing.user_id);
+                      const topDisplay = topFinishes
+                        ? `${topFinishes.wins} / ${topFinishes.top5} / ${topFinishes.top10} / ${topFinishes.top25}`
+                        : '—';
 
                       return (
                         <tr
@@ -721,8 +681,8 @@ export function LiveSeasonStandings({
                           <td className="px-1 sm:px-4 py-3 text-center text-xs sm:text-sm text-casino-gray hidden sm:table-cell">
                             {standing.tournaments_played}
                           </td>
-                          <td className="px-1 sm:px-4 py-3 text-right text-xs sm:text-sm text-casino-gray">
-                            {quartileDisplay}
+                          <td className="px-1 sm:px-4 py-3 text-right text-xs sm:text-sm text-casino-gray tabular-nums">
+                            {topDisplay}
                           </td>
                         </tr>
                       );
@@ -754,42 +714,54 @@ export function LiveSeasonStandings({
             <div className="space-y-3">
               {userStanding.rosters
                 .sort((a, b) => b.winnings - a.winnings)
-                .map((roster, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                      roster.is_active
-                        ? 'bg-casino-green/10 border-casino-green/30'
-                        : 'bg-casino-card/50 border-casino-gold/10 hover:border-casino-gold/30'
-                    }`}
-                  >
-                    <div>
-                      <p className="font-medium text-casino-text">
-                        {roster.roster_name}
-                        {roster.is_active && (
-                          <span className="ml-2 text-xs text-casino-green">● Live</span>
-                        )}
-                      </p>
-                      <p className="text-sm text-casino-gray">{roster.tournament_name}</p>
-                      {roster.tournament_id && (
-                        (() => {
-                          const finish = userTournamentFinishes.get(roster.tournament_id);
-                          if (!finish) return null;
-                          return (
-                            <p className="text-xs text-casino-gray-dark mt-0.5">
-                              Finish: {finish.rank}/{finish.total} · {finish.quartileLabel}
+                .map((roster, index) => {
+                  const finish = roster.tournament_id ? userTournamentFinishes.get(roster.tournament_id) : null;
+                  const positions = roster.player_positions ?? [];
+                  const eventWins = positions.filter((p) => p === 1).length;
+                  const eventTop5 = positions.filter((p) => p <= 5).length;
+                  const eventTop10 = positions.filter((p) => p <= 10).length;
+                  const eventTop25 = positions.filter((p) => p <= 25).length;
+                  const hasTierData = positions.length > 0;
+                  return (
+                    <div
+                      key={index}
+                      className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                        roster.is_active
+                          ? 'bg-casino-green/10 border-casino-green/30'
+                          : 'bg-casino-card/50 border-casino-gold/10 hover:border-casino-gold/30'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-casino-text">
+                          {roster.tournament_name}
+                          {roster.is_active && (
+                            <span className="ml-2 text-xs text-casino-green">● Live</span>
+                          )}
+                        </p>
+                        <div className="text-xs text-casino-gray-dark mt-0.5 space-y-0.5">
+                          {finish && (
+                            <p className="flex items-center gap-1.5 flex-wrap">
+                              <span>Finish: {finish.rank}/{finish.total}</span>
                             </p>
-                          );
-                        })()
-                      )}
+                          )}
+                          {hasTierData && (
+                            <p className="flex items-center gap-1.5 flex-wrap" title="Your roster golfers in each tier this tournament">
+                              <span className="text-casino-gray">W · T5 · T10 · T25:</span>
+                              <span className="font-medium text-casino-text">
+                                {eventWins} / {eventTop5} / {eventTop10} / {eventTop25}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <p className="font-semibold text-casino-green font-orbitron">
+                          {formatCurrency(roster.winnings)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-casino-green font-orbitron">
-                        {formatCurrency(roster.winnings)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           </CardContent>
         </Card>
@@ -799,6 +771,7 @@ export function LiveSeasonStandings({
       {selectedMember && (() => {
         const memberStanding = combinedStandings.find((s) => s.user_id === selectedMember.user_id);
         const memberFinishes = tournamentFinishesByUser.get(selectedMember.user_id);
+        const memberTops = topFinishesByUser.get(selectedMember.user_id);
         return (
           <div
             className="fixed inset-0 z-9999 flex items-center justify-center p-4"
@@ -814,20 +787,33 @@ export function LiveSeasonStandings({
               className="relative w-full max-w-md max-h-[85vh] overflow-hidden rounded-xl border border-casino-gold/30 bg-casino-card shadow-xl flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between p-4 border-b border-casino-gold/20 shrink-0">
-                <h2 id="member-modal-title" className="text-lg font-bold text-casino-gold">
-                  {selectedMember.username}&apos;s Tournament Breakdown
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setSelectedMember(null)}
-                  className="p-2 rounded-lg text-casino-gray hover:bg-casino-elevated hover:text-casino-text transition-colors focus:outline-none focus:ring-1 focus:ring-casino-gold"
-                  aria-label="Close"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+              <div className="p-4 border-b border-casino-gold/20 shrink-0 space-y-1">
+                <div className="flex items-center justify-between">
+                  <h2 id="member-modal-title" className="text-lg font-bold text-casino-gold">
+                    {selectedMember.username}&apos;s Tournament Breakdown
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMember(null)}
+                    className="p-2 rounded-lg text-casino-gray hover:bg-casino-elevated hover:text-casino-text transition-colors focus:outline-none focus:ring-1 focus:ring-casino-gold"
+                    aria-label="Close"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                {memberTops && (memberTops.wins > 0 || memberTops.top5 > 0 || memberTops.top10 > 0 || memberTops.top25 > 0) && (
+                  <p className="text-xs text-casino-gray">
+                    {memberTops.wins} Win{memberTops.wins !== 1 ? 's' : ''}
+                    {' · '}
+                    {memberTops.top5} Top 5{memberTops.top5 !== 1 ? 's' : ''}
+                    {' · '}
+                    {memberTops.top10} Top 10{memberTops.top10 !== 1 ? 's' : ''}
+                    {' · '}
+                    {memberTops.top25} Top 25{memberTops.top25 !== 1 ? 's' : ''}
+                  </p>
+                )}
               </div>
               <div className="p-4 overflow-y-auto space-y-3">
                 {memberStanding && memberStanding.rosters.length > 0 ? (
@@ -835,6 +821,12 @@ export function LiveSeasonStandings({
                     .sort((a, b) => b.winnings - a.winnings)
                     .map((roster, index) => {
                       const finish = roster.tournament_id ? memberFinishes?.get(roster.tournament_id) : null;
+                      const positions = roster.player_positions ?? [];
+                      const eventWins = positions.filter((p) => p === 1).length;
+                      const eventTop5 = positions.filter((p) => p <= 5).length;
+                      const eventTop10 = positions.filter((p) => p <= 10).length;
+                      const eventTop25 = positions.filter((p) => p <= 25).length;
+                      const hasTierData = positions.length > 0;
                       return (
                         <div
                           key={index}
@@ -844,20 +836,30 @@ export function LiveSeasonStandings({
                               : 'bg-casino-elevated/50 border-casino-gold/10'
                           }`}
                         >
-                          <div>
+                          <div className="min-w-0">
                             <p className="font-medium text-casino-text">
                               {roster.tournament_name}
                               {roster.is_active && (
                                 <span className="ml-2 text-xs text-casino-green">● Live</span>
                               )}
                             </p>
-                            {finish && (
-                              <p className="text-xs text-casino-gray-dark mt-0.5">
-                                Finish: {finish.rank}/{finish.total} · {finish.quartileLabel}
-                              </p>
-                            )}
+                            <div className="text-xs text-casino-gray-dark mt-0.5 space-y-0.5">
+                              {finish && (
+                                <p className="flex items-center gap-1.5 flex-wrap">
+                                  <span>Finish: {finish.rank}/{finish.total}</span>
+                                </p>
+                              )}
+                              {hasTierData && (
+                                <p className="flex items-center gap-1.5 flex-wrap" title="Roster golfers in each tier this tournament">
+                                  <span className="text-casino-gray">W · T5 · T10 · T25:</span>
+                                  <span className="font-medium text-casino-text">
+                                    {eventWins} / {eventTop5} / {eventTop10} / {eventTop25}
+                                  </span>
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right shrink-0 ml-3">
                             <p className="font-semibold text-casino-green font-orbitron">
                               {formatCurrency(roster.winnings)}
                             </p>

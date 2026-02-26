@@ -24,6 +24,10 @@ interface RosterData {
     status: string;
     start_date: string;
   } | null;
+  roster_players?: Array<{
+    tournament_player_id: string;
+    tournament_players?: { position: number | null } | null;
+  }> | null;
 }
 
 interface SupabaseError extends Error {
@@ -184,7 +188,8 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
         roster_name,
         total_winnings,
         profiles(username),
-        tournament:tournaments(id, name, status, start_date)
+        tournament:tournaments(id, name, status, start_date),
+        roster_players(tournament_player_id, tournament_players(position))
       `
       )
       .in('tournament_id', tournamentIds)
@@ -219,7 +224,9 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
       tournament_id: string;
       winnings: number;
       is_active: boolean;
-      segments: number[]; // Changed from segment: number | null
+      segments: number[];
+      /** Golfer finish positions in this tournament (1st, 2nd, 23rd, etc.) for W/T5/T10/T25 counts */
+      player_positions: number[];
     }>;
   }
   
@@ -264,6 +271,14 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
     const standing = standingsMap.get(userId)!;
     standing.completed_winnings += winnings;
     standing.tournaments_played += 1;
+    // Golfer finish positions in this tournament (for W/T5/T10/T25 counts)
+    const player_positions = (roster.roster_players || [])
+      .map((rp) => {
+        const tp = Array.isArray(rp.tournament_players) ? rp.tournament_players[0] : rp.tournament_players;
+        return tp?.position;
+      })
+      .filter((p): p is number => typeof p === 'number' && p >= 1);
+
     standing.rosters.push({
       roster_name: roster.roster_name,
       tournament_name: tournamentName,
@@ -271,6 +286,7 @@ export default async function SeasonStandingsPage({ searchParams }: SeasonStandi
       winnings: isActive ? 0 : (roster.total_winnings || 0), // Will be updated live for active
       is_active: isActive,
       segments: segments,
+      player_positions,
     });
   });
 
