@@ -353,6 +353,99 @@ export function LiveSeasonStandings({
   const userRank = userStandingIndex !== -1 ? userStandingIndex + 1 : null;
   const userStanding = userStandingIndex !== -1 ? combinedStandings[userStandingIndex] : null;
 
+  // Quartile distribution (Q1–Q4) for each user across tournaments in the selected period
+  const quartileStatsByUser = useMemo(() => {
+    // Build per-tournament standings from combinedStandings (which already respects selectedPeriod and live winnings)
+    const byTournament = new Map<string, { user_id: string; winnings: number }[]>();
+
+    combinedStandings.forEach((standing) => {
+      standing.rosters.forEach((roster) => {
+        const tid = roster.tournament_id;
+        if (!tid) return;
+        if (!byTournament.has(tid)) byTournament.set(tid, []);
+        byTournament.get(tid)!.push({
+          user_id: standing.user_id,
+          winnings: roster.winnings,
+        });
+      });
+    });
+
+    // Initialize user stats
+    const userStats = new Map<
+      string,
+      { totalEvents: number; counts: [number, number, number, number] }
+    >();
+    combinedStandings.forEach((s) => {
+      userStats.set(s.user_id, { totalEvents: 0, counts: [0, 0, 0, 0] });
+    });
+
+    // For each tournament, rank users by winnings and assign quartiles
+    for (const [, entries] of byTournament.entries()) {
+      const validEntries = entries.slice().sort((a, b) => b.winnings - a.winnings);
+      const n = validEntries.length;
+      if (n === 0) continue;
+
+      validEntries.forEach((entry, index) => {
+        const stats = userStats.get(entry.user_id);
+        if (!stats) return;
+
+        const fraction = index / n;
+        let qIndex: 0 | 1 | 2 | 3;
+        if (fraction < 0.25) qIndex = 0; // Q1 (top 25%)
+        else if (fraction < 0.5) qIndex = 1; // Q2
+        else if (fraction < 0.75) qIndex = 2; // Q3
+        else qIndex = 3; // Q4
+
+        stats.totalEvents += 1;
+        stats.counts[qIndex] += 1;
+      });
+    }
+
+    return userStats;
+  }, [combinedStandings]);
+
+  // Per-tournament finish + quartile for the current user (used in breakdown section)
+  const userTournamentFinishes = useMemo(() => {
+    const finishes = new Map<string, { rank: number; total: number; quartileLabel: string }>();
+
+    // Rebuild per-tournament standings from combinedStandings
+    const byTournament = new Map<string, { user_id: string; winnings: number }[]>();
+    combinedStandings.forEach((standing) => {
+      standing.rosters.forEach((roster) => {
+        const tid = roster.tournament_id;
+        if (!tid) return;
+        if (!byTournament.has(tid)) byTournament.set(tid, []);
+        byTournament.get(tid)!.push({
+          user_id: standing.user_id,
+          winnings: roster.winnings,
+        });
+      });
+    });
+
+    for (const [tournamentId, entries] of byTournament.entries()) {
+      const sorted = entries.slice().sort((a, b) => b.winnings - a.winnings);
+      const total = sorted.length;
+      if (total === 0) continue;
+
+      const index = sorted.findIndex((e) => e.user_id === currentUserId);
+      if (index === -1) continue;
+
+      const fraction = index / total;
+      let quartileLabel = 'Q4 (Bottom 25%)';
+      if (fraction < 0.25) quartileLabel = 'Q1 (Top 25%)';
+      else if (fraction < 0.5) quartileLabel = 'Q2 (25–50%)';
+      else if (fraction < 0.75) quartileLabel = 'Q3 (50–75%)';
+
+      finishes.set(tournamentId, {
+        rank: index + 1,
+        total,
+        quartileLabel,
+      });
+    }
+
+    return finishes;
+  }, [combinedStandings, currentUserId]);
+
   // Generate period options based on segment definitions
   const periodOptions = useMemo(() => {
     const options: Array<{ value: SeasonPeriod; label: string }> = [
@@ -462,16 +555,31 @@ export function LiveSeasonStandings({
                     <th className="px-1 sm:px-4 py-2 text-left text-xs font-medium text-casino-gray uppercase">Player</th>
                     <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Winnings</th>
                     <th className="px-1 sm:px-4 py-2 text-center text-xs font-medium text-casino-gray uppercase hidden sm:table-cell">Tournaments</th>
-                    <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase hidden md:table-cell">Avg.</th>
+                    <th className="px-1 sm:px-4 py-2 text-right text-xs font-medium text-casino-gray uppercase">Quartiles</th>
                   </tr>
                 </thead>
                 <tbody>
                   {combinedStandings.map((standing, index) => {
                     const rank = index + 1;
                     const isUser = standing.user_id === currentUserId;
-                    const avgWinnings = standing.tournaments_played > 0
-                      ? standing.total_winnings / standing.tournaments_played
-                      : 0;
+                    const quartileStats = quartileStatsByUser.get(standing.user_id);
+                    let quartileDisplay = '—';
+                    if (quartileStats && quartileStats.totalEvents > 0) {
+                      const labels = ['Q1', 'Q2', 'Q3', 'Q4'];
+                      const parts = quartileStats.counts
+                        .map((count, i) => ({
+                          label: labels[i],
+                          count,
+                          pct: Math.round((count / quartileStats.totalEvents) * 100),
+                        }))
+                        .filter((p) => p.count > 0)
+                        .slice(0, 3);
+                      if (parts.length > 0) {
+                        quartileDisplay = parts
+                          .map((p) => `${p.label} ${p.pct}%`)
+                          .join(' · ');
+                      }
+                    }
 
                     return (
                       <tr
@@ -507,8 +615,8 @@ export function LiveSeasonStandings({
                         <td className="px-1 sm:px-4 py-3 text-center text-xs sm:text-sm text-casino-gray hidden sm:table-cell">
                           {standing.tournaments_played}
                         </td>
-                        <td className="px-1 sm:px-4 py-3 text-right text-xs sm:text-sm text-casino-gray hidden md:table-cell">
-                          {formatCurrency(avgWinnings)}
+                        <td className="px-1 sm:px-4 py-3 text-right text-xs sm:text-sm text-casino-gray">
+                          {quartileDisplay}
                         </td>
                       </tr>
                     );
@@ -556,6 +664,17 @@ export function LiveSeasonStandings({
                         )}
                       </p>
                       <p className="text-sm text-casino-gray">{roster.tournament_name}</p>
+                      {roster.tournament_id && (
+                        (() => {
+                          const finish = userTournamentFinishes.get(roster.tournament_id);
+                          if (!finish) return null;
+                          return (
+                            <p className="text-xs text-casino-gray-dark mt-0.5">
+                              Finish: {finish.rank}/{finish.total} · {finish.quartileLabel}
+                            </p>
+                          );
+                        })()
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-casino-green font-orbitron">
