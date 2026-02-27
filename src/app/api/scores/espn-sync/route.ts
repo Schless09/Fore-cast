@@ -57,6 +57,18 @@ function sumRoundsToPar(linescores: Array<{ period?: number; displayValue?: stri
   return v1 + v2;
 }
 
+/** Known no-cut events (everyone plays 4 rounds). When cut_count is null, only skip cut for these. */
+const NO_CUT_EVENT_NAMES = [
+  'RBC Heritage', 'Cadillac Championship', 'Truist Championship', 'Travelers Championship',
+  'FedEx St. Jude Championship', 'BMW Championship', 'Tour Championship',
+];
+
+function isNoCutEvent(tournamentName: string | null): boolean {
+  if (!tournamentName) return false;
+  const n = tournamentName.toLowerCase();
+  return NO_CUT_EVENT_NAMES.some((name) => n.includes(name.toLowerCase()));
+}
+
 /** Cut: top N and ties after 36 holes. Compute projected cut score from sorted leaderboard. */
 function computeProjectedCut(
   withScores: Array<{ total_score: number; thru: string }>,
@@ -65,15 +77,25 @@ function computeProjectedCut(
 ): { cutScore: string; cutCount: number } | null {
   if (currentRound > 2) return null; // Cut already made after R2
   const n = Math.max(1, cutCount);
-  // Only players who have teed off
-  const played = withScores.filter((r) => {
-    const t = String(r.thru ?? '').trim();
-    if (!t || t === '-' || t === '0') return false;
-    if (t === 'F' || t === '18') return true;
-    if (t.includes(':') || t.includes('AM') || t.includes('PM')) return false;
-    const num = parseInt(t.replace('*', ''), 10);
-    return !Number.isNaN(num) && num > 0;
-  });
+
+  let played: typeof withScores;
+  if (currentRound >= 2) {
+    // R2: use ALL players — everyone has a valid R1 score as their base total,
+    // even if they haven't started R2 yet. Using only R2-starters would leave
+    // us with fewer than N players and return null too early.
+    played = withScores;
+  } else {
+    // R1: only players who have teed off (others still have total=0, not meaningful)
+    played = withScores.filter((r) => {
+      const t = String(r.thru ?? '').trim();
+      if (!t || t === '-' || t === '0') return false;
+      if (t === 'F' || t === '18') return true;
+      if (t.includes(':') || t.includes('AM') || t.includes('PM')) return false;
+      const num = parseInt(t.replace('*', ''), 10);
+      return !Number.isNaN(num) && num > 0;
+    });
+  }
+
   if (played.length < n) return null;
   const sorted = [...played].sort((a, b) => a.total_score - b.total_score);
   const cutPosition = n - 1; // 0-based index for Nth player
@@ -448,7 +470,8 @@ export async function POST(request: NextRequest) {
       // R3+: Made cut = (a) has valid R3 score (actively playing) OR (b) 36-hole <= cut score.
       // (a) catches players like Harman; (b) catches leaders who haven't teed off yet (R3 = "-").
       const cutCount = tournament.cut_count ?? 65;
-      const hasCut = tournament.cut_count != null;
+      // When cut_count is null: still show projected cut for normal events (default 65); only skip for known no-cut events
+      const hasCut = tournament.cut_count != null || !isNoCutEvent(tournament.name ?? null);
       const actualCutScoreNum = hasCut && currentRoundNum > 2 ? computeActualCutScore(withScores, cutCount) : null;
       const madeCutByIndex = new Map<number, boolean>();
       if (hasCut && currentRoundNum > 2) {

@@ -654,10 +654,11 @@ export function LiveLeaderboard({
 
             const prevRow = idx > 0 ? leaderboardData[idx - 1] : null;
             
-            // Cut line bar: only in R1/R2 (projected cut). R3+ no bar — CUT shows in standing column
+            // Cut line bar: only in R1/R2 (projected cut). Show between last row at/above cut and first row below (by score).
+            // Don't require row.position !== null so we always show the bar at the score boundary when cutLine exists.
             const prevRowScore = prevRow ? prevRow.total_score : null;
-            const isProjectedCutPosition = !isRound3OrLater && cutLine &&
-              row.position !== null &&
+            const isProjectedCutPosition = !isRound3OrLater &&
+              cutLine &&
               cutScoreNum !== null &&
               prevRowScore !== null &&
               prevRowScore <= cutScoreNum &&
@@ -665,12 +666,12 @@ export function LiveLeaderboard({
 
             return (
               <Fragment key={`${row.position}-${name}-${idx}`}>
-                {/* Cut Line Bar - only R1/R2 */}
+                {/* Cut Line Bar - only R1/R2; explains why players below get $0 */}
                 {isProjectedCutPosition && (
                   <tr className="bg-yellow-900/20 border-y-2 border-yellow-500/40">
                     <td colSpan={6} className="px-3 py-2 text-center">
                       <span className="text-yellow-400 font-semibold text-sm">
-                        PROJECTED CUT: {cutLine.cutScore}
+                        PROJECTED CUT: Top {cutLine.cutCount} + ties — projected at {cutLine.cutScore}
                       </span>
                     </td>
                   </tr>
