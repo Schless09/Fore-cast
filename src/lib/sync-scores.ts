@@ -186,6 +186,12 @@ function normalizeName(name: string): string {
     .replace(/[\u0300-\u036f]/g, '') // Remove combining marks
     .replace(/\s+/g, ' '); // Normalize whitespace
 
+  // Apply nickname mapping before initial-collapsing so keys with spaces match correctly
+  // e.g. "matti schmid" → "matthias schmid", "nico echavarria" → "nicolas echavarria"
+  if (NICKNAME_MAP[normalized]) {
+    return NICKNAME_MAP[normalized];
+  }
+
   // Collapse initial patterns: "s.t.", "s. t.", "s t" → "st" so "S.T. Lee" matches "ST Lee"
   normalized = normalized.replace(/(\b([a-z]\.?\s*)+)/g, (match, _p1, offset, fullStr) => {
     const letters = match.replace(/[.\s]/g, '').toLowerCase();
@@ -194,7 +200,6 @@ function normalizeName(name: string): string {
     return letters + (nextChar && /[a-z]/.test(nextChar) ? ' ' : '');
   });
 
-  // Apply nickname mapping if exists
   return NICKNAME_MAP[normalized] || normalized;
 }
 
