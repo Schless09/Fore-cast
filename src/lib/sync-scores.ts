@@ -150,6 +150,7 @@ const NICKNAME_MAP: Record<string, string> = {
   'dan brown': 'daniel brown',
   'johnny keefer': 'john keefer',
   'matti schmid': 'matthias schmid',
+  'nico echavarria': 'nicolas echavarria',
   'matt kuchar': 'matthew kuchar',
   'jt poston': 'j.t. poston',
   'si woo kim': 'si-woo kim',
