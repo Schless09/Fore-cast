@@ -168,7 +168,7 @@ const NICKNAME_MAP: Record<string, string> = {
  * Collapses initial patterns (e.g. "S.T.", "S. T.", "ST") so "S.T. Lee" matches "ST Lee".
  * Examples: "Ludvig Åberg" → "ludvig aberg", "S.T. Lee" → "st lee"
  */
-function normalizeName(name: string): string {
+function normalizeName(name: string, debug = false): string {
   let normalized = name
     .toLowerCase()
     .trim()
@@ -186,13 +186,17 @@ function normalizeName(name: string): string {
     .replace(/[\u0300-\u036f]/g, '') // Remove combining marks
     .replace(/\s+/g, ' '); // Normalize whitespace
 
+  if (debug) console.log(`[NORMALIZE]   after accent strip: "${normalized}"`);
+
   // Apply nickname mapping before initial-collapsing so keys with spaces match correctly
   // e.g. "matti schmid" → "matthias schmid", "nico echavarria" → "nicolas echavarria"
   if (NICKNAME_MAP[normalized]) {
+    if (debug) console.log(`[NORMALIZE]   NICKNAME_MAP hit: "${normalized}" → "${NICKNAME_MAP[normalized]}"`);
     return NICKNAME_MAP[normalized];
   }
 
   // Collapse initial patterns: "s.t.", "s. t.", "s t" → "st" so "S.T. Lee" matches "ST Lee"
+  const beforeRegex = normalized;
   normalized = normalized.replace(/(\b([a-z]\.?\s*)+)/g, (match, _p1, offset, fullStr) => {
     const letters = match.replace(/[.\s]/g, '').toLowerCase();
     const nextIdx = offset + match.length;
@@ -200,7 +204,11 @@ function normalizeName(name: string): string {
     return letters + (nextChar && /[a-z]/.test(nextChar) ? ' ' : '');
   });
 
-  return NICKNAME_MAP[normalized] || normalized;
+  if (debug && normalized !== beforeRegex) console.log(`[NORMALIZE]   after regex: "${normalized}"`);
+
+  const result = NICKNAME_MAP[normalized] || normalized;
+  if (debug) console.log(`[NORMALIZE]   final: "${result}"`);
+  return result;
 }
 
 interface SyncPositionsOptions {
@@ -282,28 +290,49 @@ async function syncPositionsFromCachedData(
     is_amateur?: boolean;
   }> = [];
 
+  // DEBUG: log the DB-side normalized names map keys for known problem players
+  const debugPlayers = ['nico echavarria', 'nicolas echavarria', 'matti schmid', 'matthias schmid', 'dan brown', 'daniel brown'];
+  console.log('[SYNC] 🔍 DB normalized name map keys (debug players):');
+  for (const [key] of normalizedNameToId) {
+    if (debugPlayers.some(dp => key.includes('echavarria') || key.includes('schmid') || (key.includes('brown') && key.length < 15))) {
+      console.log(`[SYNC]   DB key: "${key}"`);
+    }
+  }
+
   for (const score of cachedData) {
+    const isDebugPlayer = score.player?.toLowerCase().includes('echavarria') ||
+      score.player?.toLowerCase().includes('schmid') ||
+      score.player?.toLowerCase() === 'dan brown';
+
     let tpId: string | undefined;
     if (options.source === 'espn' && score.playerId) {
       tpId = espnAthleteIdToTPId.get(score.playerId);
+      if (isDebugPlayer) console.log(`[SYNC] 🔍 "${score.player}" espnAthleteId lookup (${score.playerId}): ${tpId ? '✅ found' : '❌ not found'}`);
     }
     if (!tpId) {
       tpId = playerIdToTPId.get(score.playerId);
+      if (isDebugPlayer) console.log(`[SYNC] 🔍 "${score.player}" playerId lookup (${score.playerId}): ${tpId ? '✅ found' : '❌ not found'}`);
     }
     if (!tpId && score.player) {
-      const normalized = normalizeName(score.player);
+      console.log(`[SYNC] 🔍 "${score.player}" name normalization:`);
+      const normalized = normalizeName(score.player, isDebugPlayer);
+      if (isDebugPlayer) console.log(`[SYNC] 🔍 "${score.player}" → normalized: "${normalized}"`);
       tpId = normalizedNameToId.get(normalized);
+      if (isDebugPlayer) console.log(`[SYNC] 🔍 "${score.player}" exact name match: ${tpId ? '✅ found' : '❌ not found'}`);
       // Fuzzy fallback: match by last name + first-name alias (e.g. Matti/Matthias Schmid)
       if (!tpId) {
         const parts = normalized.split(/\s+/);
         const last = parts.pop() ?? '';
         const first = parts.join(' ') || '';
         const candidates = lastNameToCandidates.get(last) ?? [];
+        if (isDebugPlayer) console.log(`[SYNC] 🔍 "${score.player}" fuzzy: last="${last}", first="${first}", candidates=${JSON.stringify(candidates.map(c => c.first))}`);
         tpId = candidates.find((c) => firstNamesMatchForLiveScores(first, c.first))?.tpId;
+        if (isDebugPlayer) console.log(`[SYNC] 🔍 "${score.player}" fuzzy match: ${tpId ? '✅ found' : '❌ not found'}`);
       }
     }
     
     if (tpId && score.positionValue !== null) {
+      if (isDebugPlayer) console.log(`[SYNC] ✅ "${score.player}" matched → tpId=${tpId}, position=${score.positionValue}`);
       const isTied = score.position?.startsWith('T') || false;
       const totalScore = parseScoreToNumber(score.total);
       updates.push({

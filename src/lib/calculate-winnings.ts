@@ -67,7 +67,15 @@ export async function calculateTournamentWinnings(
 
   console.log(`[PRIZE MONEY] Found ${tournamentPlayers?.length || 0} tournament players`);
   if (tournamentPlayers && tournamentPlayers.length > 0) {
-    console.log(`[PRIZE MONEY] Sample players:`, tournamentPlayers.slice(0, 3).map(p => ({ id: p.id, position: p.position })));
+    const withPos = (tournamentPlayers || []).filter(p => p.position != null && p.position > 0);
+    const nullPos = (tournamentPlayers || []).filter(p => p.position == null || p.position <= 0);
+    console.log(`[PRIZE MONEY] Players with position: ${withPos.length}, null/zero position: ${nullPos.length}`);
+    console.log(`[PRIZE MONEY] Top 5 positions:`, withPos.slice(0, 5).map(p => ({ id: p.id, position: p.position })));
+    if (nullPos.length > 0 && nullPos.length <= 10) {
+      console.log(`[PRIZE MONEY] Players with null position (all):`, nullPos.map(p => ({ id: p.id, position: p.position })));
+    } else if (nullPos.length > 0) {
+      console.log(`[PRIZE MONEY] Players with null position (first 10):`, nullPos.slice(0, 10).map(p => ({ id: p.id, position: p.position })));
+    }
   }
 
   if (tpError) {
@@ -141,25 +149,42 @@ export async function calculateTournamentWinnings(
     }
   }
 
+  // Log top positions to confirm sync wrote correct positions before calculating
+  const top5 = updates.filter(u => u.prize_money > 0).sort((a, b) => (b.prize_money ?? 0) - (a.prize_money ?? 0)).slice(0, 5);
+  console.log(`[PRIZE MONEY] Top 5 prize allocations:`, top5.map(u => ({ id: u.id, prize_money: u.prize_money })));
+  const zeroPrize = updates.filter(u => !u.prize_money || u.prize_money === 0).length;
+  console.log(`[PRIZE MONEY] Players with $0 prize: ${zeroPrize} / ${updates.length}`);
+
   // Update roster_players with player winnings
+  // Use the already-computed updates map instead of re-fetching from DB to avoid stale read issues
+  const prizeByTpId = new Map(updates.map((u) => [u.id, u.prize_money]));
+
   const { data: rosterPlayers, error: rpError } = await supabase
     .from('roster_players')
-    .select('id, tournament_player_id, tournament_players(prize_money)')
+    .select('id, tournament_player_id')
     .in(
       'tournament_player_id',
       updates.map((u) => u.id)
     );
 
-  if (!rpError && rosterPlayers) {
-    for (const rp of rosterPlayers) {
-      const prizeMoney =
-        (rp.tournament_players as { prize_money?: number } | null)?.prize_money || 0;
+  console.log(`[PRIZE MONEY] roster_players rows to update: ${rosterPlayers?.length ?? 0}, error: ${rpError?.message ?? 'none'}`);
 
-      await supabase
+  if (!rpError && rosterPlayers) {
+    let nonZeroCount = 0;
+    for (const rp of rosterPlayers) {
+      const prizeMoney = prizeByTpId.get(rp.tournament_player_id) ?? 0;
+      if (prizeMoney > 0) nonZeroCount++;
+
+      const { error: rpUpdateError } = await supabase
         .from('roster_players')
         .update({ player_winnings: prizeMoney })
         .eq('id', rp.id);
+
+      if (rpUpdateError) {
+        console.error(`[PRIZE MONEY] ⚠️ Failed to update roster_player ${rp.id}:`, rpUpdateError.message);
+      }
     }
+    console.log(`[PRIZE MONEY] Updated roster_players: ${rosterPlayers.length} rows, ${nonZeroCount} with non-zero winnings`);
   }
 
   // Recalculate total winnings for all rosters in this tournament
@@ -168,18 +193,23 @@ export async function calculateTournamentWinnings(
     .select('id, roster_players(player_winnings)')
     .eq('tournament_id', tournamentId);
 
+  console.log(`[PRIZE MONEY] user_rosters to update: ${rosters?.length ?? 0}, error: ${rostersError?.message ?? 'none'}`);
+
   if (!rostersError && rosters) {
     for (const roster of rosters) {
-      const totalWinnings =
-        (roster.roster_players as Array<{ player_winnings?: number }> | null)?.reduce(
-          (sum: number, rp) => sum + (rp.player_winnings || 0),
-          0
-        ) || 0;
+      const rosterPlayers = roster.roster_players as Array<{ player_winnings?: number }> | null;
+      const totalWinnings = rosterPlayers?.reduce((sum: number, rp) => sum + (rp.player_winnings || 0), 0) || 0;
 
-      await supabase
+      console.log(`[PRIZE MONEY] Roster ${roster.id}: ${rosterPlayers?.length ?? 0} players, total_winnings=$${totalWinnings.toLocaleString()}, player breakdown:`, rosterPlayers?.map(rp => rp.player_winnings ?? 0));
+
+      const { error: rosterUpdateError } = await supabase
         .from('user_rosters')
         .update({ total_winnings: totalWinnings })
         .eq('id', roster.id);
+
+      if (rosterUpdateError) {
+        console.error(`[PRIZE MONEY] ⚠️ Failed to update user_roster ${roster.id}:`, rosterUpdateError.message);
+      }
     }
   }
 
