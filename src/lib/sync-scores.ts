@@ -192,10 +192,12 @@ function normalizeName(name: string, debug = false): string {
   // e.g. "matti schmid" → "matthias schmid", "nico echavarria" → "nicolas echavarria"
   if (NICKNAME_MAP[normalized]) {
     if (debug) console.log(`[NORMALIZE]   NICKNAME_MAP hit: "${normalized}" → "${NICKNAME_MAP[normalized]}"`);
-    return NICKNAME_MAP[normalized];
+    normalized = NICKNAME_MAP[normalized];
+    // Fall through to regex so lookup key matches DB keys (DB names get regex-applied too, e.g. "nicolas echavarria" → "nicolasechavarria")
   }
 
   // Collapse initial patterns: "s.t.", "s. t.", "s t" → "st" so "S.T. Lee" matches "ST Lee"
+  // Also collapses multi-word names into one token, so we must use same key for ESPN lookups
   const beforeRegex = normalized;
   normalized = normalized.replace(/(\b([a-z]\.?\s*)+)/g, (match, _p1, offset, fullStr) => {
     const letters = match.replace(/[.\s]/g, '').toLowerCase();
