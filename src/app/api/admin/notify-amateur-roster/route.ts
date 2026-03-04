@@ -153,25 +153,26 @@ export async function POST(_request: NextRequest) {
       }
     }
 
-    const tournamentNames = thisWeeksTournaments.map((t) => t.name);
-    const tournamentName = tournamentNames.length === 1 ? tournamentNames[0] : tournamentNames.join(' or ');
+    // Per-user tournament names (only the ones they have him on)
+    const userToTournamentNames = new Map<string, string[]>();
+    for (const r of rosters) {
+      const t = r.tournaments as { name?: string } | { name?: string }[] | null;
+      const name = Array.isArray(t) ? t[0]?.name : t?.name;
+      if (name) {
+        const list = userToTournamentNames.get(r.user_id) ?? [];
+        if (!list.includes(name)) list.push(name);
+        userToTournamentNames.set(r.user_id, list);
+      }
+    }
+    function formatTournamentList(names: string[]): string {
+      if (names.length === 0) return 'your tournament';
+      if (names.length === 1) return names[0];
+      if (names.length === 2) return `${names[0]} and ${names[1]}`;
+      return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+    }
 
     const subject = `${AMATEUR_PLAYER_NAME} – Please remove from your roster`;
-    const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 20px;">
-      <p style="color: #1f2937; margin-bottom: 12px;">
-        <strong>${AMATEUR_PLAYER_NAME}</strong> is an amateur and is not eligible to win prize money on the PGA Tour.
-      </p>
-      <p style="color: #4b5563;">
-        He's on your roster for ${tournamentName} — please remove him and pick another player before lock.
-      </p>
-      <p style="color: #9ca3af; font-size: 14px; margin-top: 20px;">
-        — FORE!SIGHT
-      </p>
-    </div>
-    `;
-
-    const from = process.env.RESEND_FROM_EMAIL || 'FORE!SIGHT <noreply@resend.dev>';
+    const from = process.env.RESEND_FROM_EMAIL || 'FORE!SIGHT <andy@foresightgolfleague.com>';
     let emailsSent = 0;
     const seenEmails = new Set<string>();
     const uniqueUserIds = [...new Set(rosters.map((r) => r.user_id))];
@@ -182,6 +183,20 @@ export async function POST(_request: NextRequest) {
       const email = userEmails.get(userId);
       if (!email || seenEmails.has(email)) continue;
       seenEmails.add(email);
+      const tournamentLabel = formatTournamentList(userToTournamentNames.get(userId) ?? []);
+      const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 20px;">
+      <p style="color: #1f2937; margin-bottom: 12px;">
+        <strong>${AMATEUR_PLAYER_NAME}</strong> is an amateur and is not eligible to win prize money on the PGA Tour.
+      </p>
+      <p style="color: #4b5563;">
+        He's on your roster for ${tournamentLabel} — please remove him and pick another player before lock.
+      </p>
+      <p style="color: #9ca3af; font-size: 14px; margin-top: 20px;">
+        — FORE!SIGHT
+      </p>
+    </div>
+    `;
       sendAttempts++;
       const { error } = await resend.emails.send({ from, to: email, subject, html: htmlContent });
       if (!error) {
