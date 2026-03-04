@@ -131,11 +131,12 @@ export function PlayerSelector({
                         const cost = tp.cost || 0.20;
                         const costCents = Math.round(cost * 100);
                         const isWithdrawn = tp.withdrawn === true;
+                        const isAmateur = (tp.pga_players ?? tp.pga_player)?.is_amateur === true;
 
                         const wouldExceedBudget = !isSelected && !isWithdrawn && (costCents > remainingBudgetCents);
                         const wouldExceedMax = !isSelected && !canAddMore;
-                        // WD: can't add, but can remove if already in roster
-                        const isDisabled = (isWithdrawn && !isSelected) || wouldExceedBudget || wouldExceedMax;
+                        // WD or amateur: can't add (amateurs can't win money); can remove if already in roster
+                        const isDisabled = (isWithdrawn && !isSelected) || (isAmateur && !isSelected) || wouldExceedBudget || wouldExceedMax;
                         const rank = startIdx + (colIdx * 10) + rowIdx + 1;
 
                         return (
@@ -150,6 +151,7 @@ export function PlayerSelector({
                                 ? 'border-casino-gold/20 bg-casino-elevated/50 opacity-50'
                                 : 'border-casino-gold/20 hover:border-casino-green/50 hover:bg-casino-elevated'
                             }`}
+                            title={isAmateur ? 'Amateur status - Unable to win money' : undefined}
                           >
                             {/* Info button */}
                             <button
@@ -192,6 +194,11 @@ export function PlayerSelector({
                                 <span className="truncate font-medium text-casino-text">
                                   {pgaPlayer.name}
                                 </span>
+                                {isAmateur && (
+                                  <span className="text-casino-gray font-normal shrink-0" title="Amateur status - Unable to win money">
+                                    (a)
+                                  </span>
+                                )}
                                 {pgaPlayer.country && (
                                   <span className="text-xs shrink-0" title={pgaPlayer.country}>
                                     {getCountryFlag(pgaPlayer.country)}

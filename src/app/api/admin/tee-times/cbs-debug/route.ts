@@ -47,7 +47,8 @@ export async function GET() {
       hasGolfPlayers,
       hasTaylorMoore,
       sampleNames: rows.slice(0, 5).map((r) => r.name),
-      sampleRows: rows.slice(0, 3).map((r) => ({ name: r.name, r1: r.r1, r2: r.r2 })),
+      sampleRows: rows.slice(0, 3).map((r) => ({ name: r.name, r1: r.r1, r2: r.r2, isAmateur: r.isAmateur })),
+      amateurRows: rows.filter((r) => r.isAmateur).map((r) => ({ name: r.name, r1: r.r1, r2: r.r2 })),
     });
   } catch (error) {
     return NextResponse.json(

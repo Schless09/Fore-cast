@@ -79,6 +79,8 @@ export interface CBSRow {
   r2: string;
   back9R1?: boolean;
   back9R2?: boolean;
+  /** True when CBS shows "(a)" for amateur (e.g. Daniel Bennett). Used to set pga_players.is_amateur. */
+  isAmateur?: boolean;
 }
 
 /**
@@ -116,6 +118,10 @@ export function parseCBSLeaderboardHTML(html: string): CBSRow[] {
 
     if (nameCol < 0 || !name) return;
 
+    const nameCellText = cells.eq(nameCol).text().trim();
+    const isAmateur = /\(a\)/i.test(nameCellText);
+    if (isAmateur) name = name.replace(/\s*\(a\)\s*$/i, '').trim() || name;
+
     const r1Cell = cells.eq(nameCol + 1);
     const r2Cell = cells.eq(nameCol + 2);
     const r1Text = r1Cell.text().trim();
@@ -129,7 +135,7 @@ export function parseCBSLeaderboardHTML(html: string): CBSRow[] {
     const back9R2 = r2Text.includes('*');
 
     if (r1 || r2) {
-      rows.push({ name, r1, r2, back9R1, back9R2 });
+      rows.push({ name, r1, r2, back9R1, back9R2, isAmateur: isAmateur || undefined });
     }
   });
 
@@ -415,10 +421,13 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
             .eq('tournament_id', tournament.id)
             .eq('pga_player_id', pgaId);
         }
+        if (row.isAmateur) {
+          await supabase.from('pga_players').update({ is_amateur: true }).eq('id', pgaId);
+        }
       }
     }
 
-    // Sync tee times for matched players (CBS times are EST)
+    // Sync tee times and amateur status for matched players (CBS times are EST)
     let teeTimesMatched = 0;
     for (const { tp, row } of matched) {
       const updateData: Record<string, string | number | null> = {};
@@ -436,6 +445,9 @@ export async function syncTeeTimesAndWithdrawalsFromCBS(
           .update(updateData)
           .eq('id', tp.id);
         if (!error) teeTimesMatched++;
+      }
+      if (row.isAmateur && tp.pga_player_id) {
+        await supabase.from('pga_players').update({ is_amateur: true }).eq('id', tp.pga_player_id);
       }
     }
 

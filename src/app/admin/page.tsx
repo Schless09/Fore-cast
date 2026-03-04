@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { NotifyAmateurRosterButton } from './NotifyAmateurRosterButton';
 
 export default async function AdminPage() {
   // Auth is handled by Clerk middleware
@@ -189,6 +190,8 @@ export default async function AdminPage() {
             </CardContent>
           </Card>
         </Link>
+
+        <NotifyAmateurRosterButton />
       </div>
     </div>
   );

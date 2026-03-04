@@ -108,11 +108,11 @@ export function RosterBuilder({
         // Remove player
         return prev.filter((id) => id !== playerId);
       } else {
-        // Add player if under budget and max players
+        // Add player if under budget and max players (amateurs are not selectable)
         const player = tournamentPlayers.find(
           (tp) => tp.pga_player_id === playerId
         );
-        if (!player) return prev;
+        if (!player || (player.pga_players ?? player.pga_player)?.is_amateur) return prev;
 
         const currentCosts = prev.map((id) => getCostForPlayer(id));
         const newCosts = [...currentCosts, getCostForPlayer(playerId)];

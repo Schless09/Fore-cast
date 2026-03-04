@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "cbs-sync": "node --env-file=.env.local -e \"require('child_process').execSync('npx tsx scripts/cbs-sync.ts', { stdio: 'inherit', env: process.env })\""
+
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.10",

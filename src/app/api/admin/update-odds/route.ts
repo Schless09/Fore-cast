@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { generateCostFromOddsData } from '@/lib/salary-cap';
+import { syncTeeTimesAndWithdrawalsFromCBS } from '@/lib/cbs-tee-times';
 
 /**
  * Bulk update player odds and calculate costs
@@ -151,10 +152,34 @@ export async function POST(request: NextRequest) {
       updates.push(playerName);
     }
 
+    // Trigger CBS leaderboard sync (tee times + amateur flags) right after odds are in
+    let cbsResult: { message: string; teeTimesMatched?: number; withdrawnCount?: number; replacementsAdded?: number; skipped?: string } | null = null;
+    try {
+      const { data: tournament, error: tErr } = await supabase
+        .from('tournaments')
+        .select('id, name')
+        .eq('id', tournamentId)
+        .single();
+      if (!tErr && tournament) {
+        const sync = await syncTeeTimesAndWithdrawalsFromCBS(supabase, tournament);
+        cbsResult = {
+          message: sync.message,
+          teeTimesMatched: sync.teeTimesMatched,
+          withdrawnCount: sync.withdrawnCount,
+          replacementsAdded: sync.replacementsAdded,
+          skipped: sync.skipped,
+        };
+      }
+    } catch (cbsError) {
+      console.warn('CBS sync after odds update failed (non-fatal):', cbsError);
+      cbsResult = { message: (cbsError instanceof Error ? cbsError.message : 'CBS sync failed') };
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Updated odds and costs for ${updates.length} players`,
+      message: `Updated odds and costs for ${updates.length} players` + (cbsResult ? `. ${cbsResult.message}` : ''),
       updatedPlayers: updates,
+      cbsSync: cbsResult ?? undefined,
     });
   } catch (error: any) {
     console.error('Error updating odds:', error);

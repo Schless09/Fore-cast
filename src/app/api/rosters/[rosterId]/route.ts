@@ -144,10 +144,10 @@ export async function PUT(
     return NextResponse.json({ success: false, error: 'Failed to update roster players' }, { status: 500 });
   }
 
-  // Get tournament_player IDs and costs for the selected players
-  const { data: tournamentPlayers, error: tpError } = await supabase
+  // Get tournament_player IDs and costs for the selected players (exclude amateurs)
+  const { data: tournamentPlayersRaw, error: tpError } = await supabase
     .from('tournament_players')
-    .select('id, pga_player_id, cost')
+    .select('id, pga_player_id, cost, pga_players(is_amateur)')
     .eq('tournament_id', roster.tournament_id)
     .in('pga_player_id', player_ids);
 
@@ -156,8 +156,12 @@ export async function PUT(
     return NextResponse.json({ success: false, error: 'Failed to fetch tournament players' }, { status: 500 });
   }
 
+  const tournamentPlayers = (tournamentPlayersRaw || []).filter(
+    (tp) => !(tp.pga_players as { is_amateur?: boolean } | null)?.is_amateur
+  );
+
   // Insert new roster players
-  const rosterPlayers = (tournamentPlayers || []).map((tp) => ({
+  const rosterPlayers = tournamentPlayers.map((tp) => ({
     roster_id: rosterId,
     tournament_player_id: tp.id,
     player_cost: tp.cost ?? 0.2,
