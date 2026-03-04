@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
 import { formatCurrency } from '@/lib/prize-money';
 import { assignPositionsByScore } from '@/lib/leaderboard-positions';
-import { normalizeNameForLookup } from '@/lib/live-scores-prizes';
+import { normalizeNameForLookup, getAlternateNameKeysForLookup } from '@/lib/live-scores-prizes';
 
 // No more mapping needed - rapidapi_tourn_id now stores the RapidAPI tournId directly (e.g., "002", "004")
 
@@ -757,8 +757,13 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         const normalized = normalizeNameForLookup(name);
         playerNameToIdMap.set(name.toLowerCase().trim(), tp.pga_player_id);
         playerNameToIdMap.set(normalized, tp.pga_player_id);
+        // So "Nicolas Echavarria" (API) resolves to same id as "Nico Echavarria" (DB)
+        getAlternateNameKeysForLookup(name).forEach((key) => {
+          playerNameToIdMap.set(key, tp.pga_player_id);
+        });
         if (tp.cost !== null && tp.cost !== undefined) {
           playerCostMap.set(normalized, tp.cost);
+          getAlternateNameKeysForLookup(name).forEach((key) => playerCostMap.set(key, tp.cost!));
         }
       }
     });

@@ -4,6 +4,8 @@ import { isTournamentIncludedInLeague } from '@/lib/league-utils';
 const TOP_PAID_PLACES = 4;
 
 export interface WouldaCouldaPlayerWinnings {
+  /** tournament_players.id for the would-be roster version */
+  tournamentPlayerId: string;
   name: string;
   winnings: number;
 }
@@ -21,6 +23,9 @@ export interface WouldaCouldaRecipient {
   tournamentName: string;
   username: string | null;
   email: string;
+  /** Biggest single swing from a benched player (on would-be roster, not on final roster) */
+  biggestSwingPlayerName: string | null;
+  biggestSwingPlayerWinnings: number | null;
 }
 
 /**
@@ -111,6 +116,7 @@ export async function getWouldBePlayerWinningsForVersion(
     const pga = tp.pga_players as { name?: string } | { name?: string }[] | null;
     const name = Array.isArray(pga) ? pga[0]?.name : pga?.name;
     return {
+      tournamentPlayerId: tp.id,
       name: name ?? 'Unknown',
       winnings: Number(tp.prize_money ?? 0),
     };
@@ -197,8 +203,10 @@ export async function getWouldaCouldaRecipients(
       const wouldBeIdx = wouldBeStandings.findIndex((s) => s.roster_id === roster.id);
       const wouldBeRank = wouldBeIdx < 0 ? currentRank : wouldBeIdx + 1;
 
-      // Send if the previous lineup would have placed them strictly higher (in the money when they weren't, or higher when they were)
-      if (wouldBeRank < currentRank) {
+      // Send only if the previous lineup would have placed them in the money (top 4) and they aren't already
+      const wouldBeInTheMoney = wouldBeRank <= TOP_PAID_PLACES;
+      const improvedRank = wouldBeRank < currentRank;
+      if (wouldBeInTheMoney && improvedRank) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('email, username')
@@ -207,6 +215,29 @@ export async function getWouldaCouldaRecipients(
         if (profile?.email) {
           const { playerWinnings: wouldBePlayerWinnings } =
             await getWouldBePlayerWinningsForVersion(supabase, bestVersionId);
+
+          // Compute "biggest swing": highest-earning would-be player who was NOT on the final roster
+          const { data: currentRosterPlayers } = await supabase
+            .from('roster_players')
+            .select('tournament_player_id')
+            .eq('roster_id', roster.id);
+          const currentTpIds = new Set(
+            (currentRosterPlayers || [])
+              .map((p) => p.tournament_player_id)
+              .filter((id): id is string => !!id)
+          );
+
+          let biggestSwingPlayerName: string | null = null;
+          let biggestSwingPlayerWinnings = 0;
+          for (const p of wouldBePlayerWinnings) {
+            if (!p.tournamentPlayerId) continue;
+            if (currentTpIds.has(p.tournamentPlayerId)) continue;
+            if (p.winnings > biggestSwingPlayerWinnings) {
+              biggestSwingPlayerWinnings = p.winnings;
+              biggestSwingPlayerName = p.name;
+            }
+          }
+
           recipients.push({
             userId: roster.user_id,
             rosterId: roster.id,
@@ -220,6 +251,11 @@ export async function getWouldaCouldaRecipients(
             tournamentName,
             username: profile.username ?? null,
             email: profile.email,
+            biggestSwingPlayerName,
+            biggestSwingPlayerWinnings:
+              biggestSwingPlayerName && biggestSwingPlayerWinnings > 0
+                ? biggestSwingPlayerWinnings
+                : null,
           });
           break; // one league scenario per roster is enough
         }

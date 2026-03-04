@@ -12,6 +12,7 @@ interface Tournament {
   name: string;
   start_date: string;
   status: string;
+  cut_count?: number | null;
 }
 
 interface PrizeDistribution {
@@ -140,6 +141,7 @@ export default function AdminPrizeMoneyPage() {
   const [prizeData, setPrizeData] = useState('');
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loadingTournaments, setLoadingTournaments] = useState(true);
+  const [cutCount, setCutCount] = useState<string>('');
   const [parsedDistributions, setParsedDistributions] = useState<PrizeDistribution[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -152,11 +154,29 @@ export default function AdminPrizeMoneyPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from('tournaments')
-        .select('id, name, start_date, status')
+        .select('id, name, start_date, status, cut_count')
         .order('start_date', { ascending: false });
 
       if (error) throw error;
-      setTournaments(data || []);
+      const list = data || [];
+      setTournaments(list);
+
+      // Default to next upcoming (soonest start_date), then current active
+      const upcoming = list
+        .filter((t) => t.status === 'upcoming')
+        .sort((a, b) => a.start_date.localeCompare(b.start_date));
+      const active = list
+        .filter((t) => t.status === 'active')
+        .sort((a, b) => a.start_date.localeCompare(b.start_date));
+      const next = upcoming[0] ?? active[0] ?? list[0];
+      if (next) {
+        setTournamentId(next.id);
+        setCutCount(
+          typeof next.cut_count === 'number' && next.cut_count > 0
+            ? String(next.cut_count)
+            : ''
+        );
+      }
     } catch (err) {
       console.error('Failed to load tournaments:', err);
       setError('Failed to load tournaments');
@@ -194,6 +214,28 @@ export default function AdminPrizeMoneyPage() {
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleTournamentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value;
+    setTournamentId(id);
+    setMessage(null);
+    setError(null);
+    if (!id) {
+      setCutCount('');
+      return;
+    }
+    const selected = tournaments.find((t) => t.id === id);
+    if (selected) {
+      // Default to existing cut_count when present; otherwise show empty (falls back to 65 on backend)
+      setCutCount(
+        typeof selected.cut_count === 'number' && selected.cut_count > 0
+          ? String(selected.cut_count)
+          : ''
+      );
+    } else {
+      setCutCount('');
     }
   };
 
@@ -249,6 +291,62 @@ export default function AdminPrizeMoneyPage() {
       setParsedDistributions(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to import prize money');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleUpdateCutCount = async () => {
+    if (!tournamentId.trim()) {
+      setError('Please select a tournament');
+      return;
+    }
+
+    // Allow blank to mean "use default / no-cut events logic (NULL column)"
+    const trimmed = cutCount.trim();
+    let payloadValue: number | null = null;
+    if (trimmed !== '') {
+      const parsed = parseInt(trimmed, 10);
+      if (Number.isNaN(parsed) || parsed <= 0) {
+        setError('Cut count must be a positive integer (or leave blank for default).');
+        return;
+      }
+      payloadValue = parsed;
+    }
+
+    setIsUpdating(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/tournaments/${tournamentId}/cut-count`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cutCount: payloadValue }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update cut count');
+      }
+
+      // Keep local tournaments state in sync so the dropdown reflects the new value
+      setTournaments((prev) =>
+        prev.map((t) =>
+          t.id === tournamentId ? { ...t, cut_count: payloadValue } : t
+        )
+      );
+
+      setMessage(
+        payloadValue
+          ? `Cut set to Top ${payloadValue} and ties for this tournament`
+          : 'Cut count cleared. Default behavior will be used (65 for regular events; NULL for no-cut events).'
+      );
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to update cut count'
+      );
     } finally {
       setIsUpdating(false);
     }
@@ -321,7 +419,7 @@ export default function AdminPrizeMoneyPage() {
               <select
                 id="tournamentId"
                 value={tournamentId}
-                onChange={(e) => setTournamentId(e.target.value)}
+                onChange={handleTournamentChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
               >
                 <option value="">Select a tournament...</option>
@@ -332,6 +430,44 @@ export default function AdminPrizeMoneyPage() {
                 ))}
               </select>
             )}
+          </div>
+
+          {/* Cut count configuration */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="cutCount"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Cut Line (Top N and ties)
+              </label>
+              <input
+                id="cutCount"
+                type="number"
+                min={1}
+                value={cutCount}
+                onChange={(e) => setCutCount(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white"
+                placeholder="e.g., 65 for regular events, 50 for Signature"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Leave blank to use the default (65 for normal PGA events) or set to a
+                specific value like 50 for Signature events. This controls how many
+                players make the cut after 36 holes.
+              </p>
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleUpdateCutCount}
+                isLoading={isUpdating}
+                disabled={!tournamentId.trim()}
+                className="w-full"
+              >
+                Save Cut Line
+              </Button>
+            </div>
           </div>
 
           <div>

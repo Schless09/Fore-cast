@@ -122,7 +122,18 @@ export default function AdminOddsPage() {
         .order('start_date', { ascending: false });
 
       if (error) throw error;
-      setTournaments(data || []);
+      const list = data || [];
+      setTournaments(list);
+
+      // Default to next upcoming (soonest start_date), then current active
+      const upcoming = list
+        .filter((t) => t.status === 'upcoming')
+        .sort((a, b) => a.start_date.localeCompare(b.start_date));
+      const active = list
+        .filter((t) => t.status === 'active')
+        .sort((a, b) => a.start_date.localeCompare(b.start_date));
+      const next = upcoming[0] ?? active[0] ?? list[0];
+      if (next) setTournamentId(next.id);
     } catch (err) {
       console.error('Failed to load tournaments:', err);
       setError('Failed to load tournaments');

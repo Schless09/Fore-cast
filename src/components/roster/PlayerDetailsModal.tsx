@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { PGAPlayer } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
+import { FIRST_NAME_ALIASES } from '@/lib/live-scores-prizes';
 
 interface TournamentHistory {
   year: number;
@@ -90,15 +91,13 @@ export function PlayerDetailsModal({
       setIsLoading(true);
       const supabase = createClient();
 
-      try {
-        // Fetch tournament history at this venue/tournament
+      async function fetchForPlayerId(pgaPlayerId: string) {
         let historyQuery = supabase
           .from('historical_tournament_results')
           .select('*')
-          .eq('pga_player_id', player.id)
+          .eq('pga_player_id', pgaPlayerId)
           .order('tournament_date', { ascending: false });
 
-        // Filter by venue_id if available, otherwise by tournament name
         if (venueId) {
           historyQuery = historyQuery.eq('venue_id', venueId);
         } else if (tournamentName && tournamentName !== 'This Tournament') {
@@ -107,96 +106,87 @@ export function PlayerDetailsModal({
 
         const { data: historyData } = await historyQuery.limit(10);
 
-        if (historyData && historyData.length > 0) {
+        const { data: recentData } = await supabase
+          .from('historical_tournament_results')
+          .select('*')
+          .eq('pga_player_id', pgaPlayerId)
+          .order('tournament_date', { ascending: false })
+          .limit(25);
+
+        return { historyData: historyData ?? [], recentData: recentData ?? [] };
+      }
+
+      function mapHistoryToState(historyData: Array<Record<string, unknown>>, recentData: Array<Record<string, unknown>>) {
+        if (historyData.length > 0) {
           setHasData(true);
           setTournamentHistory(historyData.map(h => {
-            // Calculate score relative to par (assume par 72 per round, 4 rounds = 288 for full tournament)
-            // For missed cuts (2 rounds), par would be 144
-            const parTotal = h.is_made_cut === false ? 144 : 288;
-            const relativeScore = h.total_score ? h.total_score - parTotal : null;
-            
+            const parTotal = (h.is_made_cut === false) ? 144 : 288;
+            const totalScore = h.total_score as number | null;
+            const relativeScore = totalScore != null ? totalScore - parTotal : null;
             return {
-              year: new Date(h.tournament_date).getFullYear(),
+              year: new Date((h.tournament_date as string)).getFullYear(),
               position: h.is_made_cut === false ? 'MC' : 
-                       h.finish_position ? (h.finish_position <= 10 ? `T${h.finish_position}` : `${h.finish_position}`) : '-',
+                       h.finish_position ? ((h.finish_position as number) <= 10 ? `T${h.finish_position}` : `${h.finish_position}`) : '-',
               score: relativeScore !== null 
                 ? (relativeScore > 0 ? `+${relativeScore}` : relativeScore === 0 ? 'E' : `${relativeScore}`)
                 : '-',
-              earnings: h.prize_money || 0,
-              sg_total: h.strokes_gained_total,
+              earnings: (h.prize_money as number) || 0,
+              sg_total: h.strokes_gained_total as number | null,
             };
           }));
         }
 
-        // Fetch last 25 starts (any tournament)
-        const { data: recentData } = await supabase
-          .from('historical_tournament_results')
-          .select('*')
-          .eq('pga_player_id', player.id)
-          .order('tournament_date', { ascending: false })
-          .limit(25);
-
-        if (recentData && recentData.length > 0) {
+        if (recentData.length > 0) {
           setHasData(true);
           const starts = recentData.map(r => {
-            // Calculate score relative to par (assume par 72 per round, 4 rounds = 288 for full tournament)
-            // For missed cuts (2 rounds), par would be 144
             const parTotal = r.is_made_cut === false ? 144 : 288;
-            const relativeScore = r.total_score ? r.total_score - parTotal : null;
-            
+            const totalScore = r.total_score as number | null;
+            const relativeScore = totalScore != null ? totalScore - parTotal : null;
             return {
-              tournament: r.tournament_name,
-              date: new Date(r.tournament_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+              tournament: r.tournament_name as string,
+              date: new Date(r.tournament_date as string).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
               position: r.is_made_cut === false ? 'MC' :
-                       r.finish_position ? (r.finish_position <= 10 ? `T${r.finish_position}` : `${r.finish_position}`) : '-',
+                       r.finish_position ? ((r.finish_position as number) <= 10 ? `T${r.finish_position}` : `${r.finish_position}`) : '-',
               score: relativeScore !== null 
                 ? (relativeScore > 0 ? `+${relativeScore}` : relativeScore === 0 ? 'E' : `${relativeScore}`)
                 : '-',
               made_cut: r.is_made_cut !== false,
-              sg_total: r.strokes_gained_total,
-              sg_off_tee: r.strokes_gained_off_tee,
-              sg_approach: r.strokes_gained_approach,
-              sg_around_green: r.strokes_gained_around_green,
-              sg_putting: r.strokes_gained_putting,
-              earnings: r.prize_money || 0,
+              sg_total: r.strokes_gained_total as number | null,
+              sg_off_tee: r.strokes_gained_off_tee as number | null,
+              sg_approach: r.strokes_gained_approach as number | null,
+              sg_around_green: r.strokes_gained_around_green as number | null,
+              sg_putting: r.strokes_gained_putting as number | null,
+              earnings: (r.prize_money as number) || 0,
             };
           });
 
           setLast25Starts(starts);
 
-          // Calculate stats
           const madeCuts = starts.filter(s => s.made_cut).length;
           const missedCuts = starts.filter(s => !s.made_cut).length;
           const finishes = starts.filter(s => s.made_cut && s.position !== '-');
-          
           const top10s = finishes.filter(s => {
-            const pos = parseInt(s.position.replace('T', ''));
+            const pos = parseInt(s.position.replace('T', ''), 10);
             return !isNaN(pos) && pos <= 10;
           }).length;
-          
           const top25s = finishes.filter(s => {
-            const pos = parseInt(s.position.replace('T', ''));
+            const pos = parseInt(s.position.replace('T', ''), 10);
             return !isNaN(pos) && pos <= 25;
           }).length;
-
           const avgFinish = finishes.length > 0
             ? (finishes.reduce((sum, s) => {
-                const pos = parseInt(s.position.replace('T', ''));
+                const pos = parseInt(s.position.replace('T', ''), 10);
                 return sum + (isNaN(pos) ? 50 : pos);
               }, 0) / finishes.length).toFixed(1)
             : '-';
-
           const sgValues = starts.filter(s => s.sg_total !== null).map(s => s.sg_total as number);
           const avgSgTotal = sgValues.length > 0
             ? (sgValues.reduce((a, b) => a + b, 0) / sgValues.length).toFixed(2)
             : null;
-
-          // Calculate SG breakdown averages
           const calcAvg = (values: (number | null)[]) => {
             const valid = values.filter((v): v is number => v !== null);
             return valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(2) : null;
           };
-
           setStats({
             starts: starts.length,
             madeCuts,
@@ -211,6 +201,42 @@ export function PlayerDetailsModal({
             avgSgPutting: calcAvg(starts.map(s => s.sg_putting)),
           });
         }
+      }
+
+      try {
+        let { historyData, recentData } = await fetchForPlayerId(player.id);
+        if (historyData.length > 0 || recentData.length > 0) {
+          mapHistoryToState(historyData, recentData);
+          setIsLoading(false);
+          return;
+        }
+
+        // No data for this pga_player_id (e.g. DB has "Nico" but historical was stored under "Nicolas Echavarria"). Try alias players.
+        const nameParts = (player.name ?? '').trim().toLowerCase().split(/\s+/);
+        if (nameParts.length >= 2) {
+          const first = nameParts[0];
+          const lastName = nameParts[nameParts.length - 1];
+          const firstNamesToTry = [first, ...(FIRST_NAME_ALIASES[first] ?? [])];
+          const { data: candidates } = await supabase
+            .from('pga_players')
+            .select('id, name')
+            .ilike('name', `%${lastName}`);
+          const alternateIds = (candidates ?? [])
+            .filter((p) => p.id !== player.id && p.name)
+            .filter((p) => {
+              const pFirst = (p.name as string).trim().toLowerCase().split(/\s+/)[0];
+              return firstNamesToTry.includes(pFirst);
+            })
+            .map((p) => p.id);
+
+          for (const altId of alternateIds) {
+            const result = await fetchForPlayerId(altId);
+            if (result.historyData.length > 0 || result.recentData.length > 0) {
+              mapHistoryToState(result.historyData, result.recentData);
+              break;
+            }
+          }
+        }
       } catch (error) {
         console.error('Error fetching player history:', error);
       } finally {
@@ -219,7 +245,7 @@ export function PlayerDetailsModal({
     }
 
     fetchPlayerHistory();
-  }, [isOpen, player.id, tournamentName, venueId]);
+  }, [isOpen, player.id, player.name, tournamentName, venueId]);
 
   if (!isOpen) return null;
 

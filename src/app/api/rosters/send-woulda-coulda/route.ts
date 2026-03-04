@@ -78,10 +78,10 @@ export async function POST(request: NextRequest) {
 
   if (testEmail) {
     const testPlayerWinnings: WouldaCouldaPlayerWinnings[] = [
-      { name: 'Scottie Scheffler', winnings: 18500 },
-      { name: 'Rory McIlroy', winnings: 12500 },
-      { name: 'Tommy Fleetwood', winnings: 8200 },
-      { name: 'Lucas Glover', winnings: 9000 },
+      { tournamentPlayerId: 'test-1', name: 'Scottie Scheffler', winnings: 18500 },
+      { tournamentPlayerId: 'test-2', name: 'Rory McIlroy', winnings: 12500 },
+      { tournamentPlayerId: 'test-3', name: 'Tommy Fleetwood', winnings: 8200 },
+      { tournamentPlayerId: 'test-4', name: 'Lucas Glover', winnings: 9000 },
     ];
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -141,24 +141,42 @@ export async function POST(request: NextRequest) {
             ? '3rd'
             : `${r.wouldBeRank}th`;
 
+    const greeting = r.username ? `${r.username}, ` : '';
+    const biggestSwingLine =
+      r.biggestSwingPlayerName && r.biggestSwingPlayerWinnings
+        ? `
+        <p style="color: #6b7280; font-size: 14px; margin-top: 12px;">
+          Biggest swing: <strong>${r.biggestSwingPlayerName}</strong> alone brought in ${formatCurrency(
+            r.biggestSwingPlayerWinnings
+          )} on that would-be roster.
+        </p>
+      `
+        : '';
+
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #f59e0b; margin-bottom: 10px;">🤔 Woulda, coulda, shoulda...</h1>
-        <p style="color: #6b7280; margin-bottom: 20px;">We ran the numbers. You're not gonna love this.</p>
+        <p style="color: #6b7280; margin-bottom: 20px;">${greeting}remember that lineup you talked yourself out of?</p>
         
         <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
           <p style="margin: 0 0 8px 0;"><strong>${r.tournamentName}</strong></p>
-          <p style="margin: 0 0 8px 0;">Your <em>current</em> lineup finished in <strong>${r.currentRank}th</strong> place with ${formatCurrency(r.currentTotalWinnings)}.</p>
-          <p style="margin: 0 0 12px 0;">But a lineup you <em>had before you changed it</em> would have finished <strong>${rankOrdinal}</strong> with ${formatCurrency(r.wouldBeTotalWinnings)} — in the money. 💸</p>
+          <p style="margin: 0 0 8px 0;">At ${r.tournamentName}, your final lineup finished <strong>${r.currentRank}th</strong> with ${formatCurrency(
+            r.currentTotalWinnings
+          )}.</p>
+          <p style="margin: 0 0 12px 0;">But a lineup you actually had locked in earlier would have finished <strong>${rankOrdinal}</strong> with ${formatCurrency(
+            r.wouldBeTotalWinnings
+          )} — comfortably in the money. 💸</p>
           <p style="margin: 0; font-size: 13px; color: #92400e;">That roster would have earned:</p>
         </div>
         ${r.wouldBePlayerWinnings?.length ? renderWouldBeRosterTable(r.wouldBePlayerWinnings) : ''}
 
-        <p style="color: #6b7280; font-size: 14px;">
-          Suuuuuuucks! But maybe next time... trust your instincts?
+        ${biggestSwingLine}
+
+        <p style="color: #6b7280; font-size: 14px; margin-top: 16px;">
+          Consider this your friendly reminder for next week: sometimes your first lineup is the right one.
         </p>
         <p style="margin-top: 24px; color: #6b7280; text-align: center;">
-          — ${r.username || 'FORE!SIGHT'}
+          — FORE!SIGHT
         </p>
         <p style="margin-top: 8px; color: #fbbf24; font-weight: bold; text-align: center; font-size: 18px;">FORE!SIGHT</p>
       </div>
@@ -170,7 +188,7 @@ export async function POST(request: NextRequest) {
         replyTo: 'arschuessler90@gmail.com',
         to: r.email,
         bcc: ['arschuessler90@gmail.com'],
-        subject: `🤔 Your previous lineup would have finished ${rankOrdinal} — ${r.tournamentName}`,
+        subject: `🤔 This hurts: your benched roster finished ${rankOrdinal} — ${r.tournamentName}`,
         html: htmlContent,
       });
       if (error) {

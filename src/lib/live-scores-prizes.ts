@@ -84,6 +84,32 @@ export function firstNamesMatchForLiveScores(a: string, b: string): boolean {
   return false;
 }
 
+/**
+ * Returns all normalized keys that should map to the same player (including first-name alias variants).
+ * e.g. "Nico Echavarria" -> ["nico echavarria", "nicolas echavarria"] so lookup by "Nicolas Echavarria" finds the same id.
+ */
+export function getAlternateNameKeysForLookup(fullName: string): string[] {
+  const normalized = normalizeNameForLookup(fullName);
+  const parts = normalized.split(/\s+/);
+  if (parts.length < 2) return [normalized];
+  const first = parts[0];
+  const rest = parts.slice(1).join(' ');
+  const keys = new Set<string>([normalized]);
+  const aliases = FIRST_NAME_ALIASES[first];
+  if (aliases) {
+    for (const a of aliases) {
+      keys.add(normalizeNameForLookup(`${a} ${rest}`));
+    }
+  }
+  // Also add keys for any alias that has this first name (e.g. "nicolas" -> ["nico"], so for "Nicolas Echavarria" add "nico echavarria")
+  for (const [canon, alist] of Object.entries(FIRST_NAME_ALIASES)) {
+    if (alist.includes(first)) {
+      keys.add(normalizeNameForLookup(`${canon} ${rest}`));
+    }
+  }
+  return Array.from(keys);
+}
+
 export interface ProcessedPrizeData {
   position: number | null;
   tieCount: number;
