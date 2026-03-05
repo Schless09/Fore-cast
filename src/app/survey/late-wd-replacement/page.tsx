@@ -118,8 +118,11 @@ export default function LateWdReplacementSurveyPage() {
         <h1 className="text-3xl sm:text-4xl font-bold font-orbitron mb-2 bg-linear-to-r from-casino-gold to-casino-gold-light bg-clip-text text-transparent">
           Late withdrawal & roster replacement
         </h1>
-        <p className="text-casino-gray text-sm mb-8">
+        <p className="text-casino-gray text-sm mb-4">
           Your vote helps us decide how to handle last‑minute WDs.
+        </p>
+        <p className="text-amber-200/90 text-sm mb-8 font-medium">
+          This isn’t just for one tournament — your choice will shape how FORE!SIGHT works for <strong>all future events</strong>.
         </p>
 
         <Card className="bg-casino-card/90 border border-casino-gold/20">
@@ -128,7 +131,7 @@ export default function LateWdReplacementSurveyPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <p className="text-casino-text leading-relaxed">
-              {data?.question ?? 'When a golfer withdraws late and a replacement gets their spot, should we auto-update rosters to use the replacement?'}
+              {data?.question ?? 'Going forward, when a golfer withdraws late and a replacement gets their spot, should we auto-update rosters to use the replacement — for every tournament?'}
             </p>
 
             {!isSignedIn ? (
@@ -189,7 +192,7 @@ export default function LateWdReplacementSurveyPage() {
 
             {error && <p className="text-red-400 text-sm">{error}</p>}
 
-            {(total > 0 || data?.myVote != null) && (
+            {data?.myVote != null && (
               <div className="pt-4 border-t border-white/10">
                 <p className="text-casino-gray text-sm mb-2">Results so far ({total} vote{total !== 1 ? 's' : ''})</p>
                 <div className="flex gap-4">

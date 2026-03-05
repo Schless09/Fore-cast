@@ -54,7 +54,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      question: 'When a golfer withdraws late and a replacement player gets their spot (e.g. Jake Knapp WD, Haotong Li replaces him), should we automatically update rosters that had the withdrawn player to use the replacement?',
+      question: 'Going forward, whenever a golfer withdraws late and a replacement gets their spot (e.g. Jake Knapp WD, Haotong Li replaces him), should we automatically update rosters that had the withdrawn player to use the replacement — for every tournament, not just this one?',
       yesCount,
       noCount,
       myVote,
