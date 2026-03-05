@@ -68,7 +68,7 @@ export default function MastersPage() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/create-league">
+            <Link href="/create-league?pool=masters">
               <button className="group relative px-10 py-4 rounded-xl bg-[#006747] hover:bg-[#007a54] text-white font-bold text-base tracking-wide overflow-hidden transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(0,168,107,0.4)]">
                 <span className="relative z-10">Create Your Masters Pool →</span>
                 <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-200" />
@@ -286,7 +286,7 @@ export default function MastersPage() {
               $2 per member ($20 min). You handle payouts — we handle the scoring.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/create-league">
+              <Link href="/create-league?pool=masters">
                 <button className="group relative px-12 py-5 rounded-2xl bg-[#006747] hover:bg-[#007a54] text-white text-base font-bold transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(0,168,107,0.35)]">
                   Create Your Masters Pool →
                 </button>

@@ -109,7 +109,7 @@ export default function MajorsPage() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/create-league">
+            <Link href="/create-league?pool=majors">
               <button className="group relative px-10 py-4 rounded-xl bg-casino-gold text-black font-bold text-base tracking-wide overflow-hidden transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(251,191,36,0.4)]">
                 <span className="relative z-10">Create Your Majors Pool →</span>
                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-200" />
@@ -261,7 +261,7 @@ export default function MajorsPage() {
               $2 per member ($20 min). You handle payouts — we handle the scoring.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/create-league">
+              <Link href="/create-league?pool=majors">
                 <button className="group relative px-12 py-5 rounded-2xl bg-casino-gold hover:bg-amber-400 text-black text-base font-bold transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(251,191,36,0.45)]">
                   Create Your Majors Pool →
                 </button>

@@ -1,11 +1,33 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import Image from 'next/image';
 import { getLeagueSettings, updateLeagueSettings, uploadVenmoQRCode } from '@/lib/actions/league';
+import { STORAGE_KEY } from '@/components/leagues/PoolDefaultStorer';
+
+// Match tournament names as in DB/seed (seed-data.json): "Masters Tournament", "PGA Championship", "US Open", "The Open Championship"
+
+/** True if tournament is The Masters only (not PGA Championship). */
+function isMastersTournament(name: string): boolean {
+  const n = name.toLowerCase();
+  return (n.includes('masters') || n === 'the masters') && !n.includes('pga championship');
+}
+
+/** True if tournament is one of the four majors. */
+function isMajorTournament(name: string): boolean {
+  const n = name.toLowerCase();
+  return (
+    isMastersTournament(name) ||
+    n.includes('pga championship') ||
+    n.includes('u.s. open') ||
+    n.includes('us open') ||
+    n.includes('open championship') ||
+    (n.includes('the open') && !n.includes('u.s.'))
+  );
+}
 
 interface Tournament {
   id: string;
@@ -67,6 +89,7 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
   const [savingClubHouse, setSavingClubHouse] = useState(false);
   const [clubHouseSaved, setClubHouseSaved] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const poolDefaultsAppliedRef = useRef(false);
 
   // Resolve params
   useEffect(() => {
@@ -133,6 +156,54 @@ export default function LeagueSettingsPage({ params, searchParams }: { params: P
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // When commissioner lands with welcome=true and pool=masters|majors in localStorage, default to only those tournaments selected
+  useEffect(() => {
+    if (loading || !leagueId || !isCommissioner || !isWelcome || tournaments.length === 0 || poolDefaultsAppliedRef.current) return;
+
+    const pool = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+    if (pool !== 'masters' && pool !== 'majors') return;
+
+    const include = (name: string) =>
+      pool === 'masters' ? isMastersTournament(name) : isMajorTournament(name);
+
+    const toUpdate = tournaments.filter((t) => {
+      const shouldExclude = !include(t.name);
+      return t.is_excluded !== shouldExclude;
+    });
+    if (toUpdate.length === 0) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      poolDefaultsAppliedRef.current = true;
+      return;
+    }
+
+    poolDefaultsAppliedRef.current = true;
+    (async () => {
+      try {
+        await Promise.all(
+          toUpdate.map((t) => {
+            const shouldExclude = !include(t.name);
+            return fetch(`/api/leagues/${leagueId}/tournaments`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tournamentId: t.id, segments: t.segments, isExcluded: shouldExclude }),
+            });
+          })
+        );
+        setTournaments((prev) =>
+          prev.map((t) => {
+            const shouldExclude = !include(t.name);
+            const changed = toUpdate.some((u) => u.id === t.id);
+            return changed ? { ...t, is_excluded: shouldExclude } : t;
+          })
+        );
+        window.localStorage.removeItem(STORAGE_KEY);
+      } catch (err) {
+        console.error('Failed to apply pool defaults:', err);
+        poolDefaultsAppliedRef.current = false;
+      }
+    })();
+  }, [loading, leagueId, isCommissioner, isWelcome, tournaments]);
 
   // Update tournament segments
   const updateTournament = async (tournamentId: string, newSegments: number[], isExcluded: boolean) => {

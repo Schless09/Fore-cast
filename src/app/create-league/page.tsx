@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { PoolDefaultStorer } from '@/components/leagues/PoolDefaultStorer';
 
 export const metadata: Metadata = {
   title: 'Create a League',
@@ -8,9 +9,19 @@ export const metadata: Metadata = {
     'Become a commissioner and run your own fantasy golf league. $2 per member ($20 min). Lineup management, live scoring, and leaderboards. You handle payouts—we provide the platform.',
 };
 
-export default function CreateLeaguePage() {
+type PoolType = 'masters' | 'majors';
+
+export default async function CreateLeaguePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pool?: string }>;
+}) {
+  const params = await searchParams;
+  const pool = (params.pool === 'masters' || params.pool === 'majors' ? params.pool : undefined) as PoolType | undefined;
+
   return (
     <div className="min-h-screen bg-linear-to-b from-[#0a0f1a] via-[#111827] to-[#0a0f1a]">
+      {pool && <PoolDefaultStorer pool={pool} />}
       <div className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
         <Link
           href="/"
