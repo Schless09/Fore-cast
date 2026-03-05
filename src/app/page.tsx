@@ -82,10 +82,6 @@ export default function Home() {
       <main className="relative w-full max-w-7xl mx-auto px-4 py-16 lg:py-20">
         {/* Header */}
         <div className="text-center mb-14 lg:mb-20">
-          <span className="inline-block mb-5 text-casino-gold text-sm tracking-[0.3em] uppercase px-6 py-3 bg-casino-gold/10 rounded-full border border-casino-gold/20">
-            Compete • Strategize • Track
-          </span>
-
           <h2 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-5">
             <span className="bg-gradient-to-r from-white via-casino-gold-light to-casino-gold bg-clip-text text-transparent">
               How It Works
@@ -93,7 +89,7 @@ export default function Home() {
           </h2>
 
           <p className="text-gray-400 text-xl sm:text-2xl max-w-3xl mx-auto">
-            Three simple steps to dominate the leaderboard
+            You need a league to play—create one and invite friends, or join with an invite link. Then:
           </p>
         </div>
 
@@ -101,11 +97,10 @@ export default function Home() {
         <section className="relative grid lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-10 lg:mb-16">
           <div>
             <h3 className="text-4xl sm:text-5xl font-bold mb-5 bg-gradient-to-r from-white to-casino-gold bg-clip-text text-transparent">
-              Build Your Dream Roster
+              Build Your Lineup
             </h3>
             <p className="text-gray-400 text-lg sm:text-xl mb-6">
-              Draft PGA Tour pros under $30 salary cap and outsmart the field.
-              Your strategy decides the leaderboard—skills matter more than luck.
+              Each week, pick up to 10 PGA Tour golfers whose total cost is $30 or less. You&apos;re building the team that will earn the most prize money that week—your strategy decides who tops the leaderboard.
             </p>
           </div>
 
@@ -132,10 +127,10 @@ export default function Home() {
 
           <div>
             <h3 className="text-4xl sm:text-5xl font-bold mb-5 bg-gradient-to-r from-white to-casino-green bg-clip-text text-transparent">
-              Track Live Scores
+              Your Score = Real Prize Money
             </h3>
             <p className="text-gray-400 text-lg sm:text-xl mb-6">
-              Every birdie and bogey updates in real time.
+              We track real tournament results. Your team&apos;s score is the sum of your golfers&apos; PGA Tour prize money—updated live. Highest total wins the week.
             </p>
           </div>
         </section>
@@ -147,8 +142,7 @@ export default function Home() {
               Climb the Leaderboard
             </h3>
             <p className="text-gray-400 text-lg sm:text-xl mb-6">
-              Compete weekly, climb the leaderboard, and earn bragging rights.
-              Commissioner-managed leagues handle payouts outside the platform.
+              See weekly and season standings. Your commissioner handles payouts to winners—we show the scores; they run the money.
             </p>
           </div>
 
@@ -166,25 +160,24 @@ export default function Home() {
         <div className="relative max-w-5xl mx-auto text-center mt-10 lg:mt-16">
           <div className="absolute inset-0 bg-gradient-to-r from-casino-gold/10 via-casino-green/10 to-casino-gold/10 rounded-3xl blur-3xl" />
 
-          <div className="relative p-12 lg:p-14 bg-[#0f1419]/90 border border-casino-gold/20 rounded-3xl backdrop-blur-xl">
-            <h3 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 bg-gradient-to-r from-white to-casino-gold bg-clip-text text-transparent">
-              Ready to Play?
+          <div className="relative p-6 sm:p-10 lg:p-14 bg-[#0f1419]/90 border border-casino-gold/20 rounded-2xl sm:rounded-3xl backdrop-blur-xl">
+            <h3 className="text-3xl sm:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-white to-casino-gold bg-clip-text text-transparent leading-tight">
+              Your friends are waiting for you to send that link.
             </h3>
 
-            <p className="text-gray-400 text-lg sm:text-xl mb-6">
-              Create your own league and invite friends—or join an existing one.
-              Set your lineup, outsmart your league, and track live updates.
+            <p className="text-gray-400 text-base sm:text-xl mb-6 sm:mb-8 max-w-xl mx-auto">
+              Create a league, drop the invite, and let everyone start sweating their lineups.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/auth/signup">
-                <button className="px-12 py-5 rounded-2xl bg-gradient-to-r from-casino-gold to-casino-gold-light text-black text-lg font-bold hover:scale-105 transition">
-                  Join a League →
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center sm:gap-4">
+              <Link href="/create-league" className="w-full sm:w-auto">
+                <button className="w-full sm:w-auto px-8 py-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-casino-gold to-casino-gold-light text-black text-base sm:text-lg font-bold hover:scale-105 transition shadow-[0_0_24px_rgba(251,191,36,0.35)] hover:shadow-[0_0_36px_rgba(251,191,36,0.5)]">
+                  Create Your League →
                 </button>
               </Link>
-              <Link href="/create-league">
-                <button className="px-12 py-5 rounded-2xl border-2 border-casino-gold text-casino-gold font-bold hover:bg-casino-gold/10 transition">
-                  Create Your Own League →
+              <Link href="/auth/signup" className="w-full sm:w-auto">
+                <button className="w-full sm:w-auto px-8 py-4 rounded-xl sm:rounded-2xl border border-white/20 text-white/70 text-base font-medium hover:border-white/40 hover:text-white/90 transition">
+                  Join an Existing League
                 </button>
               </Link>
             </div>

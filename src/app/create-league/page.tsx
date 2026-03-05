@@ -22,14 +22,20 @@ export default function CreateLeaguePage() {
         <h1 className="text-4xl sm:text-5xl font-bold font-orbitron mb-4 bg-linear-to-r from-casino-gold via-casino-gold-light to-casino-gold bg-clip-text text-transparent">
           Create Your Own League
         </h1>
-        <p className="text-xl text-casino-gray mb-10">
+        <p className="text-xl text-casino-gray mb-4">
           Run a fantasy golf league for friends, family, or coworkers. You&apos;re the commissioner—we provide the platform.
+        </p>
+        <p className="text-casino-gray/90 mb-10 max-w-2xl">
+          <strong className="text-casino-gold/90">What is a league?</strong> A league is your private group. You choose which PGA tournaments count, invite members, and everyone sets a lineup each week (golfers under a $30 total cap). We show live standings—your score is the real prize money your picked golfers win. The commissioner collects from members (entry fees plus the site admin fee) and pays us the admin fee and pays league winners.
         </p>
 
         <div className="mb-8 p-6 bg-casino-gold/10 border border-casino-gold/30 rounded-xl">
           <p className="text-lg font-semibold text-casino-gold mb-1">Platform pricing</p>
-          <p className="text-casino-text">
+          <p className="text-casino-text mb-2">
             $2 per league member, $20 minimum. A 10-person league is $20; a 15-person league is $30.
+          </p>
+          <p className="text-casino-gray text-sm">
+            The commissioner collects this from members and pays us; they also collect league buy-ins and pay winners outside the app.
           </p>
         </div>
 
@@ -42,15 +48,15 @@ export default function CreateLeaguePage() {
               <ul className="space-y-2">
                 <li className="flex items-start gap-2">
                   <span className="text-casino-gold mt-0.5">✓</span>
-                  <span><strong>Lineup management</strong> — Members draft PGA Tour pros under a $30 salary cap</span>
+                  <span><strong>Lineup management</strong> — Each golfer has a price; members pick a lineup that totals $30 or less</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-casino-gold mt-0.5">✓</span>
-                  <span><strong>Live scoring</strong> — Real-time updates as tournaments play out</span>
+                  <span><strong>Live scoring</strong> — Real-time updates; your score = sum of your golfers&apos; real PGA Tour prize money</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-casino-gold mt-0.5">✓</span>
-                  <span><strong>Weekly & season leaderboards</strong> — Rosters scored by PGA Tour winnings</span>
+                  <span><strong>Weekly & season leaderboards</strong> — Highest prize-money total wins</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-casino-gold mt-0.5">✓</span>
@@ -67,12 +73,11 @@ export default function CreateLeaguePage() {
             <CardContent className="text-casino-text space-y-4">
               <p>
                 <strong>You handle the money.</strong> FORE!SIGHT never takes custody of entry fees or payouts. 
-                You collect from members (e.g., Venmo, cash) and distribute winnings yourself. We&apos;re a 
+                You collect from members (e.g., Venmo, cash)—including the $2-per-member platform fee—and pay us the admin fee; you also distribute league winnings to winners. We&apos;re a 
                 tracking tool—like a scorekeeping app for your league.
               </p>
               <p className="text-casino-gray text-sm">
-                We charge $2 per league member ($20 min) for platform access. We provide software for 
-                private fantasy leagues; you run your league.
+                Platform access is $2 per league member ($20 min). You collect that from members and pay us; we provide the software, you run your league.
               </p>
               <p className="text-casino-gold/90 text-sm font-medium">Example payout spreadsheets</p>
               <div className="rounded-xl overflow-hidden border border-casino-gold/20">
