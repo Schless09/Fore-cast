@@ -9,7 +9,6 @@ type Vote = 'yes' | 'no' | 'same_or_below' | null;
 
 interface SurveyData {
   question: string;
-  optionsNote?: string;
   yesCount: number;
   noCount: number;
   sameOrBelowCount: number;
@@ -32,7 +31,6 @@ export default function LateWdReplacementSurveyPage() {
         if (!cancelled && json.success) {
           setData({
             question: json.question,
-            optionsNote: json.optionsNote,
             yesCount: json.yesCount ?? 0,
             noCount: json.noCount ?? 0,
             sameOrBelowCount: json.sameOrBelowCount ?? 0,
@@ -56,7 +54,6 @@ export default function LateWdReplacementSurveyPage() {
     if (json.success) {
       setData({
         question: json.question,
-        optionsNote: json.optionsNote,
         yesCount: json.yesCount ?? 0,
         noCount: json.noCount ?? 0,
         sameOrBelowCount: json.sameOrBelowCount ?? 0,
@@ -138,13 +135,9 @@ export default function LateWdReplacementSurveyPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <p className="text-casino-text leading-relaxed">
-              {data?.question ?? 'When a golfer withdraws late and a replacement gets their spot, how should we handle rosters that had the withdrawn player? This applies to this tournament and future ones.'}
+              {data?.question ?? 'When a golfer withdraws after lineups are submitted and a replacement takes their spot, how should we handle rosters that originally included the withdrawn player? This rule would apply to this tournament and future events.'}
             </p>
-            {data?.optionsNote && (
-              <p className="text-casino-gray text-sm">
-                {data.optionsNote}
-              </p>
-            )}
+            <p className="text-casino-gray text-sm font-medium">Options:</p>
 
             {!isSignedIn ? (
               <p className="text-amber-400/90 text-sm">
@@ -154,76 +147,91 @@ export default function LateWdReplacementSurveyPage() {
               <div className="space-y-4">
                 <p className="text-casino-gold font-medium">
                   You voted: {data.myVote === 'yes'
-                    ? 'Yes, replace with alternate (Haotong Li)'
+                    ? 'Replace with tournament alternate'
                     : data.myVote === 'same_or_below'
-                      ? 'Yes, replace with Viktor Hovland'
-                      : 'No — leave as-is'}
+                      ? 'Replace with same or immediately lower price'
+                      : 'No replacement'}
                 </p>
                 <p className="text-casino-gray text-sm">
                   Thanks for voting. You can change your vote below.
                 </p>
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={() => submitVote('yes')}
-                    disabled={submitting !== null}
-                    className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition text-left ${
-                      data.myVote === 'yes'
-                        ? 'bg-casino-gold/20 border border-casino-gold/50 text-casino-gold'
-                        : 'bg-white/5 border border-white/20 text-casino-gray hover:border-casino-gold/30'
-                    } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    Yes, replace with alternate (Haotong Li)
-                  </button>
-                  <button
-                    onClick={() => submitVote('same_or_below')}
-                    disabled={submitting !== null}
-                    className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition text-left ${
-                      data.myVote === 'same_or_below'
-                        ? 'bg-casino-gold/20 border border-casino-gold/50 text-casino-gold'
-                        : 'bg-white/5 border border-white/20 text-casino-gray hover:border-casino-gold/30'
-                    } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    Yes, replace with Viktor Hovland
-                  </button>
-                  <button
-                    onClick={() => submitVote('no')}
-                    disabled={submitting !== null}
-                    className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition text-left ${
-                      data.myVote === 'no'
-                        ? 'bg-casino-gold/20 border border-casino-gold/50 text-casino-gold'
-                        : 'bg-white/5 border border-white/20 text-casino-gray hover:border-casino-gold/30'
-                    } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    No — leave as-is
-                  </button>
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <button
+                      onClick={() => submitVote('yes')}
+                      disabled={submitting !== null}
+                      className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition text-left ${
+                        data.myVote === 'yes'
+                          ? 'bg-casino-gold/20 border border-casino-gold/50 text-casino-gold'
+                          : 'bg-white/5 border border-white/20 text-casino-gray hover:border-casino-gold/30'
+                      } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      Replace with tournament alternate
+                    </button>
+                    <p className="text-casino-gray text-xs mt-1 ml-0.5">Automatically replace the withdrawn golfer with the official replacement (e.g. Haotong Li).</p>
+                  </div>
+                  <div>
+                    <button
+                      onClick={() => submitVote('same_or_below')}
+                      disabled={submitting !== null}
+                      className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition text-left ${
+                        data.myVote === 'same_or_below'
+                          ? 'bg-casino-gold/20 border border-casino-gold/50 text-casino-gold'
+                          : 'bg-white/5 border border-white/20 text-casino-gray hover:border-casino-gold/30'
+                      } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      Replace with same or immediately lower price
+                    </button>
+                    <p className="text-casino-gray text-xs mt-1 ml-0.5">Replace with a golfer at the same salary (e.g. Jake Knapp $5.35 → Viktor Hovland $5.35).</p>
+                  </div>
+                  <div>
+                    <button
+                      onClick={() => submitVote('no')}
+                      disabled={submitting !== null}
+                      className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition text-left ${
+                        data.myVote === 'no'
+                          ? 'bg-casino-gold/20 border border-casino-gold/50 text-casino-gold'
+                          : 'bg-white/5 border border-white/20 text-casino-gray hover:border-casino-gold/30'
+                      } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      No replacement
+                    </button>
+                    <p className="text-casino-gray text-xs mt-1 ml-0.5">Leave the withdrawn golfer in the lineup.</p>
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => submitVote('yes')}
-                  disabled={submitting !== null}
-                  className="w-full px-6 py-3 rounded-xl bg-casino-gold/20 border border-casino-gold/40 text-casino-gold font-semibold hover:bg-casino-gold/30 hover:border-casino-gold/60 transition disabled:opacity-50 text-left"
-                >
-                  {submitting === 'yes' ? 'Saving…' : 'Yes, replace with alternate (Haotong Li)'}
-                </button>
-                <button
-                  onClick={() => submitVote('same_or_below')}
-                  disabled={submitting !== null}
-                  className="w-full px-6 py-3 rounded-xl bg-white/5 border border-casino-gold/30 text-casino-text font-medium hover:border-casino-gold/40 hover:bg-casino-gold/10 transition disabled:opacity-50 text-left"
-                >
-                  {submitting === 'same_or_below' ? 'Saving…' : 'Yes, replace with Viktor Hovland'}
-                </button>
-                <button
-                  onClick={() => submitVote('no')}
-                  disabled={submitting !== null}
-                  className="w-full px-6 py-3 rounded-xl bg-white/5 border border-white/20 text-casino-text font-medium hover:border-white/40 hover:bg-white/10 transition disabled:opacity-50 text-left"
-                >
-                  {submitting === 'no' ? 'Saving…' : 'No — leave as-is'}
-                </button>
-                <p className="text-casino-gray text-xs">
-                  Same price or below = replace only with a golfer at the same cost or the next lower cost (e.g. Jake Knapp was $5.35, Viktor Hovland was also $5.35).
-                </p>
+              <div className="flex flex-col gap-4">
+                <div>
+                  <button
+                    onClick={() => submitVote('yes')}
+                    disabled={submitting !== null}
+                    className="w-full px-6 py-3 rounded-xl bg-casino-gold/20 border border-casino-gold/40 text-casino-gold font-semibold hover:bg-casino-gold/30 hover:border-casino-gold/60 transition disabled:opacity-50 text-left"
+                  >
+                    {submitting === 'yes' ? 'Saving…' : 'Replace with tournament alternate'}
+                  </button>
+                  <p className="text-casino-gray text-xs mt-1 ml-0.5">Automatically replace the withdrawn golfer with the official replacement (e.g. Haotong Li).</p>
+                </div>
+                <div>
+                  <button
+                    onClick={() => submitVote('same_or_below')}
+                    disabled={submitting !== null}
+                    className="w-full px-6 py-3 rounded-xl bg-white/5 border border-casino-gold/30 text-casino-text font-medium hover:border-casino-gold/40 hover:bg-casino-gold/10 transition disabled:opacity-50 text-left"
+                  >
+                    {submitting === 'same_or_below' ? 'Saving…' : 'Replace with same or immediately lower price'}
+                  </button>
+                  <p className="text-casino-gray text-xs mt-1 ml-0.5">Replace with a golfer at the same salary (e.g. Jake Knapp $5.35 → Viktor Hovland $5.35).</p>
+                </div>
+                <div>
+                  <button
+                    onClick={() => submitVote('no')}
+                    disabled={submitting !== null}
+                    className="w-full px-6 py-3 rounded-xl bg-white/5 border border-white/20 text-casino-text font-medium hover:border-white/40 hover:bg-white/10 transition disabled:opacity-50 text-left"
+                  >
+                    {submitting === 'no' ? 'Saving…' : 'No replacement'}
+                  </button>
+                  <p className="text-casino-gray text-xs mt-1 ml-0.5">Leave the withdrawn golfer in the lineup.</p>
+                </div>
               </div>
             )}
 
@@ -233,9 +241,9 @@ export default function LateWdReplacementSurveyPage() {
               <div className="pt-4 border-t border-white/10">
                 <p className="text-casino-gray text-sm mb-2">Results so far ({total} vote{total !== 1 ? 's' : ''})</p>
                 <div className="flex flex-wrap gap-4">
-                  <span className="text-casino-gold">Haotong Li: {data?.yesCount ?? 0} ({yesPct}%)</span>
-                  <span className="text-amber-300/90">Viktor Hovland: {data?.sameOrBelowCount ?? 0} ({sameOrBelowPct}%)</span>
-                  <span className="text-casino-gray">No — leave as-is: {data?.noCount ?? 0} ({noPct}%)</span>
+                  <span className="text-casino-gold">Tournament alternate: {data?.yesCount ?? 0} ({yesPct}%)</span>
+                  <span className="text-amber-300/90">Same or lower price: {data?.sameOrBelowCount ?? 0} ({sameOrBelowPct}%)</span>
+                  <span className="text-casino-gray">No replacement: {data?.noCount ?? 0} ({noPct}%)</span>
                 </div>
               </div>
             )}

@@ -55,8 +55,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      question: 'When a golfer withdraws late and a replacement gets their spot (e.g. Jake Knapp WD, Haotong Li replaces him), how should we handle rosters that had the withdrawn player? This applies to this tournament and future ones.',
-      optionsNote: 'Same price or below = replace only with a golfer at the same cost or the next lower cost (e.g. Jake Knapp was $5.35, Viktor Hovland was also $5.35).',
+      question: 'When a golfer withdraws after lineups are locked and a replacement takes their spot (example: Jake Knapp WD → Haotong Li replaces him), how should we handle rosters that originally included the withdrawn player? This rule would apply to this tournament and future events.',
       yesCount,
       noCount,
       sameOrBelowCount,
