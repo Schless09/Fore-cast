@@ -240,7 +240,7 @@ export default function LateWdReplacementSurveyPage() {
             {data?.myVote != null && (
               <div className="pt-4 border-t border-white/10">
                 <p className="text-casino-gray text-sm mb-2">Results so far ({total} vote{total !== 1 ? 's' : ''})</p>
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-col gap-2">
                   <span className="text-casino-gold">Tournament alternate: {data?.yesCount ?? 0} ({yesPct}%)</span>
                   <span className="text-amber-300/90">Same or lower price: {data?.sameOrBelowCount ?? 0} ({sameOrBelowPct}%)</span>
                   <span className="text-casino-gray">No replacement: {data?.noCount ?? 0} ({noPct}%)</span>
