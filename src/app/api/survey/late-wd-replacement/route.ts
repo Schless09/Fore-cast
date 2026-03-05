@@ -40,8 +40,9 @@ export async function GET() {
     const votes = countsRes.data ?? [];
     const yesCount = votes.filter((v) => v.vote === 'yes').length;
     const noCount = votes.filter((v) => v.vote === 'no').length;
+    const sameOrBelowCount = votes.filter((v) => v.vote === 'same_or_below').length;
 
-    let myVote: 'yes' | 'no' | null = null;
+    let myVote: 'yes' | 'no' | 'same_or_below' | null = null;
     if (profileId) {
       const { data: myRow } = await supabase
         .from('survey_votes')
@@ -49,14 +50,16 @@ export async function GET() {
         .eq('survey_slug', SURVEY_SLUG)
         .eq('profile_id', profileId)
         .single();
-      if (myRow) myVote = myRow.vote as 'yes' | 'no';
+      if (myRow) myVote = myRow.vote as 'yes' | 'no' | 'same_or_below';
     }
 
     return NextResponse.json({
       success: true,
-      question: 'Going forward, whenever a golfer withdraws late and a replacement gets their spot (e.g. Jake Knapp WD, Haotong Li replaces him), should we automatically update rosters that had the withdrawn player to use the replacement — for every tournament, not just this one?',
+      question: 'Going forward, whenever a golfer withdraws late and a replacement gets their spot (e.g. Jake Knapp WD, Haotong Li replaces him), how should we handle rosters that had the withdrawn player?',
+      optionsNote: 'Same price or below = replace only with a golfer at the same cost or the next lower cost (e.g. Jake Knapp was $5.35, Viktor Hovland was also $5.35).',
       yesCount,
       noCount,
+      sameOrBelowCount,
       myVote,
     });
   } catch (err) {
@@ -68,7 +71,10 @@ export async function GET() {
   }
 }
 
-/** POST: Submit or update vote. Body: { vote: 'yes' | 'no' }. */
+const VALID_VOTES = ['yes', 'no', 'same_or_below'] as const;
+type VoteValue = (typeof VALID_VOTES)[number];
+
+/** POST: Submit or update vote. Body: { vote: 'yes' | 'no' | 'same_or_below' }. */
 export async function POST(request: NextRequest) {
   try {
     const profileId = await getProfileId();
@@ -80,10 +86,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const vote = body?.vote === 'yes' ? 'yes' : body?.vote === 'no' ? 'no' : null;
+    const vote: VoteValue | null = VALID_VOTES.includes(body?.vote) ? body.vote : null;
     if (!vote) {
       return NextResponse.json(
-        { success: false, error: 'Vote must be "yes" or "no"' },
+        { success: false, error: 'Vote must be "yes", "no", or "same_or_below"' },
         { status: 400 }
       );
     }

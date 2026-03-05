@@ -182,6 +182,36 @@ export function LeagueChat({ leagueId, leagueName }: LeagueChatProps) {
     setEditContent('');
   };
 
+  // Turn URLs and relative paths in text into clickable links. Link color depends on bubble (own = gold bg, other = dark bg).
+  const renderContentWithLinks = (content: string, isOwnMessage: boolean) => {
+    const linkClass = isOwnMessage
+      ? 'underline text-black/90 hover:text-black break-all'
+      : 'underline text-amber-200 hover:text-amber-100 break-all';
+    const urlRegex = /(https?:\/\/[^\s<>"']+|\/(?:survey|tournaments|leagues|auth|create-league|masters|majors)[\w/-]*)/gi;
+    const parts = content.split(urlRegex);
+    return parts.map((part, i) => {
+      const isFullUrl = /^https?:\/\//i.test(part);
+      const isRelativePath = part.startsWith('/') && /^\/[\w/-]+$/.test(part);
+      if (isFullUrl || isRelativePath) {
+        const isSameOrigin =
+          typeof window !== 'undefined' &&
+          (part.startsWith(window.location.origin) || part.startsWith('/'));
+        return (
+          <a
+            key={i}
+            href={part}
+            target={isSameOrigin ? '_self' : '_blank'}
+            rel={isSameOrigin ? undefined : 'noopener noreferrer'}
+            className={linkClass}
+          >
+            {part}
+          </a>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
   // Format time
   const formatTime = (dateStr: string) => {
     try {
@@ -276,7 +306,7 @@ export function LeagueChat({ leagueId, leagueName }: LeagueChatProps) {
                         </div>
                       ) : (
                         <>
-                          <p className="text-sm wrap-break-word whitespace-pre-wrap">{msg.content}</p>
+                          <p className="text-sm wrap-break-word whitespace-pre-wrap">{renderContentWithLinks(msg.content, isOwnMessage)}</p>
                           <p
                             className={`text-xs mt-1 ${
                               isOwnMessage ? 'text-black/60' : 'text-casino-gray'

@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useAuth } from '@clerk/nextjs';
 
-type Vote = 'yes' | 'no' | null;
+type Vote = 'yes' | 'no' | 'same_or_below' | null;
 
 interface SurveyData {
   question: string;
+  optionsNote?: string;
   yesCount: number;
   noCount: number;
+  sameOrBelowCount: number;
   myVote: Vote;
 }
 
@@ -30,8 +32,10 @@ export default function LateWdReplacementSurveyPage() {
         if (!cancelled && json.success) {
           setData({
             question: json.question,
+            optionsNote: json.optionsNote,
             yesCount: json.yesCount ?? 0,
             noCount: json.noCount ?? 0,
+            sameOrBelowCount: json.sameOrBelowCount ?? 0,
             myVote: json.myVote ?? null,
           });
         } else if (!cancelled && !json.success) {
@@ -52,14 +56,16 @@ export default function LateWdReplacementSurveyPage() {
     if (json.success) {
       setData({
         question: json.question,
+        optionsNote: json.optionsNote,
         yesCount: json.yesCount ?? 0,
         noCount: json.noCount ?? 0,
+        sameOrBelowCount: json.sameOrBelowCount ?? 0,
         myVote: json.myVote ?? null,
       });
     }
   };
 
-  const submitVote = async (vote: 'yes' | 'no') => {
+  const submitVote = async (vote: Vote) => {
     if (!isSignedIn) return;
     setSubmitting(vote);
     setError(null);
@@ -101,9 +107,10 @@ export default function LateWdReplacementSurveyPage() {
     );
   }
 
-  const total = (data?.yesCount ?? 0) + (data?.noCount ?? 0);
+  const total = (data?.yesCount ?? 0) + (data?.noCount ?? 0) + (data?.sameOrBelowCount ?? 0);
   const yesPct = total > 0 ? Math.round(((data?.yesCount ?? 0) / total) * 100) : 0;
   const noPct = total > 0 ? Math.round(((data?.noCount ?? 0) / total) * 100) : 0;
+  const sameOrBelowPct = total > 0 ? Math.round(((data?.sameOrBelowCount ?? 0) / total) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-linear-to-b from-[#0a0f1a] via-[#111827] to-[#0a0f1a]">
@@ -131,8 +138,13 @@ export default function LateWdReplacementSurveyPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <p className="text-casino-text leading-relaxed">
-              {data?.question ?? 'Going forward, when a golfer withdraws late and a replacement gets their spot, should we auto-update rosters to use the replacement — for every tournament?'}
+              {data?.question ?? 'Going forward, when a golfer withdraws late and a replacement gets their spot, how should we handle rosters that had the withdrawn player?'}
             </p>
+            {data?.optionsNote && (
+              <p className="text-casino-gray text-sm">
+                {data.optionsNote}
+              </p>
+            )}
 
             {!isSignedIn ? (
               <p className="text-amber-400/90 text-sm">
@@ -141,12 +153,16 @@ export default function LateWdReplacementSurveyPage() {
             ) : data?.myVote != null ? (
               <div className="space-y-4">
                 <p className="text-casino-gold font-medium">
-                  You voted: {data.myVote === 'yes' ? 'Yes — auto-update rosters' : 'No — leave rosters as-is'}
+                  You voted: {data.myVote === 'yes'
+                    ? 'Yes — auto-update with any replacement'
+                    : data.myVote === 'same_or_below'
+                      ? 'Yes — only same price or below'
+                      : 'No — leave rosters as-is'}
                 </p>
                 <p className="text-casino-gray text-sm">
                   Thanks for voting. You can change your vote below.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   <button
                     onClick={() => submitVote('yes')}
                     disabled={submitting !== null}
@@ -156,7 +172,18 @@ export default function LateWdReplacementSurveyPage() {
                         : 'bg-white/5 border border-white/20 text-casino-gray hover:border-casino-gold/30'
                     } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    Yes — auto-update
+                    Yes — any replacement
+                  </button>
+                  <button
+                    onClick={() => submitVote('same_or_below')}
+                    disabled={submitting !== null}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      data.myVote === 'same_or_below'
+                        ? 'bg-casino-gold/20 border border-casino-gold/50 text-casino-gold'
+                        : 'bg-white/5 border border-white/20 text-casino-gray hover:border-casino-gold/30'
+                    } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    Yes — same price or below
                   </button>
                   <button
                     onClick={() => submitVote('no')}
@@ -172,21 +199,33 @@ export default function LateWdReplacementSurveyPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => submitVote('yes')}
-                  disabled={submitting !== null}
-                  className="px-6 py-3 rounded-xl bg-casino-gold/20 border border-casino-gold/40 text-casino-gold font-semibold hover:bg-casino-gold/30 hover:border-casino-gold/60 transition disabled:opacity-50"
-                >
-                  {submitting === 'yes' ? 'Saving…' : 'Yes — auto-update rosters'}
-                </button>
-                <button
-                  onClick={() => submitVote('no')}
-                  disabled={submitting !== null}
-                  className="px-6 py-3 rounded-xl bg-white/5 border border-white/20 text-casino-text font-medium hover:border-white/40 hover:bg-white/10 transition disabled:opacity-50"
-                >
-                  {submitting === 'no' ? 'Saving…' : 'No — leave rosters as-is'}
-                </button>
+              <div className="flex flex-col sm:flex-wrap gap-3">
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => submitVote('yes')}
+                    disabled={submitting !== null}
+                    className="px-6 py-3 rounded-xl bg-casino-gold/20 border border-casino-gold/40 text-casino-gold font-semibold hover:bg-casino-gold/30 hover:border-casino-gold/60 transition disabled:opacity-50"
+                  >
+                    {submitting === 'yes' ? 'Saving…' : 'Yes — auto-update with any replacement'}
+                  </button>
+                  <button
+                    onClick={() => submitVote('same_or_below')}
+                    disabled={submitting !== null}
+                    className="px-6 py-3 rounded-xl bg-white/5 border border-casino-gold/30 text-casino-text font-medium hover:border-casino-gold/40 hover:bg-casino-gold/10 transition disabled:opacity-50"
+                  >
+                    {submitting === 'same_or_below' ? 'Saving…' : 'Yes — same price or below only'}
+                  </button>
+                  <button
+                    onClick={() => submitVote('no')}
+                    disabled={submitting !== null}
+                    className="px-6 py-3 rounded-xl bg-white/5 border border-white/20 text-casino-text font-medium hover:border-white/40 hover:bg-white/10 transition disabled:opacity-50"
+                  >
+                    {submitting === 'no' ? 'Saving…' : 'No — leave rosters as-is'}
+                  </button>
+                </div>
+                <p className="text-casino-gray text-xs">
+                  Same price or below = replace only with a golfer at the same cost or the next lower cost (e.g. Jake Knapp was $5.35, Viktor Hovland was also $5.35).
+                </p>
               </div>
             )}
 
@@ -195,8 +234,9 @@ export default function LateWdReplacementSurveyPage() {
             {data?.myVote != null && (
               <div className="pt-4 border-t border-white/10">
                 <p className="text-casino-gray text-sm mb-2">Results so far ({total} vote{total !== 1 ? 's' : ''})</p>
-                <div className="flex gap-4">
-                  <span className="text-casino-gold">Yes: {data?.yesCount ?? 0} ({yesPct}%)</span>
+                <div className="flex flex-wrap gap-4">
+                  <span className="text-casino-gold">Yes (any): {data?.yesCount ?? 0} ({yesPct}%)</span>
+                  <span className="text-amber-300/90">Yes (same/below): {data?.sameOrBelowCount ?? 0} ({sameOrBelowPct}%)</span>
                   <span className="text-casino-gray">No: {data?.noCount ?? 0} ({noPct}%)</span>
                 </div>
               </div>

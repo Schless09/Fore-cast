@@ -382,7 +382,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     tournament.status === 'active' && !existingRoster && !isTournamentExcluded;
   const showPersonalLeaderboard =
     tournament.status === 'active' && !!existingRoster;
-  const showGolferLeaderboard = tournament.status === 'completed' || (tournament.status === 'active' && !!existingRoster);
+  const showGolferLeaderboard = tournament.status === 'completed' || tournament.status === 'active';
 
   // Load tournament leaderboard (golfers) for completed tournaments
   type PrizeDistributionRow = {
@@ -427,7 +427,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     return parseInt(s, 10) || 0;
   };
 
-  if (tournament.status === 'completed' || (tournament.status === 'active' && existingRoster)) {
+  if (tournament.status === 'completed' || tournament.status === 'active') {
     // Get prize distributions first
     const { data: prizeDistributionsData } = await supabase
       .from('prize_money_distributions')
@@ -744,7 +744,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   const playerNameToIdMap = new Map<string, string>();
   const playerCostMap = new Map<string, number>();
   let picksByPlayer: Record<string, number> = {};
-  if ((tournament.status === 'active' || tournament.status === 'completed') && (existingRoster || tournament.status === 'completed')) {
+  if (tournament.status === 'active' || tournament.status === 'completed') {
     const { data: allPlayers } = await supabase
       .from('tournament_players')
       .select('pga_player_id, cost, pga_players(name)')
@@ -865,6 +865,11 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               {tournament.status === 'active' && existingRoster && (
                 <p className="text-xs text-casino-green mt-1">
                   ⭐ Your players are highlighted
+                </p>
+              )}
+              {playerCostMap.size > 0 && (
+                <p className="text-xs text-casino-gray mt-1">
+                  Player costs ($) shown next to each name
                 </p>
               )}
             </div>
